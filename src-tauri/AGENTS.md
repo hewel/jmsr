@@ -23,7 +23,7 @@ src-tauri/
 | Add command | `src/command.rs` | `#[tauri::command]` + `#[specta]` |
 | Register command | `src/lib.rs` | Add to `collect_commands![]` macro |
 | Change app config | `tauri.conf.json` | Window size, title, CSP, icons |
-| Add Rust dependency | `Cargo.toml` | Run `cargo build` after |
+| Add Rust dependency | `cargo add` | Do not edit `Cargo.toml` directly |
 
 ## Commands
 
