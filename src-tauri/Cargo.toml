@@ -26,3 +26,8 @@ tauri-plugin-log = "2"
 specta = "=2.0.0-rc.22"
 specta-typescript = "0.0.9"
 tauri-specta = { version = "=2.0.0-rc.21", features = ["derive", "typescript"] }
+tokio = { version = "1.48.0", features = ["full"] }
+thiserror = "2.0.17"
+parking_lot = "0.12.5"
+async-channel = "2.5.0"
+which = "8.0.0"

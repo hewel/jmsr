@@ -33,9 +33,11 @@ function Example() {
 }
 
 const App = () => {
-  return <QueryClientProvider client={queryClient}>
-    <Example />
-  </QueryClientProvider>;
+  return (
+    <QueryClientProvider client={queryClient}>
+      <Example />
+    </QueryClientProvider>
+  );
 };
 
 export default App;

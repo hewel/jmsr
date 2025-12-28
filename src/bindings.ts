@@ -7,6 +7,122 @@
 export const commands = {
 async helloWorld(myName: string) : Promise<string> {
     return await TAURI_INVOKE("hello_world", { myName });
+},
+/**
+ * Start the MPV player.
+ */
+async mpvStart() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("mpv_start") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Stop the MPV player.
+ */
+async mpvStop() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("mpv_stop") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Load a media file/URL for playback.
+ */
+async mpvLoadfile(url: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("mpv_loadfile", { url }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Seek to absolute position in seconds.
+ */
+async mpvSeek(time: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("mpv_seek", { time }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Set pause state.
+ */
+async mpvSetPause(paused: boolean) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("mpv_set_pause", { paused }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Set volume (0-100).
+ */
+async mpvSetVolume(volume: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("mpv_set_volume", { volume }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Set audio track by ID.
+ */
+async mpvSetAudioTrack(id: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("mpv_set_audio_track", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Set subtitle track by ID.
+ */
+async mpvSetSubtitleTrack(id: number) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("mpv_set_subtitle_track", { id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Get a property value from MPV.
+ */
+async mpvGetProperty(name: string) : Promise<Result<PropertyValue, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("mpv_get_property", { name }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Get current player state.
+ */
+async mpvGetState() : Promise<Result<PlayerState, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("mpv_get_state") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Check if MPV is connected.
+ */
+async mpvIsConnected() : Promise<boolean> {
+    return await TAURI_INVOKE("mpv_is_connected");
 }
 }
 
@@ -20,7 +136,18 @@ async helloWorld(myName: string) : Promise<string> {
 
 /** user-defined types **/
 
-
+/**
+ * Player state returned to frontend.
+ */
+export type PlayerState = { connected: boolean; paused: boolean; time_pos: number; duration: number; volume: number }
+/**
+ * Typed property values from MPV.
+ */
+export type PropertyValue = boolean | number | string | 
+/**
+ * Arrays serialized as JSON string for specta compatibility.
+ */
+string | null
 
 /** tauri-specta globals **/
 
