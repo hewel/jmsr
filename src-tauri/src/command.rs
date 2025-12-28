@@ -1,3 +1,4 @@
+use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use specta::specta;
 use specta_typescript::Typescript;
@@ -5,6 +6,7 @@ use std::sync::Arc;
 use tauri::State;
 use tauri_specta::{collect_commands, Builder};
 
+use crate::jellyfin::{ConnectionState, Credentials, JellyfinClient, SessionManager};
 use crate::mpv::{MpvClient, PropertyValue};
 
 /// Player state returned to frontend.
@@ -31,6 +33,27 @@ impl Default for PlayerState {
 
 /// MPV client state managed by Tauri.
 pub struct MpvState(pub Arc<MpvClient>);
+
+/// Jellyfin client state managed by Tauri.
+pub struct JellyfinState {
+  pub client: Arc<JellyfinClient>,
+  pub mpv: Arc<MpvClient>,
+  pub session: RwLock<Option<Arc<SessionManager>>>,
+}
+
+impl JellyfinState {
+  pub fn new(client: Arc<JellyfinClient>, mpv: Arc<MpvClient>) -> Self {
+    Self {
+      client,
+      mpv,
+      session: RwLock::new(None),
+    }
+  }
+}
+
+// ============================================================================
+// MPV Commands
+// ============================================================================
 
 #[tauri::command]
 #[specta]
@@ -85,7 +108,11 @@ pub async fn mpv_set_volume(state: State<'_, MpvState>, volume: f64) -> Result<(
 #[tauri::command]
 #[specta]
 pub async fn mpv_set_audio_track(state: State<'_, MpvState>, id: i32) -> Result<(), String> {
-  state.0.set_audio_track(id as i64).await.map_err(|e| e.to_string())
+  state
+    .0
+    .set_audio_track(id as i64)
+    .await
+    .map_err(|e| e.to_string())
 }
 
 /// Set subtitle track by ID.
@@ -153,9 +180,71 @@ pub fn mpv_is_connected(state: State<'_, MpvState>) -> bool {
   state.0.is_connected()
 }
 
+// ============================================================================
+// Jellyfin Commands
+// ============================================================================
+
+/// Connect to a Jellyfin server.
+#[tauri::command]
+#[specta]
+pub async fn jellyfin_connect(
+  state: State<'_, JellyfinState>,
+  credentials: Credentials,
+) -> Result<(), String> {
+  // Authenticate with server
+  state
+    .client
+    .authenticate(&credentials)
+    .await
+    .map_err(|e| e.to_string())?;
+
+  // Create and start session manager
+  let session = Arc::new(SessionManager::new(state.client.clone(), state.mpv.clone()));
+  session.start().await.map_err(|e| e.to_string())?;
+
+  // Store session
+  *state.session.write() = Some(session);
+
+  Ok(())
+}
+
+/// Disconnect from Jellyfin server.
+#[tauri::command]
+#[specta]
+pub async fn jellyfin_disconnect(state: State<'_, JellyfinState>) -> Result<(), String> {
+  // Take session without holding lock across await
+  let session = state.session.write().take();
+
+  // Stop session if active
+  if let Some(session) = session {
+    session.stop().await.map_err(|e| e.to_string())?;
+  }
+
+  // Disconnect client
+  state.client.disconnect();
+
+  Ok(())
+}
+
+/// Get Jellyfin connection state.
+#[tauri::command]
+#[specta]
+pub fn jellyfin_get_state(state: State<'_, JellyfinState>) -> ConnectionState {
+  state.client.connection_state()
+}
+
+/// Check if connected to Jellyfin.
+#[tauri::command]
+#[specta]
+pub fn jellyfin_is_connected(state: State<'_, JellyfinState>) -> bool {
+  state.client.is_connected()
+}
+
 pub fn command_builder() -> Builder {
   let builder = Builder::<tauri::Wry>::new().commands(collect_commands![
+    // General
     hello_world,
+    // MPV commands
     mpv_start,
     mpv_stop,
     mpv_loadfile,
@@ -167,6 +256,11 @@ pub fn command_builder() -> Builder {
     mpv_get_property,
     mpv_get_state,
     mpv_is_connected,
+    // Jellyfin commands
+    jellyfin_connect,
+    jellyfin_disconnect,
+    jellyfin_get_state,
+    jellyfin_is_connected,
   ]);
 
   #[cfg(debug_assertions)] // <- Only export on non-release builds

@@ -123,6 +123,40 @@ async mpvGetState() : Promise<Result<PlayerState, string>> {
  */
 async mpvIsConnected() : Promise<boolean> {
     return await TAURI_INVOKE("mpv_is_connected");
+},
+/**
+ * Connect to a Jellyfin server.
+ */
+async jellyfinConnect(credentials: Credentials) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("jellyfin_connect", { credentials }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Disconnect from Jellyfin server.
+ */
+async jellyfinDisconnect() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("jellyfin_disconnect") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Get Jellyfin connection state.
+ */
+async jellyfinGetState() : Promise<ConnectionState> {
+    return await TAURI_INVOKE("jellyfin_get_state");
+},
+/**
+ * Check if connected to Jellyfin.
+ */
+async jellyfinIsConnected() : Promise<boolean> {
+    return await TAURI_INVOKE("jellyfin_is_connected");
 }
 }
 
@@ -136,6 +170,14 @@ async mpvIsConnected() : Promise<boolean> {
 
 /** user-defined types **/
 
+/**
+ * Connection state exposed to frontend.
+ */
+export type ConnectionState = { connected: boolean; serverUrl: string | null; serverName: string | null; userName: string | null }
+/**
+ * Credentials for authentication.
+ */
+export type Credentials = { serverUrl: string; username: string; password: string }
 /**
  * Player state returned to frontend.
  */

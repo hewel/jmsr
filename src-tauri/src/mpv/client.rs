@@ -156,6 +156,30 @@ impl MpvClient {
     Ok(response.data.map(PropertyValue::from).unwrap_or(PropertyValue::Null))
   }
 
+  /// Get current time position in seconds.
+  pub async fn get_time_pos(&self) -> Result<f64, MpvError> {
+    match self.get_property("time-pos").await? {
+      PropertyValue::Number(n) => Ok(n),
+      _ => Ok(0.0),
+    }
+  }
+
+  /// Get current pause state.
+  pub async fn get_pause(&self) -> Result<bool, MpvError> {
+    match self.get_property("pause").await? {
+      PropertyValue::Bool(b) => Ok(b),
+      _ => Ok(true),
+    }
+  }
+
+  /// Get current volume.
+  pub async fn get_volume(&self) -> Result<f64, MpvError> {
+    match self.get_property("volume").await? {
+      PropertyValue::Number(n) => Ok(n),
+      _ => Ok(100.0),
+    }
+  }
+
   /// Start observing a property.
   pub async fn observe_property(&self, id: i64, name: &str) -> Result<(), MpvError> {
     self.send(MpvCommand::observe_property(id, name)).await?;

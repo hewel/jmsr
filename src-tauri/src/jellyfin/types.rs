@@ -1,0 +1,265 @@
+//! Jellyfin API types.
+//!
+//! These types mirror the Jellyfin API responses and requests.
+
+use serde::{Deserialize, Serialize};
+use specta::Type;
+
+/// Authentication response from Jellyfin.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct AuthResponse {
+  pub user: User,
+  pub access_token: String,
+  pub server_id: String,
+}
+
+/// Jellyfin user information.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct User {
+  pub id: String,
+  pub name: String,
+}
+
+/// Server information.
+#[derive(Debug, Clone, Deserialize, Serialize, Type)]
+#[serde(rename_all = "PascalCase")]
+pub struct ServerInfo {
+  pub server_name: String,
+  pub version: String,
+  pub id: String,
+}
+
+/// Connection state exposed to frontend.
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ConnectionState {
+  pub connected: bool,
+  pub server_url: Option<String>,
+  pub server_name: Option<String>,
+  pub user_name: Option<String>,
+}
+
+/// Credentials for authentication.
+#[derive(Debug, Clone, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct Credentials {
+  pub server_url: String,
+  pub username: String,
+  pub password: String,
+}
+
+/// WebSocket message types from Jellyfin server.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct WsMessage {
+  pub message_type: String,
+  #[serde(default)]
+  pub data: Option<serde_json::Value>,
+}
+
+/// Play command from Jellyfin (via WebSocket).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct PlayRequest {
+  pub item_ids: Vec<String>,
+  pub start_position_ticks: Option<i64>,
+  pub play_command: String,
+  #[serde(default)]
+  pub media_source_id: Option<String>,
+  #[serde(default)]
+  pub audio_stream_index: Option<i32>,
+  #[serde(default)]
+  pub subtitle_stream_index: Option<i32>,
+}
+
+/// Playstate command from Jellyfin.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct PlaystateRequest {
+  pub command: String,
+  #[serde(default)]
+  pub seek_position_ticks: Option<i64>,
+}
+
+/// General command from Jellyfin.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct GeneralCommand {
+  pub name: String,
+  #[serde(default)]
+  pub arguments: Option<serde_json::Value>,
+}
+
+/// Media item (movie, episode, etc.).
+#[derive(Debug, Clone, Deserialize, Serialize, Type)]
+#[serde(rename_all = "PascalCase")]
+pub struct MediaItem {
+  pub id: String,
+  pub name: String,
+  #[serde(rename = "Type")]
+  pub item_type: String,
+  #[serde(default)]
+  pub series_name: Option<String>,
+  #[serde(default)]
+  pub season_name: Option<String>,
+  #[serde(default)]
+  pub index_number: Option<i32>,
+  #[serde(default)]
+  pub parent_index_number: Option<i32>,
+  #[serde(default)]
+  pub run_time_ticks: Option<i64>,
+  #[serde(default)]
+  pub overview: Option<String>,
+}
+
+/// Media source for playback.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct MediaSource {
+  pub id: String,
+  pub path: Option<String>,
+  pub protocol: String,
+  #[serde(default)]
+  pub container: Option<String>,
+  #[serde(default)]
+  pub run_time_ticks: Option<i64>,
+  #[serde(default)]
+  pub media_streams: Vec<MediaStream>,
+  #[serde(default)]
+  pub supports_direct_play: bool,
+  #[serde(default)]
+  pub supports_direct_stream: bool,
+  #[serde(default)]
+  pub supports_transcoding: bool,
+}
+
+/// Individual stream (video, audio, subtitle).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct MediaStream {
+  pub index: i32,
+  #[serde(rename = "Type")]
+  pub stream_type: String,
+  #[serde(default)]
+  pub codec: Option<String>,
+  #[serde(default)]
+  pub language: Option<String>,
+  #[serde(default)]
+  pub display_title: Option<String>,
+  #[serde(default)]
+  pub is_default: bool,
+  #[serde(default)]
+  pub is_external: bool,
+}
+
+/// Playback info request.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct PlaybackInfoRequest {
+  pub user_id: String,
+  pub device_id: String,
+  #[serde(default)]
+  pub max_streaming_bitrate: Option<i64>,
+  #[serde(default)]
+  pub start_time_ticks: Option<i64>,
+  #[serde(default)]
+  pub audio_stream_index: Option<i32>,
+  #[serde(default)]
+  pub subtitle_stream_index: Option<i32>,
+  pub enable_direct_play: bool,
+  pub enable_direct_stream: bool,
+  pub enable_transcoding: bool,
+  pub auto_open_live_stream: bool,
+}
+
+/// Playback info response.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct PlaybackInfoResponse {
+  pub media_sources: Vec<MediaSource>,
+  #[serde(default)]
+  pub play_session_id: Option<String>,
+}
+
+/// Playback start info (sent to Jellyfin when playback starts).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct PlaybackStartInfo {
+  pub item_id: String,
+  #[serde(default)]
+  pub media_source_id: Option<String>,
+  #[serde(default)]
+  pub play_session_id: Option<String>,
+  #[serde(default)]
+  pub position_ticks: Option<i64>,
+  pub is_paused: bool,
+  pub is_muted: bool,
+  pub volume_level: i32,
+  #[serde(default)]
+  pub audio_stream_index: Option<i32>,
+  #[serde(default)]
+  pub subtitle_stream_index: Option<i32>,
+  pub play_method: String,
+}
+
+/// Playback progress info (sent periodically to Jellyfin).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct PlaybackProgressInfo {
+  pub item_id: String,
+  #[serde(default)]
+  pub media_source_id: Option<String>,
+  #[serde(default)]
+  pub play_session_id: Option<String>,
+  #[serde(default)]
+  pub position_ticks: Option<i64>,
+  pub is_paused: bool,
+  pub is_muted: bool,
+  pub volume_level: i32,
+  #[serde(default)]
+  pub audio_stream_index: Option<i32>,
+  #[serde(default)]
+  pub subtitle_stream_index: Option<i32>,
+  pub play_method: String,
+}
+
+/// Playback stop info (sent when playback ends).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct PlaybackStopInfo {
+  pub item_id: String,
+  #[serde(default)]
+  pub media_source_id: Option<String>,
+  #[serde(default)]
+  pub play_session_id: Option<String>,
+  #[serde(default)]
+  pub position_ticks: Option<i64>,
+}
+
+/// Active playback session state.
+#[derive(Debug, Clone)]
+pub struct PlaybackSession {
+  pub item_id: String,
+  pub media_source_id: Option<String>,
+  pub play_session_id: Option<String>,
+  pub position_ticks: i64,
+  pub is_paused: bool,
+  pub volume: i32,
+  pub audio_stream_index: Option<i32>,
+  pub subtitle_stream_index: Option<i32>,
+}
+
+/// Ticks conversion helpers (1 tick = 100 nanoseconds).
+pub const TICKS_PER_SECOND: i64 = 10_000_000;
+
+/// Convert seconds to ticks.
+pub fn seconds_to_ticks(seconds: f64) -> i64 {
+  (seconds * TICKS_PER_SECOND as f64) as i64
+}
+
+/// Convert ticks to seconds.
+pub fn ticks_to_seconds(ticks: i64) -> f64 {
+  ticks as f64 / TICKS_PER_SECOND as f64
+}
