@@ -209,6 +209,18 @@ impl MpvClient {
     Ok(())
   }
 
+  /// Set a string property (e.g., force-media-title).
+  pub async fn set_property_string(&self, name: &str, value: &str) -> Result<(), MpvError> {
+    self.send(MpvCommand::set_property_string(name, value)).await?;
+    Ok(())
+  }
+
+  /// Disable a track (set sid/aid to "no").
+  pub async fn disable_track(&self, property: &str) -> Result<(), MpvError> {
+    self.send(MpvCommand::disable_track(property)).await?;
+    Ok(())
+  }
+
   /// Quit MPV gracefully.
   pub async fn quit(&self) -> Result<(), MpvError> {
     let _ = self.send(MpvCommand::quit()).await;

@@ -83,6 +83,16 @@ impl MpvCommand {
   pub fn cycle(property: &str) -> Self {
     Self::new(vec!["cycle".into(), property.into()])
   }
+
+  /// Set a string property.
+  pub fn set_property_string(name: &str, value: &str) -> Self {
+    Self::new(vec!["set_property".into(), name.into(), value.into()])
+  }
+
+  /// Disable a track (set property to "no").
+  pub fn disable_track(property: &str) -> Self {
+    Self::new(vec!["set_property".into(), property.into(), "no".into()])
+  }
 }
 
 /// Response from MPV for a command.

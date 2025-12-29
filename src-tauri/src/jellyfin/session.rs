@@ -17,7 +17,13 @@ pub type MpvCommandCallback = Box<dyn Fn(MpvAction) + Send + Sync>;
 #[derive(Debug, Clone)]
 pub enum MpvAction {
   /// Load and play a URL.
-  Play { url: String, start_position: f64 },
+  Play {
+    url: String,
+    start_position: f64,
+    title: String,
+    audio_index: Option<i32>,
+    subtitle_index: Option<i32>,
+  },
   /// Pause playback.
   Pause,
   /// Resume playback.
@@ -122,8 +128,11 @@ impl SessionManager {
             MpvAction::Play {
               url,
               start_position,
+              title,
+              audio_index,
+              subtitle_index,
             } => {
-              log::info!("MpvAction::Play received, url={}", url);
+              log::info!("MpvAction::Play received, url={}, title={}", url, title);
               // Start MPV if not already running
               if !mpv.is_connected() {
                 log::info!("MPV not connected, starting...");
@@ -142,6 +151,39 @@ impl SessionManager {
               }
               log::info!("File loaded successfully");
 
+              // Set the media title (shown in MPV window)
+              if let Err(e) = mpv.set_property_string("force-media-title", &title).await {
+                log::warn!("Failed to set media title: {}", e);
+              }
+
+              // Set subtitle track
+              match subtitle_index {
+                Some(-1) => {
+                  // -1 means disable subtitles
+                  if let Err(e) = mpv.disable_track("sid").await {
+                    log::warn!("Failed to disable subtitles: {}", e);
+                  }
+                }
+                Some(idx) => {
+                  // MPV uses 1-based track IDs, but Jellyfin's index may need adjustment
+                  // Jellyfin stream indices are relative to media streams, MPV uses track IDs
+                  if let Err(e) = mpv.set_subtitle_track((idx + 1) as i64).await {
+                    log::warn!("Failed to set subtitle track: {}", e);
+                  }
+                }
+                None => {
+                  // Keep default behavior
+                }
+              }
+
+              // Set audio track
+              if let Some(idx) = audio_index {
+                // MPV uses 1-based track IDs
+                if let Err(e) = mpv.set_audio_track((idx + 1) as i64).await {
+                  log::warn!("Failed to set audio track: {}", e);
+                }
+              }
+
               // Seek to start position if specified
               if start_position > 0.0 {
                 log::info!("Seeking to position: {} seconds", start_position);
@@ -152,16 +194,22 @@ impl SessionManager {
                 }
               }
 
-              log::info!("Started playback: {}", url);
+              log::info!("Started playback: {} - {}", title, url);
             }
             MpvAction::Pause => {
+              log::info!("MpvAction::Pause - setting pause=true");
               if let Err(e) = mpv.set_pause(true).await {
                 log::error!("Failed to pause: {}", e);
+              } else {
+                log::info!("MPV paused successfully");
               }
             }
             MpvAction::Resume => {
+              log::info!("MpvAction::Resume - setting pause=false");
               if let Err(e) = mpv.set_pause(false).await {
                 log::error!("Failed to resume: {}", e);
+              } else {
+                log::info!("MPV resumed successfully");
               }
             }
             MpvAction::Seek(position) => {
@@ -217,13 +265,18 @@ impl SessionManager {
     request: PlayRequest,
   ) -> Result<(), JellyfinError> {
     log::info!("handle_play called with request: {:?}", request);
-    
+
     // Get the first item ID
     let item_id = request
       .item_ids
       .first()
       .ok_or(JellyfinError::SessionNotFound)?;
     log::info!("Playing item_id: {}", item_id);
+
+    // Fetch media item metadata for title
+    let item = client.get_item(item_id).await?;
+    let title = Self::format_title(&item);
+    log::info!("Media title: {}", title);
 
     // Get playback info
     let playback_info = client
@@ -233,14 +286,21 @@ impl SessionManager {
         request.subtitle_stream_index,
       )
       .await?;
-    log::info!("Got playback info, media_sources count: {}", playback_info.media_sources.len());
+    log::info!(
+      "Got playback info, media_sources count: {}",
+      playback_info.media_sources.len()
+    );
 
     // Get the best media source
     let media_source = playback_info
       .media_sources
       .first()
       .ok_or(JellyfinError::SessionNotFound)?;
-    log::info!("Using media_source: id={}, protocol={:?}", media_source.id, media_source.protocol);
+    log::info!(
+      "Using media_source: id={}, protocol={:?}",
+      media_source.id,
+      media_source.protocol
+    );
 
     // Build stream URL
     let url = client
@@ -298,11 +358,27 @@ impl SessionManager {
       .send(MpvAction::Play {
         url,
         start_position,
+        title,
+        audio_index: request.audio_stream_index,
+        subtitle_index: request.subtitle_stream_index,
       })
       .await;
     log::info!("MpvAction::Play sent successfully");
 
     Ok(())
+  }
+
+  /// Format media title for display in MPV.
+  fn format_title(item: &MediaItem) -> String {
+    match item.item_type.as_str() {
+      "Episode" => {
+        let series = item.series_name.as_deref().unwrap_or("Unknown");
+        let season = item.parent_index_number.unwrap_or(1);
+        let episode = item.index_number.unwrap_or(1);
+        format!("{} - S{:02}E{:02} - {}", series, season, episode, item.name)
+      }
+      _ => item.name.clone(),
+    }
   }
 
   /// Handle Playstate command.
@@ -311,8 +387,10 @@ impl SessionManager {
     action_tx: &mpsc::Sender<MpvAction>,
     request: PlaystateRequest,
   ) -> Result<(), JellyfinError> {
+    log::info!("handle_playstate: command={}", request.command);
     match request.command.as_str() {
       "Pause" => {
+        log::info!("Processing Pause command");
         {
           let mut s = state.write();
           if let Some(ref mut playback) = s.playback {
@@ -322,6 +400,7 @@ impl SessionManager {
         let _ = action_tx.send(MpvAction::Pause).await;
       }
       "Unpause" => {
+        log::info!("Processing Unpause command");
         {
           let mut s = state.write();
           if let Some(ref mut playback) = s.playback {
@@ -329,6 +408,34 @@ impl SessionManager {
           }
         }
         let _ = action_tx.send(MpvAction::Resume).await;
+      }
+      "PlayPause" => {
+        // Toggle based on current state
+        let is_paused = {
+          let s = state.read();
+          s.playback.as_ref().map(|p| p.is_paused).unwrap_or(false)
+        };
+        log::info!(
+          "Processing PlayPause command, currently paused={}",
+          is_paused
+        );
+        if is_paused {
+          {
+            let mut s = state.write();
+            if let Some(ref mut playback) = s.playback {
+              playback.is_paused = false;
+            }
+          }
+          let _ = action_tx.send(MpvAction::Resume).await;
+        } else {
+          {
+            let mut s = state.write();
+            if let Some(ref mut playback) = s.playback {
+              playback.is_paused = true;
+            }
+          }
+          let _ = action_tx.send(MpvAction::Pause).await;
+        }
       }
       "Seek" => {
         if let Some(ticks) = request.seek_position_ticks {
@@ -400,26 +507,30 @@ impl SessionManager {
 
         if let Some(session) = session {
           // Get current position from MPV
-          match mpv.get_time_pos().await {
-            Ok(position) => {
-              let position_ticks = seconds_to_ticks(position);
-              log::info!("Reporting progress: position={}s, ticks={}", position, position_ticks);
+          let position_result = mpv.get_time_pos().await;
+          // Get actual pause state from MPV (syncs web UI pause button)
+          let pause_result = mpv.get_pause().await;
 
-              // Update state
+          match (position_result, pause_result) {
+            (Ok(position), Ok(is_paused)) => {
+              let position_ticks = seconds_to_ticks(position);
+
+              // Update state with actual MPV state
               {
                 let mut s = state.write();
                 if let Some(ref mut playback) = s.playback {
                   playback.position_ticks = position_ticks;
+                  playback.is_paused = is_paused;
                 }
               }
 
-              // Report progress
+              // Report progress with actual MPV state
               let progress = PlaybackProgressInfo {
                 item_id: session.item_id.clone(),
                 media_source_id: session.media_source_id.clone(),
                 play_session_id: session.play_session_id.clone(),
                 position_ticks: Some(position_ticks),
-                is_paused: session.is_paused,
+                is_paused,
                 is_muted: false,
                 volume_level: session.volume,
                 audio_stream_index: session.audio_stream_index,
@@ -432,12 +543,13 @@ impl SessionManager {
 
               if let Err(e) = client.report_playback_progress(&progress).await {
                 log::error!("Failed to report playback progress: {}", e);
-              } else {
-                log::info!("Progress reported successfully");
               }
             }
-            Err(e) => {
+            (Err(e), _) => {
               log::warn!("Failed to get time position from MPV: {}", e);
+            }
+            (_, Err(e)) => {
+              log::warn!("Failed to get pause state from MPV: {}", e);
             }
           }
         }
