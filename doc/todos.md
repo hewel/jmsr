@@ -2,11 +2,11 @@
 
 ## High Priority
 
-### Config Persistence to Disk
-- [ ] Add `tauri-plugin-store` or implement file-based config storage
-- [ ] Load config on app startup
-- [ ] Save config when user clicks "Save Settings"
-- [ ] Store in platform-appropriate location (AppData on Windows, ~/.config on Linux)
+### Config Persistence to Disk ✅
+- [x] Add `tauri-plugin-store` for file-based config storage
+- [x] Load config on app startup (in lib.rs setup)
+- [x] Save config when user clicks "Save Settings"
+- [x] Store in platform-appropriate location (handled by tauri-plugin-store)
 
 ### Apply Config Changes Live
 - [ ] When device name changes, re-register Jellyfin session capabilities
