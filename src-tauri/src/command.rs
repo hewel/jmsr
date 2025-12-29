@@ -311,20 +311,44 @@ pub fn config_get(state: State<'_, ConfigState>) -> AppConfig {
   state.0.read().clone()
 }
 
-/// Update the app configuration and persist to disk.
+/// Update the app configuration, apply changes live, and persist to disk.
 #[tauri::command]
 #[specta]
 pub async fn config_set(
   app: tauri::AppHandle,
   state: State<'_, ConfigState>,
+  mpv_state: State<'_, MpvState>,
+  jellyfin_state: State<'_, JellyfinState>,
   config: AppConfig,
 ) -> Result<(), String> {
+  use std::path::PathBuf;
   use tauri_plugin_store::StoreExt;
 
   config.validate()?;
 
   // Update in-memory state
   *state.0.write() = config.clone();
+
+  // Apply MPV config changes (takes effect on next MPV spawn)
+  let mpv_path = config
+    .mpv_path
+    .as_ref()
+    .filter(|s| !s.is_empty())
+    .map(PathBuf::from);
+  mpv_state.0.set_mpv_path(mpv_path);
+  mpv_state.0.set_extra_args(config.mpv_args.clone());
+  log::info!("MPV config updated (applies on next spawn)");
+
+  // Apply Jellyfin device name change if connected
+  if jellyfin_state.client.is_connected() {
+    jellyfin_state.client.set_device_name(config.device_name.clone());
+    // Re-register capabilities with new device name
+    if let Err(e) = jellyfin_state.client.report_capabilities().await {
+      log::warn!("Failed to re-register capabilities: {}", e);
+    } else {
+      log::info!("Jellyfin capabilities re-registered with new device name");
+    }
+  }
 
   // Persist to disk
   let store = app.store(CONFIG_STORE_FILE).map_err(|e| e.to_string())?;

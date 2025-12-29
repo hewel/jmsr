@@ -8,10 +8,10 @@
 - [x] Save config when user clicks "Save Settings"
 - [x] Store in platform-appropriate location (handled by tauri-plugin-store)
 
-### Apply Config Changes Live
-- [ ] When device name changes, re-register Jellyfin session capabilities
-- [ ] When MPV path/args change, update MpvClient state (applies on next spawn)
-- [ ] Consider showing "restart required" notice for certain settings
+### Apply Config Changes Live ✅
+- [x] When device name changes, re-register Jellyfin session capabilities
+- [x] When MPV path/args change, update MpvClient state (applies on next spawn)
+- [x] Config applied at startup from stored values
 
 ### Series-based Track Persistence
 **Goal**: Automatically select audio and subtitle tracks for TV series based on the user's last manual selection for that series. (e.g., If user selects "Japanese" audio for S01E01, S01E02 should automatically start with Japanese audio).

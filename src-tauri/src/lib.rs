@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::sync::Arc;
 
 mod command;
@@ -26,9 +27,11 @@ pub fn run() {
   // Create MPV client state
   let mpv_client = Arc::new(MpvClient::new(None));
   let mpv_state = MpvState(mpv_client.clone());
+  let mpv_for_setup = mpv_client.clone();
 
   // Create Jellyfin client state
   let jellyfin_client = Arc::new(JellyfinClient::new());
+  let jellyfin_for_setup = jellyfin_client.clone();
   let jellyfin_state = JellyfinState::new(jellyfin_client, mpv_client);
 
   tauri::Builder::default()
@@ -51,6 +54,20 @@ pub fn run() {
 
       // Load config from disk (store plugin is now available)
       let loaded_config = command::load_config_from_store(app.handle());
+
+      // Apply loaded config to MPV client
+      let mpv_path = loaded_config
+        .mpv_path
+        .as_ref()
+        .filter(|s| !s.is_empty())
+        .map(PathBuf::from);
+      mpv_for_setup.set_mpv_path(mpv_path);
+      mpv_for_setup.set_extra_args(loaded_config.mpv_args.clone());
+
+      // Apply loaded config to Jellyfin client
+      jellyfin_for_setup.set_device_name(loaded_config.device_name.clone());
+
+      // Store config in state
       *config_for_setup.write() = loaded_config;
 
       // Setup system tray
