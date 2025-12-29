@@ -519,6 +519,59 @@ impl JellyfinClient {
     }
   }
 
+  /// Get the previous episode in a series before the given episode.
+  ///
+  /// Uses the /Shows/{seriesId}/Episodes endpoint to find adjacent episodes.
+  /// Returns None if there's no previous episode or if the item is not an episode.
+  pub async fn get_previous_episode(&self, current_item: &MediaItem) -> Result<Option<MediaItem>, JellyfinError> {
+    // Only works for episodes
+    if current_item.item_type != "Episode" {
+      log::debug!("get_previous_episode: not an episode, skipping");
+      return Ok(None);
+    }
+
+    let series_id = match &current_item.series_id {
+      Some(id) => id,
+      None => {
+        log::debug!("get_previous_episode: no series_id, skipping");
+        return Ok(None);
+      }
+    };
+
+    let user_id = self.user_id()?;
+    
+    // Get all episodes for the series to find the previous one
+    // We need to fetch episodes and find the one before current
+    let path = format!(
+      "/Shows/{}/Episodes?UserId={}&Fields=MediaSources,MediaStreams",
+      series_id, user_id
+    );
+
+    let response: EpisodesResponse = self.get(&path).await?;
+    
+    // Find the current episode index and return the previous one
+    let mut prev_ep: Option<MediaItem> = None;
+    for ep in response.items {
+      if ep.id == current_item.id {
+        // Found current, return the previous one (if any)
+        if let Some(ref prev) = prev_ep {
+          log::info!(
+            "Found previous episode: {} - S{:02}E{:02} - {}",
+            prev.series_name.as_deref().unwrap_or("Unknown"),
+            prev.parent_index_number.unwrap_or(0),
+            prev.index_number.unwrap_or(0),
+            prev.name
+          );
+        }
+        return Ok(prev_ep);
+      }
+      prev_ep = Some(ep);
+    }
+    
+    log::info!("No previous episode available (start of series)");
+    Ok(None)
+  }
+
   /// Validate that our session appears in the Jellyfin session list.
   /// This checks if we're visible as a cast target.
   pub async fn validate_session(&self) -> Result<(), JellyfinError> {

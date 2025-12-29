@@ -361,7 +361,7 @@ impl SessionManager {
         Self::handle_play(client, state, action_tx, request).await?;
       }
       JellyfinCommand::Playstate(request) => {
-        Self::handle_playstate(state, action_tx, mpv, request).await?;
+        Self::handle_playstate(client, state, action_tx, mpv, request).await?;
       }
       JellyfinCommand::GeneralCommand(request) => {
         Self::handle_general_command(state, action_tx, app_handle, request).await?;
@@ -560,6 +560,7 @@ impl SessionManager {
 
   /// Handle Playstate command.
   async fn handle_playstate(
+    client: &JellyfinClient,
     state: &RwLock<SessionState>,
     action_tx: &mpsc::Sender<MpvAction>,
     mpv: &MpvClient,
@@ -638,6 +639,144 @@ impl SessionManager {
           s.playback = None;
         }
         let _ = action_tx.send(MpvAction::Stop).await;
+      }
+      "NextTrack" => {
+        log::info!("Processing NextTrack command");
+        // Get current item for next episode lookup
+        let current_item = {
+          let s = state.read();
+          s.current_item.clone()
+        };
+
+        if let Some(item) = current_item {
+          // Report playback stopped for current item
+          {
+            let session = {
+              let mut s = state.write();
+              s.playback.take()
+            };
+
+            if let Some(session) = session {
+              let stop_info = PlaybackStopInfo {
+                item_id: session.item_id,
+                media_source_id: session.media_source_id,
+                play_session_id: session.play_session_id,
+                position_ticks: Some(session.position_ticks),
+              };
+              if let Err(e) = client.report_playback_stop(&stop_info).await {
+                log::error!("Failed to report playback stop: {}", e);
+              }
+            }
+          }
+
+          // Try to get next episode
+          match client.get_next_episode(&item).await {
+            Ok(Some(next_item)) => {
+              log::info!(
+                "Playing next episode: {} - S{:02}E{:02}",
+                next_item.series_name.as_deref().unwrap_or("Unknown"),
+                next_item.parent_index_number.unwrap_or(0),
+                next_item.index_number.unwrap_or(0)
+              );
+
+              // Create a synthetic PlayRequest for the next episode
+              let play_request = PlayRequest {
+                item_ids: vec![next_item.id.clone()],
+                start_position_ticks: None,
+                play_command: "PlayNow".to_string(),
+                media_source_id: None,
+                audio_stream_index: None,
+                subtitle_stream_index: None,
+              };
+
+              // Handle the play request
+              if let Err(e) = Self::handle_play(client, state, action_tx, play_request).await {
+                log::error!("Failed to play next episode: {}", e);
+              }
+            }
+            Ok(None) => {
+              log::info!("No next episode available");
+              // Clear current item
+              let mut s = state.write();
+              s.current_item = None;
+              s.current_series_id = None;
+            }
+            Err(e) => {
+              log::error!("Failed to get next episode: {}", e);
+            }
+          }
+        } else {
+          log::warn!("NextTrack: No current item to get next episode from");
+        }
+      }
+      "PreviousTrack" => {
+        log::info!("Processing PreviousTrack command");
+        // Get current item for previous episode lookup
+        let current_item = {
+          let s = state.read();
+          s.current_item.clone()
+        };
+
+        if let Some(item) = current_item {
+          // Report playback stopped for current item
+          {
+            let session = {
+              let mut s = state.write();
+              s.playback.take()
+            };
+
+            if let Some(session) = session {
+              let stop_info = PlaybackStopInfo {
+                item_id: session.item_id,
+                media_source_id: session.media_source_id,
+                play_session_id: session.play_session_id,
+                position_ticks: Some(session.position_ticks),
+              };
+              if let Err(e) = client.report_playback_stop(&stop_info).await {
+                log::error!("Failed to report playback stop: {}", e);
+              }
+            }
+          }
+
+          // Try to get previous episode
+          match client.get_previous_episode(&item).await {
+            Ok(Some(prev_item)) => {
+              log::info!(
+                "Playing previous episode: {} - S{:02}E{:02}",
+                prev_item.series_name.as_deref().unwrap_or("Unknown"),
+                prev_item.parent_index_number.unwrap_or(0),
+                prev_item.index_number.unwrap_or(0)
+              );
+
+              // Create a synthetic PlayRequest for the previous episode
+              let play_request = PlayRequest {
+                item_ids: vec![prev_item.id.clone()],
+                start_position_ticks: None,
+                play_command: "PlayNow".to_string(),
+                media_source_id: None,
+                audio_stream_index: None,
+                subtitle_stream_index: None,
+              };
+
+              // Handle the play request
+              if let Err(e) = Self::handle_play(client, state, action_tx, play_request).await {
+                log::error!("Failed to play previous episode: {}", e);
+              }
+            }
+            Ok(None) => {
+              log::info!("No previous episode available");
+              // Clear current item
+              let mut s = state.write();
+              s.current_item = None;
+              s.current_series_id = None;
+            }
+            Err(e) => {
+              log::error!("Failed to get previous episode: {}", e);
+            }
+          }
+        } else {
+          log::warn!("PreviousTrack: No current item to get previous episode from");
+        }
       }
       _ => {
         log::warn!("Unhandled playstate command: {}", request.command);

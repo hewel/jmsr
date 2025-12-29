@@ -54,6 +54,15 @@
 - [x] Root cause: Internal state could get stale if user paused via MPV keyboard (spacebar)
 - [x] Solution: Query `mpv.get_pause()` directly for `PlayPause` toggle commands
 
+### NextTrack Command Support ✅
+- [x] Added handler for `NextTrack` playstate command from Jellyfin web UI
+- [x] Reports playback stop for current item, then fetches and plays next episode
+
+### PreviousTrack Command Support ✅
+- [x] Added `get_previous_episode()` method to `client.rs`
+- [x] Added handler for `PreviousTrack` playstate command from Jellyfin web UI
+- [x] Reports playback stop for current item, then fetches and plays previous episode
+
 ### Error Handling Improvements
 - [ ] Show user-friendly error messages in UI when commands fail
 - [ ] Handle MPV connection loss gracefully (auto-reconnect or notify user)
