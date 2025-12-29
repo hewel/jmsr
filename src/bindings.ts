@@ -188,6 +188,35 @@ async jellyfinClearSession() : Promise<Result<null, string>> {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+/**
+ * Get the current app configuration.
+ */
+async configGet() : Promise<AppConfig> {
+    return await TAURI_INVOKE("config_get");
+},
+/**
+ * Update the app configuration.
+ */
+async configSet(config: AppConfig) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("config_set", { config }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Get the default configuration.
+ */
+async configDefault() : Promise<AppConfig> {
+    return await TAURI_INVOKE("config_default");
+},
+/**
+ * Detect MPV path automatically.
+ */
+async configDetectMpv() : Promise<string | null> {
+    return await TAURI_INVOKE("config_detect_mpv");
 }
 }
 
@@ -201,6 +230,30 @@ async jellyfinClearSession() : Promise<Result<null, string>> {
 
 /** user-defined types **/
 
+/**
+ * Application configuration.
+ */
+export type AppConfig = { 
+/**
+ * Custom MPV executable path (None = auto-detect).
+ */
+mpvPath?: string | null; 
+/**
+ * Additional MPV command-line arguments.
+ */
+mpvArgs?: string[]; 
+/**
+ * Device name shown in Jellyfin cast menu.
+ */
+deviceName?: string; 
+/**
+ * Progress reporting interval in seconds.
+ */
+progressInterval?: number; 
+/**
+ * Start minimized to system tray.
+ */
+startMinimized?: boolean }
 /**
  * Connection state exposed to frontend.
  */

@@ -9,7 +9,7 @@ use super::error::JellyfinError;
 use super::types::*;
 
 /// Device info for Jellyfin client identification.
-const DEVICE_NAME: &str = "JMSR";
+const DEFAULT_DEVICE_NAME: &str = "JMSR";
 const DEVICE_ID_PREFIX: &str = "jmsr-";
 const CLIENT_NAME: &str = "Jellyfin MPV Shim Rust";
 const CLIENT_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -28,6 +28,7 @@ struct ClientState {
   user_name: Option<String>,
   server_name: Option<String>,
   device_id: String,
+  device_name: String,
 }
 
 impl JellyfinClient {
@@ -47,8 +48,19 @@ impl JellyfinClient {
         user_name: None,
         server_name: None,
         device_id,
+        device_name: DEFAULT_DEVICE_NAME.to_string(),
       })),
     }
+  }
+
+  /// Set the device name (shown in Jellyfin cast menu).
+  pub fn set_device_name(&self, name: String) {
+    self.state.write().device_name = name;
+  }
+
+  /// Get the current device name.
+  pub fn device_name(&self) -> String {
+    self.state.read().device_name.clone()
   }
 
   /// Get the device ID.
@@ -58,10 +70,10 @@ impl JellyfinClient {
 
   /// Build authorization header value.
   fn auth_header(&self, token: Option<&str>) -> String {
-    let device_id = self.device_id();
+    let state = self.state.read();
     let mut header = format!(
       r#"MediaBrowser Client="{}", Device="{}", DeviceId="{}", Version="{}""#,
-      CLIENT_NAME, DEVICE_NAME, device_id, CLIENT_VERSION
+      CLIENT_NAME, state.device_name, state.device_id, CLIENT_VERSION
     );
     if let Some(token) = token {
       header.push_str(&format!(r#", Token="{}""#, token));

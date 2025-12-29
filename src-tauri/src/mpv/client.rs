@@ -27,7 +27,8 @@ pub enum MpvError {
 
 /// High-level MPV client.
 pub struct MpvClient {
-  mpv_path: Option<PathBuf>,
+  mpv_path: Arc<Mutex<Option<PathBuf>>>,
+  extra_args: Arc<Mutex<Vec<String>>>,
   process: Arc<Mutex<Option<Child>>>,
   ipc: Arc<Mutex<Option<Arc<MpvIpc>>>>,
 }
@@ -36,10 +37,21 @@ impl MpvClient {
   /// Create a new MPV client.
   pub fn new(mpv_path: Option<PathBuf>) -> Self {
     Self {
-      mpv_path,
+      mpv_path: Arc::new(Mutex::new(mpv_path)),
+      extra_args: Arc::new(Mutex::new(Vec::new())),
       process: Arc::new(Mutex::new(None)),
       ipc: Arc::new(Mutex::new(None)),
     }
+  }
+
+  /// Update MPV path (takes effect on next start).
+  pub fn set_mpv_path(&self, path: Option<PathBuf>) {
+    *self.mpv_path.lock() = path;
+  }
+
+  /// Update extra MPV arguments (takes effect on next start).
+  pub fn set_extra_args(&self, args: Vec<String>) {
+    *self.extra_args.lock() = args;
   }
 
   /// Start MPV and connect to IPC.
@@ -47,8 +59,12 @@ impl MpvClient {
     // Cleanup any existing socket
     cleanup_ipc();
 
+    // Get current config
+    let mpv_path = self.mpv_path.lock().clone();
+    let extra_args = self.extra_args.lock().clone();
+
     // Spawn MPV process
-    let child = spawn_mpv(self.mpv_path.as_ref())?;
+    let child = spawn_mpv(mpv_path.as_ref(), &extra_args)?;
     {
       let mut process = self.process.lock();
       *process = Some(child);
@@ -246,6 +262,7 @@ impl Clone for MpvClient {
   fn clone(&self) -> Self {
     Self {
       mpv_path: self.mpv_path.clone(),
+      extra_args: self.extra_args.clone(),
       process: self.process.clone(),
       ipc: self.ipc.clone(),
     }

@@ -70,7 +70,7 @@ export default function LogPanel() {
   };
   const getLevelName = (level: number) => {
     return LogLevel[level]?.name ?? 'UNKNOWN';
-  }
+  };
 
   return (
     <div class="bg-surface-light rounded-xl border border-surface-lighter overflow-hidden">
@@ -156,9 +156,7 @@ export default function LogPanel() {
               <For each={logs()}>
                 {(log) => (
                   <div class="flex gap-2 hover:bg-white/5 px-1 rounded">
-                    <span
-                      class={`shrink-0 w-12 ${getLevelColor(log.level)}`}
-                    >
+                    <span class={`shrink-0 w-12 ${getLevelColor(log.level)}`}>
                       {getLevelName(log.level)}
                     </span>
                     <span class="text-gray-300 break-all">{log.message}</span>

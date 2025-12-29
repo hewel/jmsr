@@ -1,19 +1,26 @@
 use std::sync::Arc;
 
 mod command;
+mod config;
 mod jellyfin;
 mod mpv;
 mod tray;
 
-use command::{JellyfinState, MpvState};
+pub use config::AppConfig;
+use command::{ConfigState, JellyfinState, MpvState};
 use jellyfin::JellyfinClient;
 use mpv::MpvClient;
+use parking_lot::RwLock;
 use tauri::WindowEvent;
 use tauri_plugin_log::{Target, TargetKind};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   let builder = command::command_builder();
+
+  // Create config state with defaults
+  let config = Arc::new(RwLock::new(AppConfig::default()));
+  let config_state = ConfigState(config.clone());
 
   // Create MPV client state
   let mpv_client = Arc::new(MpvClient::new(None));
@@ -24,6 +31,7 @@ pub fn run() {
   let jellyfin_state = JellyfinState::new(jellyfin_client, mpv_client);
 
   tauri::Builder::default()
+    .manage(config_state)
     .manage(mpv_state)
     .manage(jellyfin_state)
     .invoke_handler(builder.invoke_handler())

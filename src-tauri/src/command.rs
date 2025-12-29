@@ -6,6 +6,7 @@ use std::sync::Arc;
 use tauri::State;
 use tauri_specta::{collect_commands, Builder};
 
+use crate::config::AppConfig;
 use crate::jellyfin::{ConnectionState, Credentials, JellyfinClient, SavedSession, SessionManager};
 use crate::mpv::{MpvClient, PropertyValue};
 
@@ -293,6 +294,43 @@ pub async fn jellyfin_clear_session(state: State<'_, JellyfinState>) -> Result<(
   Ok(())
 }
 
+// ============================================================================
+// Config Commands
+// ============================================================================
+
+/// Config state managed by Tauri.
+pub struct ConfigState(pub Arc<RwLock<AppConfig>>);
+
+/// Get the current app configuration.
+#[tauri::command]
+#[specta]
+pub fn config_get(state: State<'_, ConfigState>) -> AppConfig {
+  state.0.read().clone()
+}
+
+/// Update the app configuration.
+#[tauri::command]
+#[specta]
+pub fn config_set(state: State<'_, ConfigState>, config: AppConfig) -> Result<(), String> {
+  config.validate()?;
+  *state.0.write() = config;
+  Ok(())
+}
+
+/// Get the default configuration.
+#[tauri::command]
+#[specta]
+pub fn config_default() -> AppConfig {
+  AppConfig::default()
+}
+
+/// Detect MPV path automatically.
+#[tauri::command]
+#[specta]
+pub fn config_detect_mpv() -> Option<String> {
+  crate::mpv::find_mpv().map(|p| p.to_string_lossy().to_string())
+}
+
 pub fn command_builder() -> Builder {
   let builder = Builder::<tauri::Wry>::new().commands(collect_commands![
     // General
@@ -317,6 +355,11 @@ pub fn command_builder() -> Builder {
     jellyfin_get_session,
     jellyfin_restore_session,
     jellyfin_clear_session,
+    // Config commands
+    config_get,
+    config_set,
+    config_default,
+    config_detect_mpv,
   ]);
 
   #[cfg(debug_assertions)] // <- Only export on non-release builds

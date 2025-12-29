@@ -77,7 +77,7 @@ pub fn find_mpv() -> Option<PathBuf> {
 }
 
 /// Spawn MPV process with IPC server enabled.
-pub fn spawn_mpv(mpv_path: Option<&PathBuf>) -> Result<Child, ProcessError> {
+pub fn spawn_mpv(mpv_path: Option<&PathBuf>, extra_args: &[String]) -> Result<Child, ProcessError> {
   let mpv_exe = mpv_path
     .cloned()
     .or_else(find_mpv)
@@ -86,13 +86,24 @@ pub fn spawn_mpv(mpv_path: Option<&PathBuf>) -> Result<Child, ProcessError> {
   let ipc = ipc_path();
 
   log::info!("Spawning MPV: {:?} with IPC: {}", mpv_exe, ipc);
+  if !extra_args.is_empty() {
+    log::info!("Extra MPV args: {:?}", extra_args);
+  }
 
-  let child = Command::new(&mpv_exe)
+  let mut cmd = Command::new(&mpv_exe);
+  cmd
     .arg(format!("--input-ipc-server={}", ipc))
     .arg("--idle")
     .arg("--force-window")
     .arg("--keep-open")
-    .arg("--no-terminal")
+    .arg("--no-terminal");
+
+  // Add user-specified extra arguments
+  for arg in extra_args {
+    cmd.arg(arg);
+  }
+
+  let child = cmd
     .stdin(Stdio::null())
     .stdout(Stdio::null())
     .stderr(Stdio::null())

@@ -1,5 +1,5 @@
 import { createResource, createSignal, Show } from 'solid-js';
-import { type ConnectionState, commands } from '../bindings';
+import { type AppConfig, type ConnectionState, commands } from '../bindings';
 import { clearSavedSession } from '../router';
 import LogPanel from './LogPanel';
 
@@ -18,17 +18,42 @@ async function fetchMpvStatus(): Promise<boolean> {
 export default function SettingsPage(props: SettingsPageProps) {
   const [disconnecting, setDisconnecting] = createSignal(false);
   const [clearingSession, setClearingSession] = createSignal(false);
+  const [saving, setSaving] = createSignal(false);
+  const [detectingMpv, setDetectingMpv] = createSignal(false);
+  const [saveMessage, setSaveMessage] = createSignal<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
+
+  // Form State
+  const [deviceName, setDeviceName] = createSignal('JMSR');
+  const [mpvPath, setMpvPath] = createSignal('');
+  const [mpvArgs, setMpvArgs] = createSignal('');
+
   const [connectionState, { refetch: refetchConnection }] =
     createResource(fetchConnectionState);
   const [mpvConnected, { refetch: refetchMpv }] =
     createResource(fetchMpvStatus);
+
+  // Load initial configuration
+  const [config] = createResource(async () => {
+    try {
+      const cfg = await commands.configGet();
+      setDeviceName(cfg.deviceName ?? 'JMSR');
+      setMpvPath(cfg.mpvPath ?? '');
+      setMpvArgs((cfg.mpvArgs ?? []).join('\n'));
+      return cfg;
+    } catch (e) {
+      console.error('Failed to load config:', e);
+      return null;
+    }
+  });
 
   const handleDisconnect = async () => {
     setDisconnecting(true);
     try {
       const result = await commands.jellyfinDisconnect();
       if (result.status === 'ok') {
-        // Clear saved session so user won't auto-reconnect
         clearSavedSession();
         props.onDisconnected();
       }
@@ -40,11 +65,8 @@ export default function SettingsPage(props: SettingsPageProps) {
   const handleClearSession = async () => {
     setClearingSession(true);
     try {
-      // Call backend to clear session state
       await commands.jellyfinClearSession();
-      // Clear localStorage
       clearSavedSession();
-      // Return to login
       props.onDisconnected();
     } finally {
       setClearingSession(false);
@@ -54,6 +76,56 @@ export default function SettingsPage(props: SettingsPageProps) {
   const handleRefresh = () => {
     refetchConnection();
     refetchMpv();
+  };
+
+  const handleDetectMpv = async () => {
+    setDetectingMpv(true);
+    try {
+      const path = await commands.configDetectMpv();
+      if (path) {
+        setMpvPath(path);
+      }
+    } catch (e) {
+      console.error('Failed to detect MPV:', e);
+    } finally {
+      setDetectingMpv(false);
+    }
+  };
+
+  const handleSaveSettings = async () => {
+    setSaving(true);
+    setSaveMessage(null);
+    try {
+      const currentConfig = config();
+      const argsList = mpvArgs()
+        .split('\n')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+
+      const newConfig: AppConfig = {
+        deviceName: deviceName(),
+        mpvPath: mpvPath() || null,
+        mpvArgs: argsList,
+        // Preserve other settings or use defaults
+        progressInterval: currentConfig?.progressInterval || 5,
+        startMinimized: currentConfig?.startMinimized || false,
+      };
+
+      const result = await commands.configSet(newConfig);
+      if (result.status === 'ok') {
+        setSaveMessage({
+          type: 'success',
+          text: 'Settings saved successfully',
+        });
+        setTimeout(() => setSaveMessage(null), 3000);
+      } else {
+        setSaveMessage({ type: 'error', text: result.error });
+      }
+    } catch (e) {
+      setSaveMessage({ type: 'error', text: String(e) });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const state = () => connectionState();
@@ -93,7 +165,7 @@ export default function SettingsPage(props: SettingsPageProps) {
           </button>
         </div>
 
-        {/* Connection Status Card */}
+        {/* Jellyfin Connection Card */}
         <div class="bg-surface-light rounded-xl p-6 border border-surface-lighter mb-6">
           <h2 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
             <svg
@@ -112,7 +184,6 @@ export default function SettingsPage(props: SettingsPageProps) {
             fallback={<p class="text-gray-400">Loading...</p>}
           >
             <div class="space-y-3">
-              {/* Status */}
               <div class="flex items-center justify-between">
                 <span class="text-gray-400">Status</span>
                 <span
@@ -122,7 +193,6 @@ export default function SettingsPage(props: SettingsPageProps) {
                 </span>
               </div>
 
-              {/* Server */}
               <Show when={state()?.serverName}>
                 <div class="flex items-center justify-between">
                   <span class="text-gray-400">Server</span>
@@ -130,7 +200,6 @@ export default function SettingsPage(props: SettingsPageProps) {
                 </div>
               </Show>
 
-              {/* Server URL */}
               <Show when={state()?.serverUrl}>
                 <div class="flex items-center justify-between">
                   <span class="text-gray-400">URL</span>
@@ -140,7 +209,6 @@ export default function SettingsPage(props: SettingsPageProps) {
                 </div>
               </Show>
 
-              {/* Username */}
               <Show when={state()?.userName}>
                 <div class="flex items-center justify-between">
                   <span class="text-gray-400">User</span>
@@ -151,7 +219,30 @@ export default function SettingsPage(props: SettingsPageProps) {
           </Show>
         </div>
 
-        {/* MPV Status Card */}
+        {/* Device Settings Card (NEW) */}
+        <div class="bg-surface-light rounded-xl p-6 border border-surface-lighter mb-6">
+          <h2 class="text-lg font-semibold text-white mb-4">Device Settings</h2>
+          <div class="space-y-4">
+            <div>
+              <label for="device-name" class="block text-gray-400 text-sm mb-2">
+                Device Name
+              </label>
+              <input
+                id="device-name"
+                type="text"
+                value={deviceName()}
+                onInput={(e) => setDeviceName(e.currentTarget.value)}
+                class="w-full bg-surface-lighter border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-jellyfin transition-colors"
+                placeholder="JMSR"
+              />
+              <p class="text-gray-500 text-xs mt-1">
+                Name displayed in Jellyfin cast menu
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* MPV Player Card (Expanded) */}
         <div class="bg-surface-light rounded-xl p-6 border border-surface-lighter mb-6">
           <h2 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
             <svg
@@ -169,7 +260,7 @@ export default function SettingsPage(props: SettingsPageProps) {
             when={!mpvConnected.loading}
             fallback={<p class="text-gray-400">Loading...</p>}
           >
-            <div class="flex items-center justify-between">
+            <div class="flex items-center justify-between mb-6">
               <span class="text-gray-400">Status</span>
               <span
                 class={mpvConnected() ? 'text-green-400' : 'text-yellow-400'}
@@ -178,9 +269,72 @@ export default function SettingsPage(props: SettingsPageProps) {
               </span>
             </div>
           </Show>
+
+          <div class="space-y-4 pt-6 border-t border-gray-700/50">
+            <div>
+              <label for="mpv-path" class="block text-gray-400 text-sm mb-2">
+                MPV Executable Path
+              </label>
+              <div class="flex gap-2">
+                <input
+                  id="mpv-path"
+                  type="text"
+                  value={mpvPath()}
+                  onInput={(e) => setMpvPath(e.currentTarget.value)}
+                  placeholder="Path to mpv.exe or mpv binary"
+                  class="flex-1 bg-surface-lighter border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-jellyfin transition-colors"
+                />
+                <button
+                  type="button"
+                  onClick={handleDetectMpv}
+                  disabled={detectingMpv()}
+                  class="px-4 py-2 bg-surface-lighter hover:bg-gray-700 text-gray-300 rounded-lg border border-gray-700 transition-colors disabled:opacity-50"
+                >
+                  {detectingMpv() ? '...' : 'Auto-detect'}
+                </button>
+              </div>
+            </div>
+            <div>
+              <label for="mpv-args" class="block text-gray-400 text-sm mb-2">
+                Extra Arguments (one per line)
+              </label>
+              <textarea
+                id="mpv-args"
+                value={mpvArgs()}
+                onInput={(e) => setMpvArgs(e.currentTarget.value)}
+                rows={4}
+                placeholder="--fullscreen&#10;--force-window"
+                class="w-full bg-surface-lighter border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-jellyfin transition-colors font-mono text-sm"
+              />
+            </div>
+          </div>
         </div>
 
-        {/* Actions */}
+        {/* Save Settings Button (NEW) */}
+        <div class="mb-6">
+          <button
+            type="button"
+            onClick={handleSaveSettings}
+            disabled={saving()}
+            class="w-full py-3 px-6 bg-jellyfin hover:bg-jellyfin-dark text-white font-bold rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:-translate-y-0.5 active:translate-y-0"
+          >
+            {saving() ? 'Saving...' : 'Save Settings'}
+          </button>
+
+          <Show when={saveMessage()}>
+            <div
+              class={`mt-3 p-3 rounded-lg text-sm text-center ${
+                saveMessage()?.type === 'success'
+                  ? 'bg-green-900/30 text-green-400 border border-green-900/50'
+                  : 'bg-red-900/30 text-red-400 border border-red-900/50'
+              }`}
+            >
+              {saveMessage()?.text}
+            </div>
+          </Show>
+        </div>
+
+        {/* Actions Card */}
         <div class="bg-surface-light rounded-xl p-6 border border-surface-lighter mb-6">
           <h2 class="text-lg font-semibold text-white mb-4">Actions</h2>
 
