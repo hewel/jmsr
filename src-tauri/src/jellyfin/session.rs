@@ -68,6 +68,9 @@ impl SessionManager {
 
   /// Start the session (connect WebSocket and begin listening).
   pub async fn start(&self) -> Result<(), JellyfinError> {
+    // Report capabilities so we appear as a cast target
+    self.client.report_capabilities().await?;
+
     let ws_url = self.client.websocket_url()?;
     self.websocket.connect(&ws_url).await?;
 
@@ -86,10 +89,83 @@ impl SessionManager {
       });
     }
 
+    // Start MPV action consumer
+    self.start_action_consumer();
+
     // Start progress reporting loop
     self.start_progress_reporting();
 
     Ok(())
+  }
+
+  /// Start the MPV action consumer task.
+  fn start_action_consumer(&self) {
+    if let Some(mut action_rx) = self.action_rx.write().take() {
+      let mpv = self.mpv.clone();
+
+      tokio::spawn(async move {
+        while let Some(action) = action_rx.recv().await {
+          log::debug!("Processing MPV action: {:?}", action);
+
+          match action {
+            MpvAction::Play { url, start_position } => {
+              // Start MPV if not already running
+              if !mpv.is_connected() {
+                if let Err(e) = mpv.start().await {
+                  log::error!("Failed to start MPV: {}", e);
+                  continue;
+                }
+              }
+
+              // Load the file
+              if let Err(e) = mpv.loadfile(&url).await {
+                log::error!("Failed to load file: {}", e);
+                continue;
+              }
+
+              // Seek to start position if specified
+              if start_position > 0.0 {
+                // Wait a bit for file to load before seeking
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                if let Err(e) = mpv.seek(start_position).await {
+                  log::warn!("Failed to seek to start position: {}", e);
+                }
+              }
+
+              log::info!("Started playback: {}", url);
+            }
+            MpvAction::Pause => {
+              if let Err(e) = mpv.set_pause(true).await {
+                log::error!("Failed to pause: {}", e);
+              }
+            }
+            MpvAction::Resume => {
+              if let Err(e) = mpv.set_pause(false).await {
+                log::error!("Failed to resume: {}", e);
+              }
+            }
+            MpvAction::Seek(position) => {
+              if let Err(e) = mpv.seek(position).await {
+                log::error!("Failed to seek: {}", e);
+              }
+            }
+            MpvAction::Stop => {
+              mpv.stop();
+            }
+            MpvAction::SetVolume(volume) => {
+              if let Err(e) = mpv.set_volume(volume as f64).await {
+                log::error!("Failed to set volume: {}", e);
+              }
+            }
+            MpvAction::ToggleMute => {
+              if let Err(e) = mpv.toggle_mute().await {
+                log::error!("Failed to toggle mute: {}", e);
+              }
+            }
+          }
+        }
+      });
+    }
   }
 
   /// Handle a Jellyfin command.

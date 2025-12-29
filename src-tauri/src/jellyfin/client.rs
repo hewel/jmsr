@@ -401,6 +401,39 @@ impl JellyfinClient {
   pub async fn report_playback_stop(&self, info: &PlaybackStopInfo) -> Result<(), JellyfinError> {
     self.post_empty("/Sessions/Playing/Stopped", info).await
   }
+
+  /// Report session capabilities to Jellyfin.
+  ///
+  /// This makes the client appear as a controllable cast target.
+  pub async fn report_capabilities(&self) -> Result<(), JellyfinError> {
+    let capabilities = serde_json::json!({
+      "PlayableMediaTypes": ["Video", "Audio"],
+      "SupportsMediaControl": true,
+      "SupportedCommands": [
+        "Play",
+        "Pause",
+        "Unpause",
+        "PlayState",
+        "Stop",
+        "Seek",
+        "SetVolume",
+        "VolumeUp",
+        "VolumeDown",
+        "Mute",
+        "Unmute",
+        "ToggleMute",
+        "SetAudioStreamIndex",
+        "SetSubtitleStreamIndex",
+        "PlayNext",
+        "PlayMediaSource"
+      ],
+      "SupportsPersistentIdentifier": true,
+      "SupportsSync": false
+    });
+
+    log::info!("Reporting capabilities to Jellyfin");
+    self.post_empty("/Sessions/Capabilities/Full", &capabilities).await
+  }
 }
 
 impl Default for JellyfinClient {

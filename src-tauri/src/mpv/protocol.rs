@@ -86,6 +86,11 @@ impl MpvCommand {
   pub fn quit() -> Self {
     Self::new(vec!["quit".into()])
   }
+
+  /// Cycle (toggle) a property.
+  pub fn cycle(property: &str) -> Self {
+    Self::new(vec!["cycle".into(), property.into()])
+  }
 }
 
 /// Response from MPV for a command.

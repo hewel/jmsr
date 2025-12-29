@@ -192,6 +192,12 @@ impl MpvClient {
     Ok(())
   }
 
+  /// Toggle mute state.
+  pub async fn toggle_mute(&self) -> Result<(), MpvError> {
+    self.send(MpvCommand::cycle("mute")).await?;
+    Ok(())
+  }
+
   /// Quit MPV gracefully.
   pub async fn quit(&self) -> Result<(), MpvError> {
     let _ = self.send(MpvCommand::quit()).await;
