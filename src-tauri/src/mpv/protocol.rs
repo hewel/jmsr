@@ -116,7 +116,7 @@ impl MpvResponse {
 /// Event sent by MPV (property changes, playback events, etc.).
 #[derive(Debug, Clone, Deserialize)]
 pub struct MpvEvent {
-  /// Event type (e.g., "property-change", "end-file").
+  /// Event type (e.g., "property-change", "end-file", "client-message").
   pub event: String,
   /// Observer ID for property-change events.
   pub id: Option<i64>,
@@ -126,6 +126,8 @@ pub struct MpvEvent {
   pub data: Option<serde_json::Value>,
   /// Reason for end-file events (e.g., "eof", "stop", "quit", "error").
   pub reason: Option<String>,
+  /// Arguments for client-message events (from script-message command).
+  pub args: Option<Vec<String>>,
 }
 
 /// Typed property values from MPV.

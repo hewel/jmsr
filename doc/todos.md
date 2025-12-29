@@ -63,6 +63,17 @@
 - [x] Added handler for `PreviousTrack` playstate command from Jellyfin web UI
 - [x] Reports playback stop for current item, then fetches and plays previous episode
 
+### MPV Keyboard Shortcuts for Next/Previous Episode ✅
+- [x] Added `args` field to `MpvEvent` to parse `client-message` events
+- [x] Added `handle_client_message_event()` to process MPV script messages
+- [x] Supports `jmsr-next` and `jmsr-prev` commands via MPV keybindings
+- [x] Refactored event listener with helper methods for cleaner code
+- [x] User setup: Add to `~/.config/mpv/input.conf`:
+  ```
+  Shift+n script-message jmsr-next
+  Shift+p script-message jmsr-prev
+  ```
+
 ### Error Handling Improvements
 - [ ] Show user-friendly error messages in UI when commands fail
 - [ ] Handle MPV connection loss gracefully (auto-reconnect or notify user)

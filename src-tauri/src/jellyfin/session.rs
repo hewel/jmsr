@@ -1013,7 +1013,7 @@ impl SessionManager {
     });
   }
 
-  /// Start MPV event listener for end-of-file detection and auto-play next episode.
+  /// Start MPV event listener for end-of-file detection, auto-play, and keyboard shortcuts.
   fn start_mpv_event_listener(&self) {
     let mpv = self.mpv.clone();
     let client = self.client.clone();
@@ -1041,81 +1041,15 @@ impl SessionManager {
 
         // Process events
         while let Ok(event) = event_rx.recv().await {
-          if event.event == "end-file" {
-            // Check if playback ended naturally (not due to error or stop command)
-            // The reason field is at the top level of the event (not in data)
-            let reason = event.reason.as_deref().unwrap_or("");
-
-            log::info!("MPV end-file event, reason: {}", reason);
-
-            // "eof" means natural end of file, "stop" means user stopped
-            if reason == "eof" {
-              // Get current item for next episode lookup
-              let current_item = {
-                let s = state.read();
-                s.current_item.clone()
-              };
-
-              if let Some(item) = current_item {
-                log::info!("Playback ended naturally, checking for next episode...");
-
-                // Report playback stopped to Jellyfin
-                {
-                  let session = {
-                    let mut s = state.write();
-                    s.playback.take()
-                  };
-
-                  if let Some(session) = session {
-                    let stop_info = PlaybackStopInfo {
-                      item_id: session.item_id,
-                      media_source_id: session.media_source_id,
-                      play_session_id: session.play_session_id,
-                      position_ticks: Some(session.position_ticks),
-                    };
-                    if let Err(e) = client.report_playback_stop(&stop_info).await {
-                      log::error!("Failed to report playback stop: {}", e);
-                    }
-                  }
-                }
-
-                // Try to get next episode
-                match client.get_next_episode(&item).await {
-                  Ok(Some(next_item)) => {
-                    log::info!(
-                      "Auto-playing next episode: {} - S{:02}E{:02}",
-                      next_item.series_name.as_deref().unwrap_or("Unknown"),
-                      next_item.parent_index_number.unwrap_or(0),
-                      next_item.index_number.unwrap_or(0)
-                    );
-
-                    // Create a synthetic PlayRequest for the next episode
-                    let play_request = PlayRequest {
-                      item_ids: vec![next_item.id.clone()],
-                      start_position_ticks: None,
-                      play_command: "PlayNow".to_string(),
-                      media_source_id: None,
-                      audio_stream_index: None,
-                      subtitle_stream_index: None,
-                    };
-
-                    // Handle the play request
-                    if let Err(e) = Self::handle_play(&client, &state, &action_tx, play_request).await {
-                      log::error!("Failed to auto-play next episode: {}", e);
-                    }
-                  }
-                  Ok(None) => {
-                    log::info!("No next episode available, playback complete");
-                    // Clear current item
-                    let mut s = state.write();
-                    s.current_item = None;
-                    s.current_series_id = None;
-                  }
-                  Err(e) => {
-                    log::error!("Failed to get next episode: {}", e);
-                  }
-                }
-              }
+          match event.event.as_str() {
+            "end-file" => {
+              Self::handle_end_file_event(&event, &client, &state, &action_tx).await;
+            }
+            "client-message" => {
+              Self::handle_client_message_event(&event, &client, &state, &action_tx).await;
+            }
+            _ => {
+              // Ignore other events
             }
           }
         }
@@ -1124,6 +1058,163 @@ impl SessionManager {
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
       }
     });
+  }
+
+  /// Handle MPV end-file event for auto-play next episode.
+  async fn handle_end_file_event(
+    event: &crate::mpv::MpvEvent,
+    client: &JellyfinClient,
+    state: &RwLock<SessionState>,
+    action_tx: &mpsc::Sender<MpvAction>,
+  ) {
+    let reason = event.reason.as_deref().unwrap_or("");
+    log::info!("MPV end-file event, reason: {}", reason);
+
+    // "eof" means natural end of file, "stop" means user stopped
+    if reason != "eof" {
+      return;
+    }
+
+    // Get current item for next episode lookup
+    let current_item = {
+      let s = state.read();
+      s.current_item.clone()
+    };
+
+    let Some(item) = current_item else {
+      return;
+    };
+
+    log::info!("Playback ended naturally, checking for next episode...");
+
+    // Report playback stopped to Jellyfin
+    Self::report_playback_stopped(client, state).await;
+
+    // Try to get next episode
+    Self::play_adjacent_episode(client, state, action_tx, &item, true).await;
+  }
+
+  /// Handle MPV client-message event for keyboard shortcuts.
+  /// 
+  /// Users can add to their input.conf:
+  ///   Shift+n script-message jmsr-next
+  ///   Shift+p script-message jmsr-prev
+  async fn handle_client_message_event(
+    event: &crate::mpv::MpvEvent,
+    client: &JellyfinClient,
+    state: &RwLock<SessionState>,
+    action_tx: &mpsc::Sender<MpvAction>,
+  ) {
+    let args = match &event.args {
+      Some(args) if !args.is_empty() => args,
+      _ => return,
+    };
+
+    let command = args[0].as_str();
+    log::info!("MPV client-message: {}", command);
+
+    match command {
+      "jmsr-next" => {
+        let current_item = {
+          let s = state.read();
+          s.current_item.clone()
+        };
+
+        if let Some(item) = current_item {
+          log::info!("Keyboard shortcut: playing next episode");
+          Self::report_playback_stopped(client, state).await;
+          Self::play_adjacent_episode(client, state, action_tx, &item, true).await;
+        } else {
+          log::warn!("jmsr-next: No current item");
+        }
+      }
+      "jmsr-prev" => {
+        let current_item = {
+          let s = state.read();
+          s.current_item.clone()
+        };
+
+        if let Some(item) = current_item {
+          log::info!("Keyboard shortcut: playing previous episode");
+          Self::report_playback_stopped(client, state).await;
+          Self::play_adjacent_episode(client, state, action_tx, &item, false).await;
+        } else {
+          log::warn!("jmsr-prev: No current item");
+        }
+      }
+      _ => {
+        log::debug!("Unknown client-message command: {}", command);
+      }
+    }
+  }
+
+  /// Report playback stopped to Jellyfin and clear session.
+  async fn report_playback_stopped(client: &JellyfinClient, state: &RwLock<SessionState>) {
+    let session = {
+      let mut s = state.write();
+      s.playback.take()
+    };
+
+    if let Some(session) = session {
+      let stop_info = PlaybackStopInfo {
+        item_id: session.item_id,
+        media_source_id: session.media_source_id,
+        play_session_id: session.play_session_id,
+        position_ticks: Some(session.position_ticks),
+      };
+      if let Err(e) = client.report_playback_stop(&stop_info).await {
+        log::error!("Failed to report playback stop: {}", e);
+      }
+    }
+  }
+
+  /// Play the next or previous episode.
+  async fn play_adjacent_episode(
+    client: &JellyfinClient,
+    state: &RwLock<SessionState>,
+    action_tx: &mpsc::Sender<MpvAction>,
+    current_item: &MediaItem,
+    next: bool,
+  ) {
+    let result = if next {
+      client.get_next_episode(current_item).await
+    } else {
+      client.get_previous_episode(current_item).await
+    };
+
+    match result {
+      Ok(Some(adjacent_item)) => {
+        log::info!(
+          "Playing {} episode: {} - S{:02}E{:02}",
+          if next { "next" } else { "previous" },
+          adjacent_item.series_name.as_deref().unwrap_or("Unknown"),
+          adjacent_item.parent_index_number.unwrap_or(0),
+          adjacent_item.index_number.unwrap_or(0)
+        );
+
+        let play_request = PlayRequest {
+          item_ids: vec![adjacent_item.id.clone()],
+          start_position_ticks: None,
+          play_command: "PlayNow".to_string(),
+          media_source_id: None,
+          audio_stream_index: None,
+          subtitle_stream_index: None,
+        };
+
+        if let Err(e) = Self::handle_play(client, state, action_tx, play_request).await {
+          log::error!("Failed to play {} episode: {}", if next { "next" } else { "previous" }, e);
+        }
+      }
+      Ok(None) => {
+        log::info!("No {} episode available", if next { "next" } else { "previous" });
+        let mut s = state.write();
+        s.current_item = None;
+        s.current_series_id = None;
+      }
+      Err(e) => {
+        log::error!("Failed to get {} episode: {}", if next { "next" } else { "previous" }, e);
+      }
+    }
   }
 
   /// Stop the session.
