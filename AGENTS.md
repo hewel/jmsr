@@ -75,3 +75,4 @@ bunx tauri build     # Production desktop build
 - PRD at `doc/PRD.md` defines architecture: Sentinel (Tauri GUI) → Bridge (IPC) → Player (external mpv)
 - Rust backend exports bindings to `src/bindings.ts` on debug builds only
 - Test setup extends expect with jest-dom matchers (rstest.setup.ts)
+- See `doc/todos.md` for current tasks and priorities
