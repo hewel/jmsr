@@ -101,9 +101,12 @@ impl SessionManager {
 
   /// Load series preferences from disk.
   fn load_preferences_from_store(app_handle: &AppHandle) -> HashMap<String, TrackPreference> {
+    log::info!("Attempting to load series preferences from store...");
     match app_handle.store(PREFERENCES_STORE_FILE) {
       Ok(store) => {
+        log::info!("Store opened successfully, checking for key: {}", SERIES_PREFERENCES_KEY);
         if let Some(value) = store.get(SERIES_PREFERENCES_KEY) {
+          log::info!("Found stored value: {:?}", value);
           match serde_json::from_value::<HashMap<String, TrackPreference>>(value.clone()) {
             Ok(prefs) => {
               log::info!("Loaded {} series track preferences from disk", prefs.len());
@@ -114,7 +117,7 @@ impl SessionManager {
             }
           }
         } else {
-          log::debug!("No stored track preferences found");
+          log::info!("No stored track preferences found (key not present)");
         }
       }
       Err(e) => {
@@ -241,7 +244,7 @@ impl SessionManager {
                 log::warn!("Failed to set media title: {}", e);
               }
 
-              // Set subtitle track
+              // Set subtitle track (already converted to MPV 1-based index)
               match subtitle_index {
                 Some(-1) => {
                   // -1 means disable subtitles
@@ -250,9 +253,8 @@ impl SessionManager {
                   }
                 }
                 Some(idx) => {
-                  // MPV uses 1-based track IDs, but Jellyfin's index may need adjustment
-                  // Jellyfin stream indices are relative to media streams, MPV uses track IDs
-                  if let Err(e) = mpv.set_subtitle_track((idx + 1) as i64).await {
+                  // idx is already MPV's 1-based track ID
+                  if let Err(e) = mpv.set_subtitle_track(idx as i64).await {
                     log::warn!("Failed to set subtitle track: {}", e);
                   }
                 }
@@ -261,10 +263,10 @@ impl SessionManager {
                 }
               }
 
-              // Set audio track
+              // Set audio track (already converted to MPV 1-based index)
               if let Some(idx) = audio_index {
-                // MPV uses 1-based track IDs
-                if let Err(e) = mpv.set_audio_track((idx + 1) as i64).await {
+                // idx is already MPV's 1-based track ID
+                if let Err(e) = mpv.set_audio_track(idx as i64).await {
                   log::warn!("Failed to set audio track: {}", e);
                 }
               }
@@ -316,8 +318,8 @@ impl SessionManager {
               }
             }
             MpvAction::SetAudioTrack(index) => {
-              // MPV uses 1-based track IDs
-              if let Err(e) = mpv.set_audio_track((index + 1) as i64).await {
+              // index is already MPV's 1-based track ID
+              if let Err(e) = mpv.set_audio_track(index as i64).await {
                 log::error!("Failed to set audio track: {}", e);
               }
             }
@@ -328,8 +330,8 @@ impl SessionManager {
                   log::error!("Failed to disable subtitles: {}", e);
                 }
               } else {
-                // MPV uses 1-based track IDs
-                if let Err(e) = mpv.set_subtitle_track((index + 1) as i64).await {
+                // index is already MPV's 1-based track ID
+                if let Err(e) = mpv.set_subtitle_track(index as i64).await {
                   log::error!("Failed to set subtitle track: {}", e);
                 }
               }
@@ -413,6 +415,11 @@ impl SessionManager {
 
     if let Some(ref series_id) = item.series_id {
       let s = state.read();
+      log::info!(
+        "Looking up preferences for series_id={}, available prefs: {:?}",
+        series_id,
+        s.series_preferences.keys().collect::<Vec<_>>()
+      );
       if let Some(pref) = s.series_preferences.get(series_id) {
         log::info!("Found track preference for series {}: {:?}", series_id, pref);
 
@@ -497,15 +504,34 @@ impl SessionManager {
     };
     client.report_playback_start(&start_info).await?;
 
-    // Send action to MPV
-    log::info!("Sending MpvAction::Play to action channel");
+    // Convert Jellyfin indices to MPV indices before sending
+    let mpv_audio_index = audio_index.map(|idx| {
+      if idx < 0 {
+        idx // -1 means disable
+      } else {
+        jellyfin_to_mpv_track_index(&media_source.media_streams, "Audio", idx)
+      }
+    });
+    let mpv_subtitle_index = subtitle_index.map(|idx| {
+      if idx < 0 {
+        idx // -1 means disable
+      } else {
+        jellyfin_to_mpv_track_index(&media_source.media_streams, "Subtitle", idx)
+      }
+    });
+
+    // Send action to MPV with converted indices
+    log::info!(
+      "Sending MpvAction::Play: audio_index {:?} (Jellyfin) -> {:?} (MPV), subtitle_index {:?} (Jellyfin) -> {:?} (MPV)",
+      audio_index, mpv_audio_index, subtitle_index, mpv_subtitle_index
+    );
     let _ = action_tx
       .send(MpvAction::Play {
         url,
         start_position,
         title,
-        audio_index,
-        subtitle_index,
+        audio_index: mpv_audio_index,
+        subtitle_index: mpv_subtitle_index,
       })
       .await;
     log::info!("MpvAction::Play sent successfully");
@@ -630,10 +656,14 @@ impl SessionManager {
       }
       "SetAudioStreamIndex" => {
         if let Some(args) = &request.arguments {
-          if let Some(index) = args.get("Index").and_then(|v| v.as_i64()) {
-            log::info!("SetAudioStreamIndex: {}", index);
+          // Index can be a string or number depending on Jellyfin client
+          let index = args.get("Index").and_then(|v| {
+            v.as_i64().or_else(|| v.as_str().and_then(|s| s.parse::<i64>().ok()))
+          });
+          if let Some(index) = index {
+            log::info!("SetAudioStreamIndex: {} (Jellyfin index)", index);
             // Update playback state and save series preference
-            {
+            let mpv_index = {
               let mut s = state.write();
               if let Some(ref mut playback) = s.playback {
                 playback.audio_stream_index = Some(index as i32);
@@ -654,19 +684,25 @@ impl SessionManager {
                   should_save_prefs = true;
                 }
               }
-            }
-            // Send to MPV
-            let _ = action_tx.send(MpvAction::SetAudioTrack(index as i32)).await;
+              // Convert Jellyfin stream index to MPV track index
+              jellyfin_to_mpv_track_index(&s.current_media_streams, "Audio", index as i32)
+            };
+            // Send to MPV with converted index
+            log::info!("SetAudioStreamIndex: {} (MPV index)", mpv_index);
+            let _ = action_tx.send(MpvAction::SetAudioTrack(mpv_index)).await;
           }
         }
       }
       "SetSubtitleStreamIndex" => {
         if let Some(args) = &request.arguments {
-          // Index can be -1 to disable subtitles
-          if let Some(index) = args.get("Index").and_then(|v| v.as_i64()) {
-            log::info!("SetSubtitleStreamIndex: {}", index);
+          // Index can be -1 to disable subtitles, and can be string or number
+          let index = args.get("Index").and_then(|v| {
+            v.as_i64().or_else(|| v.as_str().and_then(|s| s.parse::<i64>().ok()))
+          });
+          if let Some(index) = index {
+            log::info!("SetSubtitleStreamIndex: {} (Jellyfin index)", index);
             // Update playback state and save series preference
-            {
+            let mpv_index = {
               let mut s = state.write();
               if let Some(ref mut playback) = s.playback {
                 playback.subtitle_stream_index = Some(index as i32);
@@ -700,9 +736,16 @@ impl SessionManager {
                   should_save_prefs = true;
                 }
               }
-            }
-            // Send to MPV
-            let _ = action_tx.send(MpvAction::SetSubtitleTrack(index as i32)).await;
+              // Convert Jellyfin stream index to MPV track index (or -1 to disable)
+              if index == -1 {
+                -1
+              } else {
+                jellyfin_to_mpv_track_index(&s.current_media_streams, "Subtitle", index as i32)
+              }
+            };
+            // Send to MPV with converted index
+            log::info!("SetSubtitleStreamIndex: {} (MPV index)", mpv_index);
+            let _ = action_tx.send(MpvAction::SetSubtitleTrack(mpv_index)).await;
           }
         }
       }
@@ -993,4 +1036,22 @@ impl SessionManager {
 
     Ok(())
   }
+}
+
+/// Convert Jellyfin stream index to MPV track index.
+/// Jellyfin uses absolute indices across all streams (video, audio, subtitle combined).
+/// MPV uses 1-based indices within each track type (audio, subtitle).
+fn jellyfin_to_mpv_track_index(streams: &[MediaStream], stream_type: &str, jellyfin_index: i32) -> i32 {
+  // Count how many tracks of this type come before and including the target index
+  let mut mpv_index = 0;
+  for stream in streams {
+    if stream.stream_type == stream_type {
+      mpv_index += 1;
+      if stream.index == jellyfin_index {
+        return mpv_index;
+      }
+    }
+  }
+  // Fallback: return 1 (first track of type) if not found
+  1
 }
