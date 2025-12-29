@@ -61,7 +61,10 @@ impl JellyfinWebSocket {
         "MessageType": "SessionsStart",
         "Data": "0,1500"
       });
-      if let Err(e) = write.send(Message::Text(capabilities.to_string().into())).await {
+      if let Err(e) = write
+        .send(Message::Text(capabilities.to_string().into()))
+        .await
+      {
         log::error!("Failed to send capabilities: {}", e);
         *connected.write() = false;
         return;
@@ -143,7 +146,9 @@ impl JellyfinWebSocket {
         if let Some(data) = msg.data {
           let command: GeneralCommand = serde_json::from_value(data)?;
           log::info!("Received GeneralCommand: {:?}", command);
-          let _ = command_tx.send(JellyfinCommand::GeneralCommand(command)).await;
+          let _ = command_tx
+            .send(JellyfinCommand::GeneralCommand(command))
+            .await;
         }
       }
       "ForceKeepAlive" | "KeepAlive" => {

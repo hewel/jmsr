@@ -108,7 +108,10 @@ impl SessionManager {
           log::debug!("Processing MPV action: {:?}", action);
 
           match action {
-            MpvAction::Play { url, start_position } => {
+            MpvAction::Play {
+              url,
+              start_position,
+            } => {
               // Start MPV if not already running
               if !mpv.is_connected() {
                 if let Err(e) = mpv.start().await {
@@ -197,7 +200,10 @@ impl SessionManager {
     request: PlayRequest,
   ) -> Result<(), JellyfinError> {
     // Get the first item ID
-    let item_id = request.item_ids.first().ok_or(JellyfinError::SessionNotFound)?;
+    let item_id = request
+      .item_ids
+      .first()
+      .ok_or(JellyfinError::SessionNotFound)?;
 
     // Get playback info
     let playback_info = client

@@ -36,19 +36,17 @@ pub fn setup_tray<R: Runtime>(app: &tauri::App<R>) -> Result<(), Box<dyn std::er
     .menu(&menu)
     .tooltip("JMSR - Jellyfin MPV Shim")
     .show_menu_on_left_click(false) // Left-click shows window, right-click shows menu
-    .on_menu_event(|app, event| {
-      match event.id.as_ref() {
-        MENU_SHOW => {
-          if let Some(window) = app.get_webview_window("main") {
-            let _ = window.show();
-            let _ = window.set_focus();
-          }
+    .on_menu_event(|app, event| match event.id.as_ref() {
+      MENU_SHOW => {
+        if let Some(window) = app.get_webview_window("main") {
+          let _ = window.show();
+          let _ = window.set_focus();
         }
-        MENU_QUIT => {
-          app.exit(0);
-        }
-        _ => {}
       }
+      MENU_QUIT => {
+        app.exit(0);
+      }
+      _ => {}
     })
     .on_tray_icon_event(|tray, event| {
       // Left-click on tray icon shows/focuses the window

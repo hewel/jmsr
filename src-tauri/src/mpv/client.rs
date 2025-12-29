@@ -153,7 +153,12 @@ impl MpvClient {
   /// Get a property value.
   pub async fn get_property(&self, name: &str) -> Result<PropertyValue, MpvError> {
     let response = self.send(MpvCommand::get_property(name)).await?;
-    Ok(response.data.map(PropertyValue::from).unwrap_or(PropertyValue::Null))
+    Ok(
+      response
+        .data
+        .map(PropertyValue::from)
+        .unwrap_or(PropertyValue::Null),
+    )
   }
 
   /// Get current time position in seconds.

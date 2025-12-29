@@ -38,7 +38,6 @@ pub fn find_mpv() -> Option<PathBuf> {
       r"C:\Program Files\mpv\mpv.exe",
       r"C:\Program Files (x86)\mpv\mpv.exe",
       r"C:\mpv\mpv.exe",
-      r"C:\Users\Hewel\scoop\apps\mpv\current\mpv.exe"
     ];
     for path in common_paths {
       let p = PathBuf::from(path);

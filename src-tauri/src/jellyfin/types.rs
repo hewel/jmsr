@@ -273,4 +273,5 @@ pub struct SavedSession {
   pub user_id: String,
   pub user_name: String,
   pub server_name: Option<String>,
+  pub device_id: Option<String>,
 }

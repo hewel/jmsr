@@ -1,7 +1,7 @@
 //! Jellyfin HTTP client for REST API calls.
 
 use parking_lot::RwLock;
-use reqwest::{Client, header};
+use reqwest::{header, Client};
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -18,7 +18,6 @@ const CLIENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub struct JellyfinClient {
   http: Client,
   state: Arc<RwLock<ClientState>>,
-  device_id: String,
 }
 
 /// Internal connection state.
@@ -28,6 +27,7 @@ struct ClientState {
   user_id: Option<String>,
   user_name: Option<String>,
   server_name: Option<String>,
+  device_id: String,
 }
 
 impl JellyfinClient {
@@ -46,21 +46,22 @@ impl JellyfinClient {
         user_id: None,
         user_name: None,
         server_name: None,
+        device_id,
       })),
-      device_id,
     }
   }
 
   /// Get the device ID.
-  pub fn device_id(&self) -> &str {
-    &self.device_id
+  pub fn device_id(&self) -> String {
+    self.state.read().device_id.clone()
   }
 
   /// Build authorization header value.
   fn auth_header(&self, token: Option<&str>) -> String {
+    let device_id = self.device_id();
     let mut header = format!(
       r#"MediaBrowser Client="{}", Device="{}", DeviceId="{}", Version="{}""#,
-      CLIENT_NAME, DEVICE_NAME, self.device_id, CLIENT_VERSION
+      CLIENT_NAME, DEVICE_NAME, device_id, CLIENT_VERSION
     );
     if let Some(token) = token {
       header.push_str(&format!(r#", Token="{}""#, token));
@@ -160,6 +161,10 @@ impl JellyfinClient {
       state.user_id = Some(session.user_id.clone());
       state.user_name = Some(session.user_name.clone());
       state.server_name = session.server_name.clone();
+      // Restore device_id if present, otherwise keep the generated one
+      if let Some(saved_device_id) = &session.device_id {
+        state.device_id = saved_device_id.clone();
+      }
     }
 
     // Validate the token by calling /System/Info/Public
@@ -191,6 +196,7 @@ impl JellyfinClient {
         user_id,
         user_name,
         server_name: state.server_name.clone(),
+        device_id: Some(state.device_id.clone()),
       })
     } else {
       None
@@ -245,10 +251,7 @@ impl JellyfinClient {
   }
 
   /// Make an authenticated GET request.
-  pub async fn get<T: serde::de::DeserializeOwned>(
-    &self,
-    path: &str,
-  ) -> Result<T, JellyfinError> {
+  pub async fn get<T: serde::de::DeserializeOwned>(&self, path: &str) -> Result<T, JellyfinError> {
     let server_url = self.server_url()?;
     let token = self.access_token()?;
     let url = format!("{}{}", server_url, path);
@@ -327,7 +330,7 @@ impl JellyfinClient {
 
     let request = PlaybackInfoRequest {
       user_id,
-      device_id: self.device_id.clone(),
+      device_id: self.device_id(),
       max_streaming_bitrate: Some(140_000_000), // 140 Mbps
       start_time_ticks: None,
       audio_stream_index,
@@ -365,8 +368,14 @@ impl JellyfinClient {
   /// Get WebSocket URL for session.
   pub fn websocket_url(&self) -> Result<String, JellyfinError> {
     let state = self.state.read();
-    let server_url = state.server_url.as_ref().ok_or(JellyfinError::NotConnected)?;
-    let token = state.access_token.as_ref().ok_or(JellyfinError::NotConnected)?;
+    let server_url = state
+      .server_url
+      .as_ref()
+      .ok_or(JellyfinError::NotConnected)?;
+    let token = state
+      .access_token
+      .as_ref()
+      .ok_or(JellyfinError::NotConnected)?;
 
     // Convert http(s) to ws(s)
     let ws_url = if server_url.starts_with("https://") {
@@ -377,15 +386,12 @@ impl JellyfinClient {
 
     Ok(format!(
       "{}/socket?api_key={}&deviceId={}",
-      ws_url, token, self.device_id
+      ws_url, token, state.device_id
     ))
   }
 
   /// Report playback started.
-  pub async fn report_playback_start(
-    &self,
-    info: &PlaybackStartInfo,
-  ) -> Result<(), JellyfinError> {
+  pub async fn report_playback_start(&self, info: &PlaybackStartInfo) -> Result<(), JellyfinError> {
     self.post_empty("/Sessions/Playing", info).await
   }
 
@@ -405,6 +411,7 @@ impl JellyfinClient {
   /// Report session capabilities to Jellyfin.
   ///
   /// This makes the client appear as a controllable cast target.
+  /// Includes a full DeviceProfile for proper Jellyfin cast visibility.
   pub async fn report_capabilities(&self) -> Result<(), JellyfinError> {
     let capabilities = serde_json::json!({
       "PlayableMediaTypes": ["Video", "Audio"],
@@ -428,11 +435,64 @@ impl JellyfinClient {
         "PlayMediaSource"
       ],
       "SupportsPersistentIdentifier": true,
-      "SupportsSync": false
+      "SupportsSync": false,
+      "DeviceProfile": {
+        "Name": "JMSR",
+        "MaxStreamingBitrate": 140_000_000,
+        "MaxStaticBitrate": 140_000_000,
+        "MusicStreamingTranscodingBitrate": 384_000,
+        "DirectPlayProfiles": [
+          {
+            "Container": "mkv,mp4,avi,mov,wmv,ts,m2ts,webm,ogv,flv,3gp",
+            "Type": "Video"
+          },
+          {
+            "Container": "mp3,flac,wav,aac,ogg,wma,m4a,opus,webm",
+            "Type": "Audio"
+          }
+        ],
+        "TranscodingProfiles": [
+          {
+            "Container": "ts",
+            "Type": "Video",
+            "VideoCodec": "h264",
+            "AudioCodec": "aac,mp3",
+            "Context": "Streaming",
+            "Protocol": "hls",
+            "MaxAudioChannels": "6",
+            "MinSegments": 1,
+            "BreakOnNonKeyFrames": true
+          },
+          {
+            "Container": "mp3",
+            "Type": "Audio",
+            "AudioCodec": "mp3",
+            "Context": "Streaming",
+            "Protocol": "http",
+            "MaxAudioChannels": "2"
+          }
+        ],
+        "SubtitleProfiles": [
+          { "Format": "srt", "Method": "External" },
+          { "Format": "ass", "Method": "External" },
+          { "Format": "ssa", "Method": "External" },
+          { "Format": "sub", "Method": "External" },
+          { "Format": "vtt", "Method": "External" },
+          { "Format": "pgs", "Method": "Embed" },
+          { "Format": "pgssub", "Method": "Embed" },
+          { "Format": "dvdsub", "Method": "Embed" },
+          { "Format": "dvbsub", "Method": "Embed" }
+        ],
+        "ResponseProfiles": [],
+        "ContainerProfiles": [],
+        "CodecProfiles": []
+      }
     });
 
-    log::info!("Reporting capabilities to Jellyfin");
-    self.post_empty("/Sessions/Capabilities/Full", &capabilities).await
+    log::info!("Reporting capabilities to Jellyfin with full DeviceProfile");
+    self
+      .post_empty("/Sessions/Capabilities/Full", &capabilities)
+      .await
   }
 }
 

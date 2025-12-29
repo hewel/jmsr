@@ -41,20 +41,12 @@ impl MpvCommand {
 
   /// Set pause state.
   pub fn set_pause(paused: bool) -> Self {
-    Self::new(vec![
-      "set_property".into(),
-      "pause".into(),
-      paused.into(),
-    ])
+    Self::new(vec!["set_property".into(), "pause".into(), paused.into()])
   }
 
   /// Set volume (0-100).
   pub fn set_volume(volume: f64) -> Self {
-    Self::new(vec![
-      "set_property".into(),
-      "volume".into(),
-      volume.into(),
-    ])
+    Self::new(vec!["set_property".into(), "volume".into(), volume.into()])
   }
 
   /// Set audio track by ID.
@@ -140,9 +132,7 @@ impl From<serde_json::Value> for PropertyValue {
   fn from(value: serde_json::Value) -> Self {
     match value {
       serde_json::Value::Bool(b) => PropertyValue::Bool(b),
-      serde_json::Value::Number(n) => {
-        PropertyValue::Number(n.as_f64().unwrap_or(0.0))
-      }
+      serde_json::Value::Number(n) => PropertyValue::Number(n.as_f64().unwrap_or(0.0)),
       serde_json::Value::String(s) => PropertyValue::String(s),
       serde_json::Value::Array(_) | serde_json::Value::Object(_) => {
         PropertyValue::Json(value.to_string())

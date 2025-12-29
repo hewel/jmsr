@@ -210,7 +210,7 @@ string | null
 /**
  * Saved session data for persistence.
  */
-export type SavedSession = { serverUrl: string; accessToken: string; userId: string; userName: string; serverName: string | null }
+export type SavedSession = { serverUrl: string; accessToken: string; userId: string; userName: string; serverName: string | null; deviceId: string | null }
 
 /** tauri-specta globals **/
 

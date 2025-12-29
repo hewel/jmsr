@@ -77,7 +77,9 @@ impl MpvIpc {
       .open(path)
       .map_err(|e| IpcError::ConnectionFailed(e.to_string()))?;
 
-    let reader = pipe.try_clone().map_err(|e| IpcError::ConnectionFailed(e.to_string()))?;
+    let reader = pipe
+      .try_clone()
+      .map_err(|e| IpcError::ConnectionFailed(e.to_string()))?;
     let writer: Box<dyn Write + Send> = Box::new(pipe);
 
     Self::setup(reader, writer)
@@ -90,7 +92,9 @@ impl MpvIpc {
     let stream =
       UnixStream::connect(path).map_err(|e| IpcError::ConnectionFailed(e.to_string()))?;
 
-    let reader = stream.try_clone().map_err(|e| IpcError::ConnectionFailed(e.to_string()))?;
+    let reader = stream
+      .try_clone()
+      .map_err(|e| IpcError::ConnectionFailed(e.to_string()))?;
     let writer: Box<dyn Write + Send> = Box::new(stream);
 
     Self::setup(reader, writer)
