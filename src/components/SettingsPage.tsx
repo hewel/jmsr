@@ -16,6 +16,7 @@ async function fetchMpvStatus(): Promise<boolean> {
 
 export default function SettingsPage(props: SettingsPageProps) {
   const [disconnecting, setDisconnecting] = createSignal(false);
+  const [clearingSession, setClearingSession] = createSignal(false);
   const [connectionState, { refetch: refetchConnection }] =
     createResource(fetchConnectionState);
   const [mpvConnected, { refetch: refetchMpv }] =
@@ -32,6 +33,20 @@ export default function SettingsPage(props: SettingsPageProps) {
       }
     } finally {
       setDisconnecting(false);
+    }
+  };
+
+  const handleClearSession = async () => {
+    setClearingSession(true);
+    try {
+      // Call backend to clear session state
+      await commands.jellyfinClearSession();
+      // Clear localStorage
+      clearSavedSession();
+      // Return to login
+      props.onDisconnected();
+    } finally {
+      setClearingSession(false);
     }
   };
 
@@ -177,6 +192,20 @@ export default function SettingsPage(props: SettingsPageProps) {
             >
               {disconnecting() ? 'Disconnecting...' : 'Disconnect from Server'}
             </button>
+
+            <button
+              type="button"
+              onClick={handleClearSession}
+              disabled={clearingSession()}
+              class="w-full py-3 px-6 bg-gray-600/20 hover:bg-gray-600/30 text-gray-300 font-medium rounded-lg border border-gray-600/30 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {clearingSession() ? 'Clearing...' : 'Clear Saved Session'}
+            </button>
+
+            <p class="text-gray-500 text-xs text-center">
+              Clear saved session will remove stored credentials and return to
+              login.
+            </p>
           </div>
         </div>
 

@@ -271,6 +271,28 @@ pub async fn jellyfin_restore_session(
   Ok(())
 }
 
+/// Clear/logout from the current session.
+///
+/// This disconnects from the server and should be paired with
+/// clearing the saved session from localStorage on the frontend.
+#[tauri::command]
+#[specta]
+pub async fn jellyfin_clear_session(state: State<'_, JellyfinState>) -> Result<(), String> {
+  // Take session without holding lock across await
+  let session = state.session.write().take();
+
+  // Stop session if active
+  if let Some(session) = session {
+    session.stop().await.map_err(|e| e.to_string())?;
+  }
+
+  // Disconnect client (clears internal state)
+  state.client.disconnect();
+
+  log::info!("Session cleared");
+  Ok(())
+}
+
 pub fn command_builder() -> Builder {
   let builder = Builder::<tauri::Wry>::new().commands(collect_commands![
     // General
@@ -294,6 +316,7 @@ pub fn command_builder() -> Builder {
     jellyfin_is_connected,
     jellyfin_get_session,
     jellyfin_restore_session,
+    jellyfin_clear_session,
   ]);
 
   #[cfg(debug_assertions)] // <- Only export on non-release builds

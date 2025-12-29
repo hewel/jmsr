@@ -68,7 +68,10 @@ impl SessionManager {
 
   /// Start the session (connect WebSocket and begin listening).
   pub async fn start(&self) -> Result<(), JellyfinError> {
-    log::info!("Starting session with Device ID: {}", self.client.device_id());
+    log::info!(
+      "Starting session with Device ID: {}",
+      self.client.device_id()
+    );
     // IMPORTANT: Connect WebSocket FIRST, THEN report capabilities.
     // Jellyfin's WebSocketController.SupportsMediaControl returns true
     // only when HasOpenSockets is true. Without an active WebSocket,

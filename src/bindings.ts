@@ -174,6 +174,20 @@ async jellyfinRestoreSession(session: SavedSession) : Promise<Result<null, strin
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+/**
+ * Clear/logout from the current session.
+ * 
+ * This disconnects from the server and should be paired with
+ * clearing the saved session from localStorage on the frontend.
+ */
+async jellyfinClearSession() : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("jellyfin_clear_session") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
