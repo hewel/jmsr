@@ -253,7 +253,15 @@ progressInterval?: number;
 /**
  * Start minimized to system tray.
  */
-startMinimized?: boolean }
+startMinimized?: boolean; 
+/**
+ * Keybinding for next episode in MPV.
+ */
+keybindNext?: string; 
+/**
+ * Keybinding for previous episode in MPV.
+ */
+keybindPrev?: string }
 /**
  * Connection state exposed to frontend.
  */

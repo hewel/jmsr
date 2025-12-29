@@ -24,6 +24,58 @@ pub fn ipc_path() -> String {
   }
 }
 
+/// Get the path to JMSR's custom input.conf for MPV keybindings.
+pub fn jmsr_input_conf_path() -> Option<PathBuf> {
+  dirs::config_dir().map(|p| p.join("jmsr").join("input.conf"))
+}
+
+/// Write JMSR's input.conf with the specified keybindings.
+/// Always overwrites the file with the provided keybindings.
+pub fn write_input_conf(keybind_next: &str, keybind_prev: &str) -> Option<PathBuf> {
+  let path = jmsr_input_conf_path()?;
+
+  // Create parent directory if needed
+  if let Some(parent) = path.parent() {
+    if !parent.exists() {
+      if let Err(e) = std::fs::create_dir_all(parent) {
+        log::warn!("Failed to create JMSR config directory: {}", e);
+        return None;
+      }
+    }
+  }
+
+  let bindings = format!(
+    r#"# JMSR MPV Keybindings
+# These keybindings are used by JMSR to control episode navigation.
+# You can customize these bindings in JMSR Settings.
+
+{} script-message jmsr-next    # Play next episode
+{} script-message jmsr-prev    # Play previous episode
+"#,
+    keybind_next, keybind_prev
+  );
+
+  if let Err(e) = std::fs::write(&path, bindings) {
+    log::warn!("Failed to write JMSR input.conf: {}", e);
+    return None;
+  }
+  log::info!("Updated JMSR input.conf at {:?}", path);
+
+  Some(path)
+}
+
+/// Ensure JMSR's input.conf exists with default keybindings.
+fn ensure_input_conf() -> Option<PathBuf> {
+  let path = jmsr_input_conf_path()?;
+
+  // Only create if it doesn't exist (preserve user customizations via config)
+  if !path.exists() {
+    return write_input_conf("Shift+n", "Shift+p");
+  }
+
+  Some(path)
+}
+
 /// Find MPV executable in common locations.
 pub fn find_mpv() -> Option<PathBuf> {
   // Check PATH first
@@ -97,6 +149,13 @@ pub fn spawn_mpv(mpv_path: Option<&PathBuf>, extra_args: &[String]) -> Result<Ch
     .arg("--force-window")
     .arg("--keep-open=no")
     .arg("--no-terminal");
+
+  // Add JMSR keybindings via input.conf
+  // Using --input-conf appends to (not replaces) the user's input.conf
+  if let Some(input_conf) = ensure_input_conf() {
+    cmd.arg(format!("--input-conf={}", input_conf.display()));
+    log::info!("Using JMSR input.conf: {:?}", input_conf);
+  }
 
   // Add user-specified extra arguments
   for arg in extra_args {

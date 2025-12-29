@@ -68,11 +68,14 @@
 - [x] Added `handle_client_message_event()` to process MPV script messages
 - [x] Supports `jmsr-next` and `jmsr-prev` commands via MPV keybindings
 - [x] Refactored event listener with helper methods for cleaner code
-- [x] User setup: Add to `~/.config/mpv/input.conf`:
-  ```
-  Shift+n script-message jmsr-next
-  Shift+p script-message jmsr-prev
-  ```
+- [x] **Out of the box**: JMSR auto-creates `input.conf` in config directory on first run
+  - Windows: `%APPDATA%\jmsr\input.conf`
+  - macOS: `~/Library/Application Support/jmsr/input.conf`
+  - Linux: `~/.config/jmsr/input.conf`
+- [x] Default keybindings:
+  - `Shift+n` - Next episode
+  - `Shift+p` - Previous episode
+- [x] Users can customize the keybindings by editing the generated `input.conf`
 
 ### Error Handling Improvements
 - [ ] Show user-friendly error messages in UI when commands fail

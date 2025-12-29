@@ -46,11 +46,14 @@ export default function SettingsPage(props: SettingsPageProps) {
       deviceName: 'JMSR',
       mpvPath: '',
       mpvArgs: '',
+      keybindNext: 'Shift+n',
+      keybindPrev: 'Shift+p',
     },
     onSubmit: async ({ value }) => {
       setSaveMessage(null);
       try {
         const cfg = initialConfig();
+
         const argsList = value.mpvArgs
           .split('\n')
           .map((s) => s.trim())
@@ -62,6 +65,8 @@ export default function SettingsPage(props: SettingsPageProps) {
           mpvArgs: argsList,
           progressInterval: cfg?.progressInterval ?? 5,
           startMinimized: cfg?.startMinimized ?? false,
+          keybindNext: value.keybindNext,
+          keybindPrev: value.keybindPrev,
         };
 
         const result = await commands.configSet(newConfig);
@@ -87,6 +92,8 @@ export default function SettingsPage(props: SettingsPageProps) {
       form.setFieldValue('deviceName', cfg.deviceName ?? 'JMSR');
       form.setFieldValue('mpvPath', cfg.mpvPath ?? '');
       form.setFieldValue('mpvArgs', (cfg.mpvArgs ?? []).join('\n'));
+      form.setFieldValue('keybindNext', cfg.keybindNext ?? 'Shift+n');
+      form.setFieldValue('keybindPrev', cfg.keybindPrev ?? 'Shift+p');
     }
   });
 
@@ -368,6 +375,104 @@ export default function SettingsPage(props: SettingsPageProps) {
                 )}
               </form.Field>
             </div>
+          </div>
+
+          {/* Keybindings Card */}
+          <div class="bg-surface-light rounded-xl p-6 border border-surface-lighter mb-6">
+            <h2 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <svg
+                class="w-5 h-5 text-jellyfin"
+                fill="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path d="M20 5H4c-1.1 0-1.99.9-1.99 2L2 17c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zm-1 2H5v-2h2v2zm0-3H5V8h2v2zm9 7H8v-2h8v2zm0-4h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z" />
+              </svg>
+              Keybindings
+            </h2>
+
+            <p class="text-gray-400 text-sm mb-4">
+              Keyboard shortcuts for MPV episode navigation. Changes take effect
+              on next MPV restart.
+            </p>
+
+            <div class="space-y-4">
+              <form.Field
+                name="keybindNext"
+                validators={{
+                  onChange: ({ value }) =>
+                    !value.trim() ? 'Keybinding is required' : undefined,
+                }}
+              >
+                {(field) => (
+                  <div>
+                    <label
+                      for={field().name}
+                      class="block text-gray-400 text-sm mb-2"
+                    >
+                      Next Episode
+                    </label>
+                    <input
+                      id={field().name}
+                      name={field().name}
+                      type="text"
+                      value={field().state.value}
+                      onInput={(e) =>
+                        field().handleChange(e.currentTarget.value)
+                      }
+                      onBlur={() => field().handleBlur()}
+                      class="w-full bg-surface-lighter border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-jellyfin transition-colors font-mono"
+                      placeholder="Shift+n"
+                    />
+                    <Show when={field().state.meta.errors.length > 0}>
+                      <p class="text-red-400 text-xs mt-1">
+                        {field().state.meta.errors[0]}
+                      </p>
+                    </Show>
+                  </div>
+                )}
+              </form.Field>
+
+              <form.Field
+                name="keybindPrev"
+                validators={{
+                  onChange: ({ value }) =>
+                    !value.trim() ? 'Keybinding is required' : undefined,
+                }}
+              >
+                {(field) => (
+                  <div>
+                    <label
+                      for={field().name}
+                      class="block text-gray-400 text-sm mb-2"
+                    >
+                      Previous Episode
+                    </label>
+                    <input
+                      id={field().name}
+                      name={field().name}
+                      type="text"
+                      value={field().state.value}
+                      onInput={(e) =>
+                        field().handleChange(e.currentTarget.value)
+                      }
+                      onBlur={() => field().handleBlur()}
+                      class="w-full bg-surface-lighter border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-jellyfin transition-colors font-mono"
+                      placeholder="Shift+p"
+                    />
+                    <Show when={field().state.meta.errors.length > 0}>
+                      <p class="text-red-400 text-xs mt-1">
+                        {field().state.meta.errors[0]}
+                      </p>
+                    </Show>
+                  </div>
+                )}
+              </form.Field>
+            </div>
+
+            <p class="text-gray-500 text-xs mt-4">
+              Use MPV keybinding syntax (e.g., Shift+n, Ctrl+Left, Alt+q)
+            </p>
           </div>
 
           {/* Save Settings Button */}

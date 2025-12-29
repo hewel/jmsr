@@ -8,7 +8,7 @@ use tauri_specta::{collect_commands, Builder};
 
 use crate::config::AppConfig;
 use crate::jellyfin::{ConnectionState, Credentials, JellyfinClient, SavedSession, SessionManager};
-use crate::mpv::{MpvClient, PropertyValue};
+use crate::mpv::{MpvClient, PropertyValue, write_input_conf};
 
 /// Player state returned to frontend.
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
@@ -351,6 +351,9 @@ pub async fn config_set(
       log::info!("Jellyfin capabilities re-registered with new device name");
     }
   }
+
+  // Update MPV keybindings file
+  write_input_conf(&config.keybind_next, &config.keybind_prev);
 
   // Persist to disk
   let store = app.store(CONFIG_STORE_FILE).map_err(|e| e.to_string())?;
