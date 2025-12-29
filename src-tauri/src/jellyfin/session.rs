@@ -73,22 +73,16 @@ impl SessionManager {
       self.client.device_id()
     );
 
-    // DOUBLE REPORT STRATEGY:
-    // 1. First, report capabilities via HTTP and capture the payload
-    // 2. Connect WebSocket, passing the payload for a second report via WS
-    //
-    // This ensures Jellyfin sees us as a cast target regardless of which
-    // registration path it checks (HTTP session or WebSocket session).
-
-    // Step 1: Report capabilities via HTTP (returns the JSON payload)
-    let caps_payload = self.client.report_capabilities().await?;
-    log::info!("Reported capabilities via HTTP");
-
-    // Step 2: Connect WebSocket with capabilities for second report
     let ws_url = self.client.websocket_url()?;
-    log::info!("Connecting to WebSocket: {}", ws_url);
-    self.websocket.connect(&ws_url, Some(caps_payload)).await?;
-    log::info!("Connected to WebSocket and reported capabilities via WS");
+    self.websocket.connect(&ws_url, None).await?;
+
+    let _caps_payload = self.client.report_capabilities().await?;
+
+    if let Err(e) = self.client.validate_session().await {
+      log::warn!("Session validation failed: {} - cast may not work", e);
+    } else {
+      log::info!("Session validated - we should appear as cast target");
+    }
 
     // Take the command receiver and start processing
     if let Some(mut command_rx) = self.websocket.take_command_receiver() {

@@ -411,70 +411,132 @@ impl JellyfinClient {
   /// Report session capabilities to Jellyfin via HTTP, and return the payload for WS.
   ///
   /// This makes the client appear as a controllable cast target.
-  /// Includes a full DeviceProfile for proper Jellyfin cast visibility.
   /// Returns the capabilities JSON so it can be sent via WebSocket too (Double Report Strategy).
   pub async fn report_capabilities(&self) -> Result<serde_json::Value, JellyfinError> {
-    let device_id = self.device_id();
-
-    // Define the device profile (Critical for visibility)
-    let device_profile = serde_json::json!({
-      "Name": DEVICE_NAME,
-      "Id": device_id,
-      "MaxStreamingBitrate": 120_000_000,
-      "MaxStaticBitrate": 100_000_000,
-      "MusicStreamingTranscodingBitrate": 192000,
-      "DirectPlayProfiles": [
-        {
-          "Container": "mkv,mp4,m4v,mov,avi,webm,mp3,aac,flac,opus,wav,ogg,ts",
-          "Type": "Video"
-        },
-        {
-          "Container": "mp3,aac,flac,opus,wav,ogg",
-          "Type": "Audio"
-        }
-      ],
-      "TranscodingProfiles": [
-        {
-          "Container": "ts",
-          "Type": "Video",
-          "AudioCodec": "aac,mp3,opus",
-          "VideoCodec": "h264,hevc,vp9,av1",
-          "Context": "Streaming",
-          "Protocol": "hls",
-          "MinSegments": 1
-        }
-      ],
-      "SubtitleProfiles": [
-        { "Format": "srt", "Method": "External" },
-        { "Format": "ass", "Method": "External" },
-        { "Format": "sub", "Method": "External" }
-      ]
-    });
-
-    // Define main capabilities
     let capabilities = serde_json::json!({
       "PlayableMediaTypes": ["Video", "Audio"],
-      "SupportsMediaControl": true,
       "SupportedCommands": [
-        "Play", "Pause", "Unpause", "PlayState", "Stop", "Seek",
-        "SetVolume", "VolumeUp", "VolumeDown", "Mute", "Unmute",
-        "ToggleMute", "SetAudioStreamIndex", "SetSubtitleStreamIndex",
-        "PlayNext", "PlayMediaSource", "DisplayMessage"
+        "MoveUp", "MoveDown", "MoveLeft", "MoveRight", "Select",
+        "Back", "ToggleFullscreen", "GoHome", "GoToSettings",
+        "VolumeUp", "VolumeDown", "ToggleMute", "Mute", "Unmute", "SetVolume",
+        "SetAudioStreamIndex", "SetSubtitleStreamIndex",
+        "DisplayContent", "Play", "Playstate", "PlayNext", "PlayMediaSource"
       ],
+      "SupportsMediaControl": true,
       "SupportsPersistentIdentifier": true,
-      "SupportsSync": false,
-      "DeviceProfile": device_profile,
-      "AppVersion": CLIENT_VERSION,
-      "IconUrl": "https://raw.githubusercontent.com/jellyfin/jellyfin-ux/master/branding/SVG/icon-transparent.svg"
     });
 
-    log::info!("Reporting capabilities via HTTP (DeviceId: {})", device_id);
-    self
-      .post_empty("/Sessions/Capabilities/Full", &capabilities)
+    let server_url = self.server_url()?;
+    let token = self.access_token()?;
+    let url = format!("{}/Sessions/Capabilities/Full", server_url);
+
+    let response = self
+      .http
+      .post(&url)
+      .header(reqwest::header::CONTENT_TYPE, "application/json")
+      .header("X-Emby-Authorization", self.auth_header(Some(&token)))
+      .json(&capabilities)
+      .send()
       .await?;
+
+    log::info!("Capabilities POST response status: {}", response.status());
+    if !response.status().is_success() {
+      let status = response.status();
+      let text = response.text().await.unwrap_or_default();
+      log::error!("Capabilities POST failed: HTTP {} - {}", status, text);
+    }
 
     // RETURN the JSON so we can send it via WebSocket too
     Ok(capabilities)
+  }
+
+  /// Validate that our session appears in the Jellyfin session list.
+  /// This checks if we're visible as a cast target.
+  pub async fn validate_session(&self) -> Result<(), JellyfinError> {
+    let device_id = self.device_id();
+    let server_url = self.server_url()?;
+    let token = self.access_token()?;
+
+    // Query all sessions
+    let url = format!("{}/Sessions", server_url);
+    let response = self
+      .http
+      .get(&url)
+      .header("X-Emby-Authorization", self.auth_header(Some(&token)))
+      .send()
+      .await?;
+
+    let sessions: Vec<serde_json::Value> = response.json().await?;
+
+    // Look for our device in the session list
+    for session in &sessions {
+      if let Some(session_device_id) = session.get("DeviceId").and_then(|v| v.as_str()) {
+        if session_device_id == device_id {
+          // Found our session! Check if it supports media control
+          let supports_media_control = session
+            .get("SupportsMediaControl")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+          let supports_remote_control = session
+            .get("SupportsRemoteControl")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+
+          log::info!(
+            "Found our session: DeviceId={}, SupportsMediaControl={}, SupportsRemoteControl={}",
+            device_id,
+            supports_media_control,
+            supports_remote_control
+          );
+
+          // Log full session for debugging
+          log::debug!(
+            "Session details: {}",
+            serde_json::to_string_pretty(session).unwrap_or_default()
+          );
+
+          if supports_media_control {
+            return Ok(());
+          } else {
+            return Err(JellyfinError::SessionNotFound);
+          }
+        }
+      }
+    }
+
+    // Log all sessions for debugging
+    log::warn!(
+      "Our session not found in session list. Our DeviceId={}, Total sessions={}",
+      device_id,
+      sessions.len()
+    );
+    for (i, session) in sessions.iter().enumerate() {
+      let sess_device_id = session
+        .get("DeviceId")
+        .and_then(|v| v.as_str())
+        .unwrap_or("?");
+      let sess_device_name = session
+        .get("DeviceName")
+        .and_then(|v| v.as_str())
+        .unwrap_or("?");
+      let sess_client = session
+        .get("Client")
+        .and_then(|v| v.as_str())
+        .unwrap_or("?");
+      let supports_media = session
+        .get("SupportsMediaControl")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+      log::info!(
+        "Session[{}]: DeviceId={}, DeviceName={}, Client={}, SupportsMediaControl={}",
+        i,
+        sess_device_id,
+        sess_device_name,
+        sess_client,
+        supports_media
+      );
+    }
+    Err(JellyfinError::SessionNotFound)
   }
 }
 
