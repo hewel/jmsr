@@ -1,6 +1,6 @@
 import { createResource, createSignal, Show } from 'solid-js';
-import { clearSavedSession } from '../App';
 import { type ConnectionState, commands } from '../bindings';
+import { clearSavedSession } from '../router';
 import LogPanel from './LogPanel';
 
 interface SettingsPageProps {

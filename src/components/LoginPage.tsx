@@ -1,7 +1,7 @@
 import { createForm } from '@tanstack/solid-form';
 import { createSignal, onMount, Show } from 'solid-js';
-import { saveSession } from '../App';
 import { type Credentials, commands } from '../bindings';
+import { saveSession } from '../router';
 
 interface LoginPageProps {
   onConnected: () => void;

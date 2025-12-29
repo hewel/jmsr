@@ -15,6 +15,14 @@ interface LogEntry {
 
 const MAX_LOGS = 200;
 
+const LogLevel: Record<number, { name: string; color: string }> = {
+  1: { name: 'ERROR', color: 'text-red-500' },
+  2: { name: 'WARN', color: 'text-yellow-500' },
+  3: { name: 'INFO', color: 'text-blue-500' },
+  4: { name: 'DEBUG', color: 'text-gray-400' },
+  5: { name: 'TRACE', color: 'text-gray-600' },
+};
+
 export default function LogPanel() {
   const [logs, setLogs] = createSignal<LogEntry[]>([]);
   const [expanded, setExpanded] = createSignal(false);
@@ -58,21 +66,11 @@ export default function LogPanel() {
   };
 
   const getLevelColor = (level: number) => {
-    switch (level) {
-      case 1:
-        return 'text-red-400';
-      case 2:
-        return 'text-yellow-400';
-      case 3:
-        return 'text-gray-500';
-      case 4:
-        return 'text-gray-400';
-      case 5:
-        return 'text-gray-600';
-      default:
-        return 'text-blue-400';
-    }
+    return LogLevel[level]?.color ?? 'text-gray-400';
   };
+  const getLevelName = (level: number) => {
+    return LogLevel[level]?.name ?? 'UNKNOWN';
+  }
 
   return (
     <div class="bg-surface-light rounded-xl border border-surface-lighter overflow-hidden">
@@ -159,9 +157,9 @@ export default function LogPanel() {
                 {(log) => (
                   <div class="flex gap-2 hover:bg-white/5 px-1 rounded">
                     <span
-                      class={`flex-shrink-0 w-12 ${getLevelColor(log.level)}`}
+                      class={`shrink-0 w-12 ${getLevelColor(log.level)}`}
                     >
-                      {log.level}
+                      {getLevelName(log.level)}
                     </span>
                     <span class="text-gray-300 break-all">{log.message}</span>
                   </div>
