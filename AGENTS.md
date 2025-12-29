@@ -4,7 +4,7 @@ Tauri v2 desktop app: Jellyfin MPV Shim rewrite. External MPV player controller 
 
 ## Stack
 
-- **Frontend**: Solid.js + TypeScript + Rsbuild + TanStack Query
+- **Frontend**: Solid.js + TypeScript + Rsbuild + TanStack Query + TanStack Form
 - **Backend**: Rust (Tauri v2) with tauri-specta for type-safe bindings
 - **Tools**: Bun, Biome (lint/format), Rstest (jsdom)
 
@@ -53,6 +53,7 @@ bunx tauri build     # Production desktop build
 - **Type-safe IPC**: All Rust↔TS via tauri-specta, never raw `invoke()`
 - **NO libmpv embed**: MPV spawned as external process, controlled via JSON IPC
 - **Solid.js reactivity**: Use `createSignal`, `createResource`, NOT React hooks
+- **Forms**: Always use `@tanstack/solid-form` with `createForm` for form handling
 
 ## Anti-Patterns
 
