@@ -3,10 +3,12 @@ use std::sync::Arc;
 mod command;
 mod jellyfin;
 mod mpv;
+mod tray;
 
 use command::{JellyfinState, MpvState};
 use jellyfin::JellyfinClient;
 use mpv::MpvClient;
+use tauri::WindowEvent;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -25,6 +27,7 @@ pub fn run() {
     .manage(jellyfin_state)
     .invoke_handler(builder.invoke_handler())
     .setup(move |app| {
+      // Setup logging in debug builds
       if cfg!(debug_assertions) {
         app.handle().plugin(
           tauri_plugin_log::Builder::default()
@@ -32,8 +35,21 @@ pub fn run() {
             .build(),
         )?;
       }
+
+      // Setup system tray
+      if let Err(e) = tray::setup_tray(app) {
+        log::error!("Failed to setup system tray: {}", e);
+      }
+
       builder.mount_events(app);
       Ok(())
+    })
+    .on_window_event(|window, event| {
+      // Hide window to tray on close instead of quitting
+      if let WindowEvent::CloseRequested { api, .. } = event {
+        api.prevent_close();
+        let _ = window.hide();
+      }
     })
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
