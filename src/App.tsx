@@ -46,7 +46,6 @@ function AppContent() {
 
       // Try to restore saved session from localStorage
       const savedSession = loadSavedSession();
-      console.log(savedSession);
       if (savedSession) {
         const result = await commands.jellyfinRestoreSession(savedSession);
         if (result.status === 'ok') {

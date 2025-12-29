@@ -1,6 +1,7 @@
 import { createResource, createSignal, Show } from 'solid-js';
 import { clearSavedSession } from '../App';
 import { type ConnectionState, commands } from '../bindings';
+import LogPanel from './LogPanel';
 
 interface SettingsPageProps {
   onDisconnected: () => void;
@@ -180,7 +181,7 @@ export default function SettingsPage(props: SettingsPageProps) {
         </div>
 
         {/* Actions */}
-        <div class="bg-surface-light rounded-xl p-6 border border-surface-lighter">
+        <div class="bg-surface-light rounded-xl p-6 border border-surface-lighter mb-6">
           <h2 class="text-lg font-semibold text-white mb-4">Actions</h2>
 
           <div class="space-y-3">
@@ -208,6 +209,9 @@ export default function SettingsPage(props: SettingsPageProps) {
             </p>
           </div>
         </div>
+
+        {/* Log Panel */}
+        <LogPanel />
 
         {/* Version Footer */}
         <div class="mt-8 text-center">

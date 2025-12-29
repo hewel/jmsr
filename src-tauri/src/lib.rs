@@ -9,6 +9,7 @@ use command::{JellyfinState, MpvState};
 use jellyfin::JellyfinClient;
 use mpv::MpvClient;
 use tauri::WindowEvent;
+use tauri_plugin_log::{Target, TargetKind};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -27,14 +28,16 @@ pub fn run() {
     .manage(jellyfin_state)
     .invoke_handler(builder.invoke_handler())
     .setup(move |app| {
-      // Setup logging in debug builds
-      if cfg!(debug_assertions) {
-        app.handle().plugin(
-          tauri_plugin_log::Builder::default()
-            .level(log::LevelFilter::Info)
-            .build(),
-        )?;
-      }
+      // Setup logging with webview target for in-app log viewing
+      app.handle().plugin(
+        tauri_plugin_log::Builder::default()
+          .level(log::LevelFilter::Info)
+          .targets([
+            Target::new(TargetKind::Stdout),
+            Target::new(TargetKind::Webview),
+          ])
+          .build(),
+      )?;
 
       // Setup system tray
       if let Err(e) = tray::setup_tray(app) {

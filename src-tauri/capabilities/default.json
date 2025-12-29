@@ -8,6 +8,9 @@
     "core:window:allow-close",
     "core:window:allow-hide",
     "core:window:allow-show",
-    "core:window:allow-set-focus"
+    "core:window:allow-set-focus",
+    "core:window:allow-set-size",
+    "core:window:allow-inner-size",
+    "log:default"
   ]
 }
