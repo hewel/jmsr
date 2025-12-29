@@ -180,10 +180,11 @@ impl SessionManager {
       let state = self.state.clone();
       let action_tx = self.action_tx.clone();
       let app_handle = self.app_handle.clone();
+      let mpv = self.mpv.clone();
 
       tokio::spawn(async move {
         while let Some(cmd) = command_rx.recv().await {
-          if let Err(e) = Self::handle_command(&client, &state, &action_tx, &app_handle, cmd).await {
+          if let Err(e) = Self::handle_command(&client, &state, &action_tx, &app_handle, &mpv, cmd).await {
             log::error!("Failed to handle Jellyfin command: {}", e);
           }
         }
@@ -305,7 +306,11 @@ impl SessionManager {
               }
             }
             MpvAction::Stop => {
-              mpv.stop();
+              log::info!("MpvAction::Stop - quitting MPV gracefully");
+              if let Err(e) = mpv.quit().await {
+                log::warn!("Failed to quit MPV gracefully: {}, forcing stop", e);
+                mpv.stop();
+              }
             }
             MpvAction::SetVolume(volume) => {
               if let Err(e) = mpv.set_volume(volume as f64).await {
@@ -348,6 +353,7 @@ impl SessionManager {
     state: &RwLock<SessionState>,
     action_tx: &mpsc::Sender<MpvAction>,
     app_handle: &AppHandle,
+    mpv: &MpvClient,
     cmd: JellyfinCommand,
   ) -> Result<(), JellyfinError> {
     match cmd {
@@ -355,7 +361,7 @@ impl SessionManager {
         Self::handle_play(client, state, action_tx, request).await?;
       }
       JellyfinCommand::Playstate(request) => {
-        Self::handle_playstate(state, action_tx, request).await?;
+        Self::handle_playstate(state, action_tx, mpv, request).await?;
       }
       JellyfinCommand::GeneralCommand(request) => {
         Self::handle_general_command(state, action_tx, app_handle, request).await?;
@@ -556,6 +562,7 @@ impl SessionManager {
   async fn handle_playstate(
     state: &RwLock<SessionState>,
     action_tx: &mpsc::Sender<MpvAction>,
+    mpv: &MpvClient,
     request: PlaystateRequest,
   ) -> Result<(), JellyfinError> {
     log::info!("handle_playstate: command={}", request.command);
@@ -581,13 +588,17 @@ impl SessionManager {
         let _ = action_tx.send(MpvAction::Resume).await;
       }
       "PlayPause" => {
-        // Toggle based on current state
-        let is_paused = {
-          let s = state.read();
-          s.playback.as_ref().map(|p| p.is_paused).unwrap_or(false)
+        // Query actual MPV state to handle cases where user paused via MPV keyboard
+        let is_paused = match mpv.get_pause().await {
+          Ok(paused) => paused,
+          Err(e) => {
+            log::warn!("Failed to get pause state from MPV: {}, using internal state", e);
+            let s = state.read();
+            s.playback.as_ref().map(|p| p.is_paused).unwrap_or(false)
+          }
         };
         log::info!(
-          "Processing PlayPause command, currently paused={}",
+          "Processing PlayPause command, MPV paused={}",
           is_paused
         );
         if is_paused {
@@ -621,6 +632,7 @@ impl SessionManager {
         }
       }
       "Stop" => {
+        log::info!("Processing Stop command");
         {
           let mut s = state.write();
           s.playback = None;

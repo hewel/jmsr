@@ -86,11 +86,15 @@ impl MpvClient {
 
   /// Stop MPV and disconnect.
   pub fn stop(&self) {
+    log::info!("stop() called - closing IPC connection");
     // Close IPC first
     {
       let mut ipc = self.ipc.lock();
       if let Some(conn) = ipc.take() {
+        log::info!("Closing IPC connection");
         conn.close();
+      } else {
+        log::warn!("No IPC connection to close");
       }
     }
 
@@ -98,8 +102,17 @@ impl MpvClient {
     {
       let mut process = self.process.lock();
       if let Some(mut child) = process.take() {
-        let _ = child.kill();
-        let _ = child.wait();
+        log::info!("Killing MPV process (pid: {:?})", child.id());
+        match child.kill() {
+          Ok(_) => log::info!("kill() succeeded"),
+          Err(e) => log::error!("kill() failed: {}", e),
+        }
+        match child.wait() {
+          Ok(status) => log::info!("MPV process exited with: {}", status),
+          Err(e) => log::error!("wait() failed: {}", e),
+        }
+      } else {
+        log::warn!("No MPV process handle to kill");
       }
     }
 
@@ -109,7 +122,10 @@ impl MpvClient {
 
   /// Check if connected.
   pub fn is_connected(&self) -> bool {
-    self.ipc.lock().is_some()
+    let connected = self.ipc.lock().is_some();
+    let has_process = self.process.lock().is_some();
+    log::debug!("is_connected check: ipc={}, process={}", connected, has_process);
+    connected
   }
 
   /// Get a clone of the IPC connection.
@@ -243,12 +259,6 @@ impl MpvClient {
   pub fn events(&self) -> Option<Receiver<MpvEvent>> {
     let guard = self.ipc.lock();
     guard.as_ref().map(|ipc| ipc.events())
-  }
-}
-
-impl Drop for MpvClient {
-  fn drop(&mut self) {
-    self.stop();
   }
 }
 

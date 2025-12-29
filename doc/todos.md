@@ -48,11 +48,11 @@
 
 ## Medium Priority
 
-### Debug Web UI Pause Issue
-- [ ] Investigate: "When I click play button on web, MPV stays paused"
-- [ ] Check logs for `handle_playstate` and `Processing Unpause command`
-- [ ] Verify WebSocket messages are being received
-- [ ] Test with different Jellyfin clients (web, mobile, TV)
+### Debug Web UI Pause Issue ✅
+- [x] Investigate: "When I click play button on web, MPV stays paused"
+- [x] Fixed: `PlayPause` handler now queries actual MPV pause state instead of internal state
+- [x] Root cause: Internal state could get stale if user paused via MPV keyboard (spacebar)
+- [x] Solution: Query `mpv.get_pause()` directly for `PlayPause` toggle commands
 
 ### Error Handling Improvements
 - [ ] Show user-friendly error messages in UI when commands fail
