@@ -1,41 +1,93 @@
-import { createSignal, Show } from 'solid-js';
+import { createForm } from '@tanstack/solid-form';
+import { createSignal, onMount, Show } from 'solid-js';
 import { type Credentials, commands } from '../bindings';
 
 interface LoginPageProps {
   onConnected: () => void;
 }
 
-export default function LoginPage(props: LoginPageProps) {
-  const [serverUrl, setServerUrl] = createSignal('');
-  const [username, setUsername] = createSignal('');
-  const [password, setPassword] = createSignal('');
-  const [loading, setLoading] = createSignal(false);
-  const [error, setError] = createSignal<string | null>(null);
+const STORAGE_KEY = 'jmsr_saved_credentials';
 
-  const handleSubmit = async (e: Event) => {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
+interface SavedCredentials {
+  serverUrl: string;
+  username: string;
+  rememberMe: boolean;
+}
 
-    const credentials: Credentials = {
-      serverUrl: serverUrl(),
-      username: username(),
-      password: password(),
-    };
-
-    try {
-      const result = await commands.jellyfinConnect(credentials);
-      if (result.status === 'ok') {
-        props.onConnected();
-      } else {
-        setError(result.error);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Connection failed');
-    } finally {
-      setLoading(false);
+function loadSavedCredentials(): SavedCredentials | null {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      return JSON.parse(saved) as SavedCredentials;
     }
-  };
+  } catch {
+    // Ignore parse errors
+  }
+  return null;
+}
+
+function saveCredentials(serverUrl: string, username: string): void {
+  const data: SavedCredentials = { serverUrl, username, rememberMe: true };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+function clearSavedCredentials(): void {
+  localStorage.removeItem(STORAGE_KEY);
+}
+
+export default function LoginPage(props: LoginPageProps) {
+  const [error, setError] = createSignal<string | null>(null);
+  const [initialValues, setInitialValues] = createSignal({
+    serverUrl: '',
+    username: '',
+    password: '',
+    rememberMe: false,
+  });
+
+  // Load saved credentials on mount
+  onMount(() => {
+    const saved = loadSavedCredentials();
+    if (saved) {
+      setInitialValues({
+        serverUrl: saved.serverUrl,
+        username: saved.username,
+        password: '',
+        rememberMe: saved.rememberMe,
+      });
+    }
+  });
+
+  const form = createForm(() => ({
+    defaultValues: initialValues(),
+    onSubmit: async ({ value }) => {
+      setError(null);
+
+      const credentials: Credentials = {
+        serverUrl: value.serverUrl,
+        username: value.username,
+        password: value.password,
+      };
+
+      try {
+        const result = await commands.jellyfinConnect(credentials);
+        if (result.status === 'ok') {
+          // Save or clear credentials based on rememberMe
+          if (value.rememberMe) {
+            saveCredentials(value.serverUrl, value.username);
+          } else {
+            clearSavedCredentials();
+          }
+          props.onConnected();
+        } else {
+          setError(result.error);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Connection failed');
+      }
+    },
+  }));
+
+  const isSubmitting = form.useStore((state) => state.isSubmitting);
 
   return (
     <div class="min-h-screen bg-surface flex items-center justify-center p-6">
@@ -52,65 +104,149 @@ export default function LoginPage(props: LoginPageProps) {
             Connect to Server
           </h2>
 
-          <form onSubmit={handleSubmit} class="space-y-5">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              form.handleSubmit();
+            }}
+            class="space-y-5"
+          >
             {/* Server URL */}
-            <div>
-              <label
-                for="serverUrl"
-                class="block text-sm font-medium text-gray-300 mb-2"
-              >
-                Server URL
-              </label>
-              <input
-                id="serverUrl"
-                type="url"
-                value={serverUrl()}
-                onInput={(e) => setServerUrl(e.currentTarget.value)}
-                placeholder="https://jellyfin.example.com"
-                required
-                disabled={loading()}
-                class="w-full px-4 py-3 bg-surface border border-surface-lighter rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-jellyfin focus:border-transparent transition-all duration-200 disabled:opacity-50"
-              />
-            </div>
+            <form.Field
+              name="serverUrl"
+              validators={{
+                onBlur: ({ value }) => {
+                  if (!value) return 'Server URL is required';
+                  try {
+                    new URL(value);
+                    return undefined;
+                  } catch {
+                    return 'Please enter a valid URL';
+                  }
+                },
+              }}
+              children={(field) => {
+                const errors = () => field().state.meta.errors;
+                const touched = () => field().state.meta.isTouched;
+                return (
+                  <div>
+                    <label
+                      for={field().name}
+                      class="block text-sm font-medium text-gray-300 mb-2"
+                    >
+                      Server URL
+                    </label>
+                    <input
+                      id={field().name}
+                      name={field().name}
+                      type="url"
+                      value={field().state.value}
+                      onInput={(e) =>
+                        field().handleChange(e.currentTarget.value)
+                      }
+                      onBlur={field().handleBlur}
+                      placeholder="https://jellyfin.example.com"
+                      disabled={isSubmitting()}
+                      class="w-full px-4 py-3 bg-surface border border-surface-lighter rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-jellyfin focus:border-transparent transition-all duration-200 disabled:opacity-50"
+                    />
+                    <Show when={touched() && errors().length > 0}>
+                      <p class="text-red-400 text-sm mt-1">{errors()[0]}</p>
+                    </Show>
+                  </div>
+                );
+              }}
+            />
 
             {/* Username */}
-            <div>
-              <label
-                for="username"
-                class="block text-sm font-medium text-gray-300 mb-2"
-              >
-                Username
-              </label>
-              <input
-                id="username"
-                type="text"
-                value={username()}
-                onInput={(e) => setUsername(e.currentTarget.value)}
-                placeholder="Enter your username"
-                required
-                disabled={loading()}
-                class="w-full px-4 py-3 bg-surface border border-surface-lighter rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-jellyfin focus:border-transparent transition-all duration-200 disabled:opacity-50"
-              />
-            </div>
+            <form.Field
+              name="username"
+              validators={{
+                onBlur: ({ value }) => {
+                  if (!value) return 'Username is required';
+                  return undefined;
+                },
+              }}
+              children={(field) => {
+                const errors = () => field().state.meta.errors;
+                const touched = () => field().state.meta.isTouched;
+                return (
+                  <div>
+                    <label
+                      for={field().name}
+                      class="block text-sm font-medium text-gray-300 mb-2"
+                    >
+                      Username
+                    </label>
+                    <input
+                      id={field().name}
+                      name={field().name}
+                      type="text"
+                      value={field().state.value}
+                      onInput={(e) =>
+                        field().handleChange(e.currentTarget.value)
+                      }
+                      onBlur={field().handleBlur}
+                      placeholder="Enter your username"
+                      disabled={isSubmitting()}
+                      class="w-full px-4 py-3 bg-surface border border-surface-lighter rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-jellyfin focus:border-transparent transition-all duration-200 disabled:opacity-50"
+                    />
+                    <Show when={touched() && errors().length > 0}>
+                      <p class="text-red-400 text-sm mt-1">{errors()[0]}</p>
+                    </Show>
+                  </div>
+                );
+              }}
+            />
 
             {/* Password */}
-            <div>
-              <label
-                for="password"
-                class="block text-sm font-medium text-gray-300 mb-2"
-              >
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                value={password()}
-                onInput={(e) => setPassword(e.currentTarget.value)}
-                placeholder="Enter your password"
-                disabled={loading()}
-                class="w-full px-4 py-3 bg-surface border border-surface-lighter rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-jellyfin focus:border-transparent transition-all duration-200 disabled:opacity-50"
-              />
-            </div>
+            <form.Field
+              name="password"
+              children={(field) => (
+                <div>
+                  <label
+                    for={field().name}
+                    class="block text-sm font-medium text-gray-300 mb-2"
+                  >
+                    Password
+                  </label>
+                  <input
+                    id={field().name}
+                    name={field().name}
+                    type="password"
+                    value={field().state.value}
+                    onInput={(e) => field().handleChange(e.currentTarget.value)}
+                    onBlur={field().handleBlur}
+                    placeholder="Enter your password"
+                    disabled={isSubmitting()}
+                    class="w-full px-4 py-3 bg-surface border border-surface-lighter rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-jellyfin focus:border-transparent transition-all duration-200 disabled:opacity-50"
+                  />
+                </div>
+              )}
+            />
+
+            {/* Remember Me */}
+            <form.Field
+              name="rememberMe"
+              children={(field) => (
+                <div class="flex items-center gap-3">
+                  <input
+                    id={field().name}
+                    name={field().name}
+                    type="checkbox"
+                    checked={field().state.value}
+                    onChange={(e) =>
+                      field().handleChange(e.currentTarget.checked)
+                    }
+                    disabled={isSubmitting()}
+                    class="w-4 h-4 rounded border-surface-lighter bg-surface text-jellyfin focus:ring-jellyfin focus:ring-2 focus:ring-offset-0"
+                  />
+                  <label for={field().name} class="text-sm text-gray-300">
+                    Remember server and username
+                  </label>
+                </div>
+              )}
+            />
 
             {/* Error Message */}
             <Show when={error()}>
@@ -122,10 +258,10 @@ export default function LoginPage(props: LoginPageProps) {
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={loading()}
+              disabled={isSubmitting()}
               class="w-full py-3 px-6 bg-jellyfin hover:bg-jellyfin-dark text-white font-medium rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              <Show when={loading()} fallback="Connect">
+              <Show when={isSubmitting()} fallback="Connect">
                 <svg
                   class="animate-spin h-5 w-5"
                   xmlns="http://www.w3.org/2000/svg"

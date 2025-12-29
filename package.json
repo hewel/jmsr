@@ -15,7 +15,9 @@
   "dependencies": {
     "@tailwindcss/forms": "^0.5.11",
     "@tailwindcss/postcss": "^4.1.18",
+    "@tanstack/solid-form": "^1.27.6",
     "@tanstack/solid-query": "^5.90.16",
+    "@tanstack/solid-router": "^1.144.0",
     "@tauri-apps/api": "^2.9.1",
     "solid-js": "^1.9.10",
     "tailwindcss": "^4.1.18"
