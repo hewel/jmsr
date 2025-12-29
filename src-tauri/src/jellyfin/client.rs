@@ -345,19 +345,15 @@ impl JellyfinClient {
   }
 
   /// Build the direct play URL for a media source.
+  /// Always uses HTTP streaming URL - even for "File" protocol sources,
+  /// since the file path is on the server, not accessible locally.
   pub fn build_stream_url(&self, item_id: &str, media_source: &MediaSource) -> Option<String> {
     let state = self.state.read();
     let server_url = state.server_url.as_ref()?;
     let token = state.access_token.as_ref()?;
 
-    // For file protocol, return the path directly (local files)
-    if media_source.protocol == "File" {
-      if let Some(path) = &media_source.path {
-        return Some(path.clone());
-      }
-    }
-
-    // Build streaming URL
+    // Build streaming URL - always use HTTP, never raw file paths
+    // The file path in media_source.path is on the server, not locally accessible
     let container = media_source.container.as_deref().unwrap_or("mkv");
     Some(format!(
       "{}/Videos/{}/stream.{}?Static=true&MediaSourceId={}&api_key={}",

@@ -3,13 +3,13 @@
 //! Handles platform-specific socket/pipe connections.
 
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader, Write};
 use std::sync::Arc;
 use std::time::Duration;
 
 use async_channel::{Receiver, Sender};
 use parking_lot::Mutex;
 use thiserror::Error;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
 
@@ -37,12 +37,19 @@ struct IpcState {
   pending: HashMap<i64, PendingRequest>,
 }
 
+/// Writer channel message.
+enum WriteMessage {
+  Command(Vec<u8>),
+  Close,
+}
+
 /// MPV IPC connection.
 pub struct MpvIpc {
   state: Arc<Mutex<IpcState>>,
-  writer: Arc<Mutex<Option<Box<dyn Write + Send>>>>,
+  write_tx: async_channel::Sender<WriteMessage>,
   event_rx: Receiver<MpvEvent>,
   _reader_handle: JoinHandle<()>,
+  _writer_handle: JoinHandle<()>,
 }
 
 impl MpvIpc {
@@ -55,7 +62,7 @@ impl MpvIpc {
         tokio::time::sleep(Duration::from_millis(100 * (attempt as u64 + 1))).await;
       }
 
-      match Self::try_connect(path) {
+      match Self::try_connect(path).await {
         Ok(ipc) => return Ok(ipc),
         Err(e) => {
           log::debug!("IPC connect attempt {} failed: {}", attempt + 1, e);
@@ -68,73 +75,73 @@ impl MpvIpc {
   }
 
   #[cfg(windows)]
-  fn try_connect(path: &str) -> Result<Self, IpcError> {
-    use std::fs::OpenOptions;
+  async fn try_connect(path: &str) -> Result<Self, IpcError> {
+    use tokio::net::windows::named_pipe::ClientOptions;
 
-    let pipe = OpenOptions::new()
-      .read(true)
-      .write(true)
+    let client = ClientOptions::new()
       .open(path)
-      .map_err(|e| IpcError::ConnectionFailed(e.to_string()))?;
+      .map_err(|e| IpcError::ConnectionFailed(format!("Failed to open pipe: {}", e)))?;
 
-    let reader = pipe
-      .try_clone()
-      .map_err(|e| IpcError::ConnectionFailed(e.to_string()))?;
-    let writer: Box<dyn Write + Send> = Box::new(pipe);
-
-    Self::setup(reader, writer)
+    let (reader, writer) = tokio::io::split(client);
+    Self::setup(reader, writer).await
   }
 
   #[cfg(not(windows))]
-  fn try_connect(path: &str) -> Result<Self, IpcError> {
-    use std::os::unix::net::UnixStream;
+  async fn try_connect(path: &str) -> Result<Self, IpcError> {
+    use tokio::net::UnixStream;
 
-    let stream =
-      UnixStream::connect(path).map_err(|e| IpcError::ConnectionFailed(e.to_string()))?;
-
-    let reader = stream
-      .try_clone()
+    let stream = UnixStream::connect(path)
+      .await
       .map_err(|e| IpcError::ConnectionFailed(e.to_string()))?;
-    let writer: Box<dyn Write + Send> = Box::new(stream);
 
-    Self::setup(reader, writer)
+    let (reader, writer) = tokio::io::split(stream);
+    Self::setup(reader, writer).await
   }
 
-  fn setup<R: std::io::Read + Send + 'static>(
-    reader: R,
-    writer: Box<dyn Write + Send>,
-  ) -> Result<Self, IpcError> {
+  async fn setup<R, W>(reader: R, writer: W) -> Result<Self, IpcError>
+  where
+    R: tokio::io::AsyncRead + Send + Unpin + 'static,
+    W: tokio::io::AsyncWrite + Send + Unpin + 'static,
+  {
     let state = Arc::new(Mutex::new(IpcState {
       pending: HashMap::new(),
     }));
 
     let (event_tx, event_rx) = async_channel::unbounded();
-    let writer = Arc::new(Mutex::new(Some(writer)));
+    let (write_tx, write_rx) = async_channel::unbounded::<WriteMessage>();
 
+    // Spawn reader task
     let reader_state = state.clone();
-    let reader_handle = tokio::task::spawn_blocking(move || {
-      Self::reader_loop(reader, reader_state, event_tx);
+    let reader_handle = tokio::spawn(async move {
+      Self::reader_loop(reader, reader_state, event_tx).await;
+    });
+
+    // Spawn writer task
+    let writer_handle = tokio::spawn(async move {
+      Self::writer_loop(writer, write_rx).await;
     });
 
     Ok(Self {
       state,
-      writer,
+      write_tx,
       event_rx,
       _reader_handle: reader_handle,
+      _writer_handle: writer_handle,
     })
   }
 
-  fn reader_loop<R: std::io::Read>(
+  async fn reader_loop<R: tokio::io::AsyncRead + Unpin>(
     reader: R,
     state: Arc<Mutex<IpcState>>,
     event_tx: Sender<MpvEvent>,
   ) {
+    log::info!("MPV IPC reader loop started");
     let mut buf_reader = BufReader::new(reader);
     let mut line = String::new();
 
     loop {
       line.clear();
-      match buf_reader.read_line(&mut line) {
+      match buf_reader.read_line(&mut line).await {
         Ok(0) => {
           log::info!("MPV IPC connection closed");
           break;
@@ -147,13 +154,18 @@ impl MpvIpc {
 
           match MpvMessage::parse(trimmed) {
             Ok(MpvMessage::Response(response)) => {
+              log::info!(
+                "MPV reader: received response for request_id={}",
+                response.request_id
+              );
               let mut state = state.lock();
               if let Some(tx) = state.pending.remove(&response.request_id) {
                 let _ = tx.send(Ok(response));
               }
             }
             Ok(MpvMessage::Event(event)) => {
-              let _ = event_tx.send_blocking(event);
+              log::info!("MPV reader: received event {:?}", event);
+              let _ = event_tx.send(event).await;
             }
             Err(e) => {
               log::warn!("Failed to parse MPV message: {} - {}", e, trimmed);
@@ -162,6 +174,37 @@ impl MpvIpc {
         }
         Err(e) => {
           log::error!("MPV IPC read error: {}", e);
+          break;
+        }
+      }
+    }
+  }
+
+  async fn writer_loop<W: tokio::io::AsyncWrite + Unpin>(
+    mut writer: W,
+    write_rx: async_channel::Receiver<WriteMessage>,
+  ) {
+    log::info!("MPV IPC writer loop started");
+
+    while let Ok(msg) = write_rx.recv().await {
+      match msg {
+        WriteMessage::Command(data) => {
+          if let Err(e) = writer.write_all(&data).await {
+            log::error!("MPV IPC write error: {}", e);
+            break;
+          }
+          if let Err(e) = writer.write_all(b"\n").await {
+            log::error!("MPV IPC write newline error: {}", e);
+            break;
+          }
+          if let Err(e) = writer.flush().await {
+            log::error!("MPV IPC flush error: {}", e);
+            break;
+          }
+          log::info!("MPV command written to pipe");
+        }
+        WriteMessage::Close => {
+          log::info!("MPV IPC writer closing");
           break;
         }
       }
@@ -183,21 +226,33 @@ impl MpvIpc {
 
     // Serialize and send
     let json = serde_json::to_string(&cmd).map_err(|e| IpcError::WriteFailed(e.into()))?;
+    log::info!("Sending MPV command: {}", json);
 
-    {
-      let mut writer_guard = self.writer.lock();
-      let writer = writer_guard.as_mut().ok_or(IpcError::Disconnected)?;
-      writer.write_all(json.as_bytes())?;
-      writer.write_all(b"\n")?;
-      writer.flush()?;
-    }
+    // Send to writer task
+    self
+      .write_tx
+      .send(WriteMessage::Command(json.into_bytes()))
+      .await
+      .map_err(|_| IpcError::Disconnected)?;
+
+    log::info!("MPV command queued, waiting for response...");
 
     // Wait for response with timeout
     match tokio::time::timeout(Duration::from_secs(5), rx).await {
-      Ok(Ok(result)) => result,
-      Ok(Err(_)) => Err(IpcError::Disconnected),
+      Ok(Ok(result)) => {
+        log::info!("MPV response received: {:?}", result);
+        result
+      }
+      Ok(Err(_)) => {
+        log::error!("MPV IPC channel closed unexpectedly");
+        Err(IpcError::Disconnected)
+      }
       Err(_) => {
         // Remove pending request on timeout
+        log::error!(
+          "MPV command timeout after 5 seconds, request_id={}",
+          request_id
+        );
         let mut state = self.state.lock();
         state.pending.remove(&request_id);
         Err(IpcError::Timeout)
@@ -212,7 +267,6 @@ impl MpvIpc {
 
   /// Close the connection.
   pub fn close(&self) {
-    let mut writer = self.writer.lock();
-    *writer = None;
+    let _ = self.write_tx.send_blocking(WriteMessage::Close);
   }
 }

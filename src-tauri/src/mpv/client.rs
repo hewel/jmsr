@@ -104,8 +104,11 @@ impl MpvClient {
 
   /// Send a command to MPV.
   async fn send(&self, cmd: MpvCommand) -> Result<MpvResponse, MpvError> {
+    log::info!("send: acquiring IPC lock...");
     let ipc = self.get_ipc()?;
+    log::info!("send: got IPC, sending command...");
     let response = ipc.send_command(cmd).await?;
+    log::info!("send: got response, error={}", response.error);
 
     if !response.is_success() {
       return Err(MpvError::CommandFailed(response.error));
@@ -116,7 +119,10 @@ impl MpvClient {
 
   /// Load a file for playback.
   pub async fn loadfile(&self, url: &str) -> Result<(), MpvError> {
-    self.send(MpvCommand::loadfile(url)).await?;
+    log::info!("loadfile: getting IPC connection...");
+    let result = self.send(MpvCommand::loadfile(url)).await;
+    log::info!("loadfile: send result = {:?}", result.as_ref().map(|_| "ok").map_err(|e| e.to_string()));
+    result?;
     Ok(())
   }
 

@@ -114,30 +114,37 @@ impl SessionManager {
       let mpv = self.mpv.clone();
 
       tokio::spawn(async move {
+        log::info!("MPV action consumer started, waiting for actions...");
         while let Some(action) = action_rx.recv().await {
-          log::debug!("Processing MPV action: {:?}", action);
+          log::info!("Processing MPV action: {:?}", action);
 
           match action {
             MpvAction::Play {
               url,
               start_position,
             } => {
+              log::info!("MpvAction::Play received, url={}", url);
               // Start MPV if not already running
               if !mpv.is_connected() {
+                log::info!("MPV not connected, starting...");
                 if let Err(e) = mpv.start().await {
                   log::error!("Failed to start MPV: {}", e);
                   continue;
                 }
+                log::info!("MPV started successfully");
               }
 
               // Load the file
+              log::info!("Loading file into MPV: {}", url);
               if let Err(e) = mpv.loadfile(&url).await {
                 log::error!("Failed to load file: {}", e);
                 continue;
               }
+              log::info!("File loaded successfully");
 
               // Seek to start position if specified
               if start_position > 0.0 {
+                log::info!("Seeking to position: {} seconds", start_position);
                 // Wait a bit for file to load before seeking
                 tokio::time::sleep(std::time::Duration::from_millis(500)).await;
                 if let Err(e) = mpv.seek(start_position).await {
@@ -209,11 +216,14 @@ impl SessionManager {
     action_tx: &mpsc::Sender<MpvAction>,
     request: PlayRequest,
   ) -> Result<(), JellyfinError> {
+    log::info!("handle_play called with request: {:?}", request);
+    
     // Get the first item ID
     let item_id = request
       .item_ids
       .first()
       .ok_or(JellyfinError::SessionNotFound)?;
+    log::info!("Playing item_id: {}", item_id);
 
     // Get playback info
     let playback_info = client
@@ -223,17 +233,20 @@ impl SessionManager {
         request.subtitle_stream_index,
       )
       .await?;
+    log::info!("Got playback info, media_sources count: {}", playback_info.media_sources.len());
 
     // Get the best media source
     let media_source = playback_info
       .media_sources
       .first()
       .ok_or(JellyfinError::SessionNotFound)?;
+    log::info!("Using media_source: id={}, protocol={:?}", media_source.id, media_source.protocol);
 
     // Build stream URL
     let url = client
       .build_stream_url(item_id, media_source)
       .ok_or(JellyfinError::NotConnected)?;
+    log::info!("Built stream URL: {}", url);
 
     // Calculate start position
     let start_position = request
@@ -279,12 +292,14 @@ impl SessionManager {
     client.report_playback_start(&start_info).await?;
 
     // Send action to MPV
+    log::info!("Sending MpvAction::Play to action channel");
     let _ = action_tx
       .send(MpvAction::Play {
         url,
         start_position,
       })
       .await;
+    log::info!("MpvAction::Play sent successfully");
 
     Ok(())
   }
