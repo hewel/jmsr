@@ -54,6 +54,8 @@ struct SessionState {
   last_report_time: std::time::Instant,
   /// Current series ID being played (for track preference saving).
   current_series_id: Option<String>,
+  /// Current item being played (for next episode lookup).
+  current_item: Option<MediaItem>,
   /// Current media streams (for looking up track languages).
   current_media_streams: Vec<MediaStream>,
   /// Track preferences per series (key: series_id).
@@ -88,6 +90,7 @@ impl SessionManager {
         playback: None,
         last_report_time: std::time::Instant::now(),
         current_series_id: None,
+        current_item: None,
         current_media_streams: Vec::new(),
         series_preferences,
       })),
@@ -189,6 +192,9 @@ impl SessionManager {
 
     // Start progress reporting loop
     self.start_progress_reporting();
+
+    // Start MPV event listener for end-of-file detection
+    self.start_mpv_event_listener();
 
     Ok(())
   }
@@ -454,6 +460,7 @@ impl SessionManager {
     {
       let mut s = state.write();
       s.current_series_id = item.series_id.clone();
+      s.current_item = Some(item.clone());
       s.current_media_streams = media_source.media_streams.clone();
       s.playback = Some(PlaybackSession {
         item_id: item_id.clone(),
@@ -808,6 +815,124 @@ impl SessionManager {
             }
           }
         }
+      }
+    });
+  }
+
+  /// Start MPV event listener for end-of-file detection and auto-play next episode.
+  fn start_mpv_event_listener(&self) {
+    let mpv = self.mpv.clone();
+    let client = self.client.clone();
+    let state = self.state.clone();
+    let action_tx = self.action_tx.clone();
+
+    tokio::spawn(async move {
+      log::info!("MPV event listener started");
+
+      // Wait a bit for MPV to connect before trying to get events
+      tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+
+      loop {
+        // Try to get the event receiver
+        let event_rx = match mpv.events() {
+          Some(rx) => rx,
+          None => {
+            // MPV not connected yet, wait and retry
+            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+            continue;
+          }
+        };
+
+        log::info!("Got MPV event receiver, listening for events...");
+
+        // Process events
+        while let Ok(event) = event_rx.recv().await {
+          log::debug!("MPV event: {:?}", event);
+
+          if event.event == "end-file" {
+            // Check if playback ended naturally (not due to error or stop command)
+            let reason = event.data
+              .as_ref()
+              .and_then(|d| d.get("reason"))
+              .and_then(|r| r.as_str())
+              .unwrap_or("");
+
+            log::info!("MPV end-file event, reason: {}", reason);
+
+            // "eof" means natural end of file, "stop" means user stopped
+            if reason == "eof" {
+              // Get current item for next episode lookup
+              let current_item = {
+                let s = state.read();
+                s.current_item.clone()
+              };
+
+              if let Some(item) = current_item {
+                log::info!("Playback ended naturally, checking for next episode...");
+
+                // Report playback stopped to Jellyfin
+                {
+                  let session = {
+                    let mut s = state.write();
+                    s.playback.take()
+                  };
+
+                  if let Some(session) = session {
+                    let stop_info = PlaybackStopInfo {
+                      item_id: session.item_id,
+                      media_source_id: session.media_source_id,
+                      play_session_id: session.play_session_id,
+                      position_ticks: Some(session.position_ticks),
+                    };
+                    if let Err(e) = client.report_playback_stop(&stop_info).await {
+                      log::error!("Failed to report playback stop: {}", e);
+                    }
+                  }
+                }
+
+                // Try to get next episode
+                match client.get_next_episode(&item).await {
+                  Ok(Some(next_item)) => {
+                    log::info!(
+                      "Auto-playing next episode: {} - S{:02}E{:02}",
+                      next_item.series_name.as_deref().unwrap_or("Unknown"),
+                      next_item.parent_index_number.unwrap_or(0),
+                      next_item.index_number.unwrap_or(0)
+                    );
+
+                    // Create a synthetic PlayRequest for the next episode
+                    let play_request = PlayRequest {
+                      item_ids: vec![next_item.id.clone()],
+                      start_position_ticks: None,
+                      play_command: "PlayNow".to_string(),
+                      media_source_id: None,
+                      audio_stream_index: None,
+                      subtitle_stream_index: None,
+                    };
+
+                    // Handle the play request
+                    if let Err(e) = Self::handle_play(&client, &state, &action_tx, play_request).await {
+                      log::error!("Failed to auto-play next episode: {}", e);
+                    }
+                  }
+                  Ok(None) => {
+                    log::info!("No next episode available, playback complete");
+                    // Clear current item
+                    let mut s = state.write();
+                    s.current_item = None;
+                    s.current_series_id = None;
+                  }
+                  Err(e) => {
+                    log::error!("Failed to get next episode: {}", e);
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        log::info!("MPV event receiver closed, waiting for reconnection...");
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
       }
     });
   }

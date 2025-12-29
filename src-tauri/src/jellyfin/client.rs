@@ -470,6 +470,55 @@ impl JellyfinClient {
     Ok(capabilities)
   }
 
+  /// Get the next episode in a series after the given episode.
+  ///
+  /// Uses the /Shows/{seriesId}/Episodes endpoint with StartItemId to get adjacent episodes.
+  /// Returns None if there's no next episode or if the item is not an episode.
+  pub async fn get_next_episode(&self, current_item: &MediaItem) -> Result<Option<MediaItem>, JellyfinError> {
+    // Only works for episodes
+    if current_item.item_type != "Episode" {
+      log::debug!("get_next_episode: not an episode, skipping");
+      return Ok(None);
+    }
+
+    let series_id = match &current_item.series_id {
+      Some(id) => id,
+      None => {
+        log::debug!("get_next_episode: no series_id, skipping");
+        return Ok(None);
+      }
+    };
+
+    let user_id = self.user_id()?;
+    
+    // Get episodes starting from current, limit 2 (current + next)
+    let path = format!(
+      "/Shows/{}/Episodes?UserId={}&StartItemId={}&Limit=2&Fields=MediaSources,MediaStreams",
+      series_id, user_id, current_item.id
+    );
+
+    let response: EpisodesResponse = self.get(&path).await?;
+    
+    // The response includes the current episode and the next one (if exists)
+    // We want the second item (index 1) which is the next episode
+    if response.items.len() >= 2 {
+      let next_ep = response.items.into_iter().nth(1);
+      if let Some(ref ep) = next_ep {
+        log::info!(
+          "Found next episode: {} - S{:02}E{:02} - {}",
+          ep.series_name.as_deref().unwrap_or("Unknown"),
+          ep.parent_index_number.unwrap_or(0),
+          ep.index_number.unwrap_or(0),
+          ep.name
+        );
+      }
+      Ok(next_ep)
+    } else {
+      log::info!("No next episode available (end of series or season)");
+      Ok(None)
+    }
+  }
+
   /// Validate that our session appears in the Jellyfin session list.
   /// This checks if we're visible as a cast target.
   pub async fn validate_session(&self) -> Result<(), JellyfinError> {

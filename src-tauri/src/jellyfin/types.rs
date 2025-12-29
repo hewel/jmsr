@@ -302,3 +302,11 @@ pub fn find_stream_by_lang(streams: &[MediaStream], stream_type: &str, lang: &st
     })
     .map(|s| s.index)
 }
+
+/// Response from /Shows/{seriesId}/Episodes endpoint.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct EpisodesResponse {
+  pub items: Vec<MediaItem>,
+  pub total_record_count: i32,
+}

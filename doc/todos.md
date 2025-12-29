@@ -30,6 +30,22 @@
 - [x] `load_preferences_from_store()` loads from `preferences.json` on init
 - [x] `save_preferences_static()` saves to disk when user changes tracks
 
+### Auto-Play Next Episode ✅
+**Goal**: When an episode finishes playing naturally (EOF), automatically start the next episode in the series.
+
+**Status**: ✅ Complete
+
+#### Implementation Details
+- [x] Added `EpisodesResponse` struct in `types.rs` for parsing episodes API
+- [x] Added `get_next_episode()` method in `client.rs` using `/Shows/{seriesId}/Episodes` endpoint
+- [x] Added `current_item: Option<MediaItem>` to `SessionState` to track what's playing
+- [x] Added `start_mpv_event_listener()` in `session.rs` that:
+  - Spawns background task listening to MPV events
+  - Detects `end-file` events with `reason: "eof"` (natural end, not user stop)
+  - Reports playback stopped to Jellyfin
+  - Fetches and plays next episode automatically
+- [x] Track preferences from series-based persistence apply to auto-played episodes
+
 ## Medium Priority
 
 ### Debug Web UI Pause Issue
@@ -74,3 +90,4 @@
 - [x] Config persistence to disk (tauri-plugin-store)
 - [x] Apply config changes live (MPV path/args, device name)
 - [x] Series-based track persistence (audio/subtitle preferences per series)
+- [x] Auto-play next episode when current finishes naturally
