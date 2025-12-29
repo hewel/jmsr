@@ -164,7 +164,7 @@ impl MpvIpc {
               }
             }
             Ok(MpvMessage::Event(event)) => {
-              log::debug!("MPV reader: received event {:?}", event);
+              log::debug!("MPV event: {} (reason={:?})", event.event, event.reason);
               let _ = event_tx.send(event).await;
             }
             Err(e) => {

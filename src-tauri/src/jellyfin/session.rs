@@ -847,8 +847,6 @@ impl SessionManager {
 
         // Process events
         while let Ok(event) = event_rx.recv().await {
-          log::debug!("MPV event: {:?}", event);
-
           if event.event == "end-file" {
             // Check if playback ended naturally (not due to error or stop command)
             // The reason field is at the top level of the event (not in data)

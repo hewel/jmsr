@@ -95,7 +95,7 @@ pub fn spawn_mpv(mpv_path: Option<&PathBuf>, extra_args: &[String]) -> Result<Ch
     .arg(format!("--input-ipc-server={}", ipc))
     .arg("--idle")
     .arg("--force-window")
-    .arg("--keep-open")
+    .arg("--keep-open=no")
     .arg("--no-terminal");
 
   // Add user-specified extra arguments
