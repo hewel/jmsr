@@ -8,6 +8,9 @@ pub enum JellyfinError {
   #[error("HTTP request failed: {0}")]
   Http(#[from] reqwest::Error),
 
+  #[error("HTTP error: {0}")]
+  HttpError(String),
+
   #[error("WebSocket error: {0}")]
   WebSocket(#[from] tokio_tungstenite::tungstenite::Error),
 

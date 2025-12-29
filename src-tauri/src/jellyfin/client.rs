@@ -289,7 +289,7 @@ impl JellyfinClient {
   }
 
   /// Make an authenticated POST request without expecting a response body.
-  pub async fn post_empty<B: serde::Serialize>(
+  pub async fn post_empty<B: serde::Serialize + std::fmt::Debug>(
     &self,
     path: &str,
     body: &B,
@@ -298,7 +298,9 @@ impl JellyfinClient {
     let token = self.access_token()?;
     let url = format!("{}{}", server_url, path);
 
-    self
+    log::debug!("POST {} with body: {:?}", path, body);
+
+    let response = self
       .http
       .post(&url)
       .header(header::CONTENT_TYPE, "application/json")
@@ -306,6 +308,16 @@ impl JellyfinClient {
       .json(body)
       .send()
       .await?;
+
+    let status = response.status();
+    if !status.is_success() {
+      let body = response.text().await.unwrap_or_default();
+      log::error!("POST {} failed with status {}: {}", path, status, body);
+      return Err(JellyfinError::HttpError(format!(
+        "HTTP {} - {}",
+        status, body
+      )));
+    }
 
     Ok(())
   }

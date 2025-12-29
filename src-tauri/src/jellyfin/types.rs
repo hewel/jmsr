@@ -202,6 +202,7 @@ pub struct PlaybackStartInfo {
   #[serde(default)]
   pub subtitle_stream_index: Option<i32>,
   pub play_method: String,
+  pub can_seek: bool,
 }
 
 /// Playback progress info (sent periodically to Jellyfin).
@@ -223,6 +224,7 @@ pub struct PlaybackProgressInfo {
   #[serde(default)]
   pub subtitle_stream_index: Option<i32>,
   pub play_method: String,
+  pub can_seek: bool,
 }
 
 /// Playback stop info (sent when playback ends).

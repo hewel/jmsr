@@ -288,6 +288,7 @@ impl SessionManager {
       } else {
         "Transcode".to_string()
       },
+      can_seek: true,
     };
     client.report_playback_start(&start_info).await?;
 
@@ -386,6 +387,7 @@ impl SessionManager {
 
     tokio::spawn(async move {
       let mut interval = tokio::time::interval(std::time::Duration::from_secs(5));
+      log::info!("Progress reporting loop started");
 
       loop {
         interval.tick().await;
@@ -398,33 +400,44 @@ impl SessionManager {
 
         if let Some(session) = session {
           // Get current position from MPV
-          if let Ok(position) = mpv.get_time_pos().await {
-            let position_ticks = seconds_to_ticks(position);
+          match mpv.get_time_pos().await {
+            Ok(position) => {
+              let position_ticks = seconds_to_ticks(position);
+              log::info!("Reporting progress: position={}s, ticks={}", position, position_ticks);
 
-            // Update state
-            {
-              let mut s = state.write();
-              if let Some(ref mut playback) = s.playback {
-                playback.position_ticks = position_ticks;
+              // Update state
+              {
+                let mut s = state.write();
+                if let Some(ref mut playback) = s.playback {
+                  playback.position_ticks = position_ticks;
+                }
+              }
+
+              // Report progress
+              let progress = PlaybackProgressInfo {
+                item_id: session.item_id.clone(),
+                media_source_id: session.media_source_id.clone(),
+                play_session_id: session.play_session_id.clone(),
+                position_ticks: Some(position_ticks),
+                is_paused: session.is_paused,
+                is_muted: false,
+                volume_level: session.volume,
+                audio_stream_index: session.audio_stream_index,
+                subtitle_stream_index: session.subtitle_stream_index,
+                play_method: "DirectPlay".to_string(),
+                can_seek: true,
+              };
+
+              log::debug!("Progress payload: {:?}", progress);
+
+              if let Err(e) = client.report_playback_progress(&progress).await {
+                log::error!("Failed to report playback progress: {}", e);
+              } else {
+                log::info!("Progress reported successfully");
               }
             }
-
-            // Report progress
-            let progress = PlaybackProgressInfo {
-              item_id: session.item_id,
-              media_source_id: session.media_source_id,
-              play_session_id: session.play_session_id,
-              position_ticks: Some(position_ticks),
-              is_paused: session.is_paused,
-              is_muted: false,
-              volume_level: session.volume,
-              audio_stream_index: session.audio_stream_index,
-              subtitle_stream_index: session.subtitle_stream_index,
-              play_method: "DirectPlay".to_string(),
-            };
-
-            if let Err(e) = client.report_playback_progress(&progress).await {
-              log::error!("Failed to report playback progress: {}", e);
+            Err(e) => {
+              log::warn!("Failed to get time position from MPV: {}", e);
             }
           }
         }
