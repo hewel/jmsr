@@ -263,3 +263,14 @@ pub fn seconds_to_ticks(seconds: f64) -> i64 {
 pub fn ticks_to_seconds(ticks: i64) -> f64 {
   ticks as f64 / TICKS_PER_SECOND as f64
 }
+
+/// Saved session data for persistence.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SavedSession {
+  pub server_url: String,
+  pub access_token: String,
+  pub user_id: String,
+  pub user_name: String,
+  pub server_name: Option<String>,
+}

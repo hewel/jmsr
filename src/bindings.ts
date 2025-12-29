@@ -157,6 +157,23 @@ async jellyfinGetState() : Promise<ConnectionState> {
  */
 async jellyfinIsConnected() : Promise<boolean> {
     return await TAURI_INVOKE("jellyfin_is_connected");
+},
+/**
+ * Get the current session data for saving.
+ */
+async jellyfinGetSession() : Promise<SavedSession | null> {
+    return await TAURI_INVOKE("jellyfin_get_session");
+},
+/**
+ * Restore a session from saved data.
+ */
+async jellyfinRestoreSession(session: SavedSession) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("jellyfin_restore_session", { session }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -190,6 +207,10 @@ export type PropertyValue = boolean | number | string |
  * Arrays serialized as JSON string for specta compatibility.
  */
 string | null
+/**
+ * Saved session data for persistence.
+ */
+export type SavedSession = { serverUrl: string; accessToken: string; userId: string; userName: string; serverName: string | null }
 
 /** tauri-specta globals **/
 

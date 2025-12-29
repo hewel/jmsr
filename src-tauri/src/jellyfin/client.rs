@@ -148,6 +148,55 @@ impl JellyfinClient {
     state.server_name = None;
   }
 
+  /// Restore a session from saved data.
+  ///
+  /// Validates the token by making a test API call.
+  pub async fn restore_session(&self, session: &SavedSession) -> Result<(), JellyfinError> {
+    // Set the state first
+    {
+      let mut state = self.state.write();
+      state.server_url = Some(session.server_url.clone());
+      state.access_token = Some(session.access_token.clone());
+      state.user_id = Some(session.user_id.clone());
+      state.user_name = Some(session.user_name.clone());
+      state.server_name = session.server_name.clone();
+    }
+
+    // Validate the token by calling /System/Info/Public
+    // If this fails, clear the state and return error
+    match self.fetch_server_info().await {
+      Ok(_) => Ok(()),
+      Err(e) => {
+        self.disconnect();
+        Err(JellyfinError::AuthFailed(format!(
+          "Session validation failed: {}",
+          e
+        )))
+      }
+    }
+  }
+
+  /// Get current session data for persistence.
+  pub fn get_saved_session(&self) -> Option<SavedSession> {
+    let state = self.state.read();
+    if let (Some(server_url), Some(access_token), Some(user_id), Some(user_name)) = (
+      state.server_url.clone(),
+      state.access_token.clone(),
+      state.user_id.clone(),
+      state.user_name.clone(),
+    ) {
+      Some(SavedSession {
+        server_url,
+        access_token,
+        user_id,
+        user_name,
+        server_name: state.server_name.clone(),
+      })
+    } else {
+      None
+    }
+  }
+
   /// Check if connected.
   pub fn is_connected(&self) -> bool {
     let state = self.state.read();

@@ -6,7 +6,7 @@ use std::sync::Arc;
 use tauri::State;
 use tauri_specta::{collect_commands, Builder};
 
-use crate::jellyfin::{ConnectionState, Credentials, JellyfinClient, SessionManager};
+use crate::jellyfin::{ConnectionState, Credentials, JellyfinClient, SavedSession, SessionManager};
 use crate::mpv::{MpvClient, PropertyValue};
 
 /// Player state returned to frontend.
@@ -240,6 +240,37 @@ pub fn jellyfin_is_connected(state: State<'_, JellyfinState>) -> bool {
   state.client.is_connected()
 }
 
+/// Get the current session data for saving.
+#[tauri::command]
+#[specta]
+pub fn jellyfin_get_session(state: State<'_, JellyfinState>) -> Option<SavedSession> {
+  state.client.get_saved_session()
+}
+
+/// Restore a session from saved data.
+#[tauri::command]
+#[specta]
+pub async fn jellyfin_restore_session(
+  state: State<'_, JellyfinState>,
+  session: SavedSession,
+) -> Result<(), String> {
+  // Restore connection from saved session
+  state
+    .client
+    .restore_session(&session)
+    .await
+    .map_err(|e| e.to_string())?;
+
+  // Create and start session manager
+  let session_mgr = Arc::new(SessionManager::new(state.client.clone(), state.mpv.clone()));
+  session_mgr.start().await.map_err(|e| e.to_string())?;
+
+  // Store session
+  *state.session.write() = Some(session_mgr);
+
+  Ok(())
+}
+
 pub fn command_builder() -> Builder {
   let builder = Builder::<tauri::Wry>::new().commands(collect_commands![
     // General
@@ -261,6 +292,8 @@ pub fn command_builder() -> Builder {
     jellyfin_disconnect,
     jellyfin_get_state,
     jellyfin_is_connected,
+    jellyfin_get_session,
+    jellyfin_restore_session,
   ]);
 
   #[cfg(debug_assertions)] // <- Only export on non-release builds
@@ -268,4 +301,15 @@ pub fn command_builder() -> Builder {
     .export(Typescript::default(), "../src/bindings.ts")
     .expect("Failed to export typescript bindings");
   builder
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn export_bindings() {
+    // This test triggers binding generation
+    let _ = command_builder();
+  }
 }

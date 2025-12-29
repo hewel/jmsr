@@ -1,5 +1,6 @@
 import { createForm } from '@tanstack/solid-form';
 import { createSignal, onMount, Show } from 'solid-js';
+import { saveSession } from '../App';
 import { type Credentials, commands } from '../bindings';
 
 interface LoginPageProps {
@@ -77,6 +78,13 @@ export default function LoginPage(props: LoginPageProps) {
           } else {
             clearSavedCredentials();
           }
+
+          // Save the full session (with auth token) for auto-reconnect
+          const session = await commands.jellyfinGetSession();
+          if (session) {
+            saveSession(session);
+          }
+
           props.onConnected();
         } else {
           setError(result.error);

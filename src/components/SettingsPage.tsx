@@ -1,4 +1,5 @@
 import { createResource, createSignal, Show } from 'solid-js';
+import { clearSavedSession } from '../App';
 import { type ConnectionState, commands } from '../bindings';
 
 interface SettingsPageProps {
@@ -25,6 +26,8 @@ export default function SettingsPage(props: SettingsPageProps) {
     try {
       const result = await commands.jellyfinDisconnect();
       if (result.status === 'ok') {
+        // Clear saved session so user won't auto-reconnect
+        clearSavedSession();
         props.onDisconnected();
       }
     } finally {
