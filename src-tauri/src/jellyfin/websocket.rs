@@ -41,7 +41,12 @@ impl JellyfinWebSocket {
   }
 
   /// Connect to Jellyfin WebSocket.
-  pub async fn connect(&self, url: &str) -> Result<(), JellyfinError> {
+  /// Accepts optional capabilities JSON to send via WebSocket (Double Report Strategy).
+  pub async fn connect(
+    &self,
+    url: &str,
+    capabilities: Option<serde_json::Value>,
+  ) -> Result<(), JellyfinError> {
     let (ws_stream, _) = connect_async(url).await?;
     let (mut write, mut read) = ws_stream.split();
 
@@ -56,18 +61,33 @@ impl JellyfinWebSocket {
 
     // Spawn WebSocket reader task
     tokio::spawn(async move {
-      // Send initial capabilities message
-      let capabilities = serde_json::json!({
+      // FIX 1: "1000,1000" tells the server we are an ACTIVE client
+      let session_start = serde_json::json!({
         "MessageType": "SessionsStart",
         "Data": "1000,1000"
       });
       if let Err(e) = write
-        .send(Message::Text(capabilities.to_string().into()))
+        .send(Message::Text(session_start.to_string().into()))
         .await
       {
-        log::error!("Failed to send capabilities: {}", e);
+        log::error!("Failed to send SessionsStart: {}", e);
         *connected.write() = false;
         return;
+      }
+
+      // FIX 2: Send Capabilities via WebSocket (Double Report Strategy)
+      if let Some(caps) = capabilities {
+        let report_caps = serde_json::json!({
+          "MessageType": "ReportCapabilities",
+          "Data": caps
+        });
+        log::info!("Reporting capabilities via WebSocket");
+        if let Err(e) = write
+          .send(Message::Text(report_caps.to_string().into()))
+          .await
+        {
+          log::error!("Failed to send ReportCapabilities via WS: {}", e);
+        }
       }
 
       // Keep-alive interval

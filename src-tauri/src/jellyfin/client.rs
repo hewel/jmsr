@@ -408,91 +408,73 @@ impl JellyfinClient {
     self.post_empty("/Sessions/Playing/Stopped", info).await
   }
 
-  /// Report session capabilities to Jellyfin.
+  /// Report session capabilities to Jellyfin via HTTP, and return the payload for WS.
   ///
   /// This makes the client appear as a controllable cast target.
   /// Includes a full DeviceProfile for proper Jellyfin cast visibility.
-  pub async fn report_capabilities(&self) -> Result<(), JellyfinError> {
+  /// Returns the capabilities JSON so it can be sent via WebSocket too (Double Report Strategy).
+  pub async fn report_capabilities(&self) -> Result<serde_json::Value, JellyfinError> {
+    let device_id = self.device_id();
+
+    // Define the device profile (Critical for visibility)
+    let device_profile = serde_json::json!({
+      "Name": DEVICE_NAME,
+      "Id": device_id,
+      "MaxStreamingBitrate": 120_000_000,
+      "MaxStaticBitrate": 100_000_000,
+      "MusicStreamingTranscodingBitrate": 192000,
+      "DirectPlayProfiles": [
+        {
+          "Container": "mkv,mp4,m4v,mov,avi,webm,mp3,aac,flac,opus,wav,ogg,ts",
+          "Type": "Video"
+        },
+        {
+          "Container": "mp3,aac,flac,opus,wav,ogg",
+          "Type": "Audio"
+        }
+      ],
+      "TranscodingProfiles": [
+        {
+          "Container": "ts",
+          "Type": "Video",
+          "AudioCodec": "aac,mp3,opus",
+          "VideoCodec": "h264,hevc,vp9,av1",
+          "Context": "Streaming",
+          "Protocol": "hls",
+          "MinSegments": 1
+        }
+      ],
+      "SubtitleProfiles": [
+        { "Format": "srt", "Method": "External" },
+        { "Format": "ass", "Method": "External" },
+        { "Format": "sub", "Method": "External" }
+      ]
+    });
+
+    // Define main capabilities
     let capabilities = serde_json::json!({
       "PlayableMediaTypes": ["Video", "Audio"],
       "SupportsMediaControl": true,
       "SupportedCommands": [
-        "Play",
-        "Pause",
-        "Unpause",
-        "PlayState",
-        "Stop",
-        "Seek",
-        "SetVolume",
-        "VolumeUp",
-        "VolumeDown",
-        "Mute",
-        "Unmute",
-        "ToggleMute",
-        "SetAudioStreamIndex",
-        "SetSubtitleStreamIndex",
-        "PlayNext",
-        "PlayMediaSource"
+        "Play", "Pause", "Unpause", "PlayState", "Stop", "Seek",
+        "SetVolume", "VolumeUp", "VolumeDown", "Mute", "Unmute",
+        "ToggleMute", "SetAudioStreamIndex", "SetSubtitleStreamIndex",
+        "PlayNext", "PlayMediaSource", "DisplayMessage"
       ],
       "SupportsPersistentIdentifier": true,
       "SupportsSync": false,
-      "DeviceProfile": {
-        "Name": "JMSR",
-        "MaxStreamingBitrate": 140_000_000,
-        "MaxStaticBitrate": 140_000_000,
-        "MusicStreamingTranscodingBitrate": 384_000,
-        "DirectPlayProfiles": [
-          {
-            "Container": "mkv,mp4,avi,mov,wmv,ts,m2ts,webm,ogv,flv,3gp",
-            "Type": "Video"
-          },
-          {
-            "Container": "mp3,flac,wav,aac,ogg,wma,m4a,opus,webm",
-            "Type": "Audio"
-          }
-        ],
-        "TranscodingProfiles": [
-          {
-            "Container": "ts",
-            "Type": "Video",
-            "VideoCodec": "h264",
-            "AudioCodec": "aac,mp3",
-            "Context": "Streaming",
-            "Protocol": "hls",
-            "MaxAudioChannels": "6",
-            "MinSegments": 1,
-            "BreakOnNonKeyFrames": true
-          },
-          {
-            "Container": "mp3",
-            "Type": "Audio",
-            "AudioCodec": "mp3",
-            "Context": "Streaming",
-            "Protocol": "http",
-            "MaxAudioChannels": "2"
-          }
-        ],
-        "SubtitleProfiles": [
-          { "Format": "srt", "Method": "External" },
-          { "Format": "ass", "Method": "External" },
-          { "Format": "ssa", "Method": "External" },
-          { "Format": "sub", "Method": "External" },
-          { "Format": "vtt", "Method": "External" },
-          { "Format": "pgs", "Method": "Embed" },
-          { "Format": "pgssub", "Method": "Embed" },
-          { "Format": "dvdsub", "Method": "Embed" },
-          { "Format": "dvbsub", "Method": "Embed" }
-        ],
-        "ResponseProfiles": [],
-        "ContainerProfiles": [],
-        "CodecProfiles": []
-      }
+      "DeviceProfile": device_profile,
+      "AppVersion": CLIENT_VERSION,
+      "IconUrl": "https://raw.githubusercontent.com/jellyfin/jellyfin-ux/master/branding/SVG/icon-transparent.svg"
     });
 
-    log::info!("Reporting capabilities to Jellyfin with full DeviceProfile");
+    log::info!("Reporting capabilities via HTTP (DeviceId: {})", device_id);
     self
       .post_empty("/Sessions/Capabilities/Full", &capabilities)
-      .await
+      .await?;
+
+    // RETURN the JSON so we can send it via WebSocket too
+    Ok(capabilities)
   }
 }
 

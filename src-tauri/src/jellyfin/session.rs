@@ -72,16 +72,23 @@ impl SessionManager {
       "Starting session with Device ID: {}",
       self.client.device_id()
     );
-    // IMPORTANT: Connect WebSocket FIRST, THEN report capabilities.
-    // Jellyfin's WebSocketController.SupportsMediaControl returns true
-    // only when HasOpenSockets is true. Without an active WebSocket,
-    // the session won't appear as a cast target even with correct capabilities.
+
+    // DOUBLE REPORT STRATEGY:
+    // 1. First, report capabilities via HTTP and capture the payload
+    // 2. Connect WebSocket, passing the payload for a second report via WS
+    //
+    // This ensures Jellyfin sees us as a cast target regardless of which
+    // registration path it checks (HTTP session or WebSocket session).
+
+    // Step 1: Report capabilities via HTTP (returns the JSON payload)
+    let caps_payload = self.client.report_capabilities().await?;
+    log::info!("Reported capabilities via HTTP");
+
+    // Step 2: Connect WebSocket with capabilities for second report
     let ws_url = self.client.websocket_url()?;
     log::info!("Connecting to WebSocket: {}", ws_url);
-    self.websocket.connect(&ws_url).await?;
-
-    // Now report capabilities so we appear as a cast target
-    self.client.report_capabilities().await?;
+    self.websocket.connect(&ws_url, Some(caps_payload)).await?;
+    log::info!("Connected to WebSocket and reported capabilities via WS");
 
     // Take the command receiver and start processing
     if let Some(mut command_rx) = self.websocket.take_command_receiver() {
