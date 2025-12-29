@@ -154,7 +154,7 @@ impl MpvIpc {
 
           match MpvMessage::parse(trimmed) {
             Ok(MpvMessage::Response(response)) => {
-              log::info!(
+              log::trace!(
                 "MPV reader: received response for request_id={}",
                 response.request_id
               );
@@ -164,7 +164,7 @@ impl MpvIpc {
               }
             }
             Ok(MpvMessage::Event(event)) => {
-              log::info!("MPV reader: received event {:?}", event);
+              log::debug!("MPV reader: received event {:?}", event);
               let _ = event_tx.send(event).await;
             }
             Err(e) => {
@@ -201,7 +201,7 @@ impl MpvIpc {
             log::error!("MPV IPC flush error: {}", e);
             break;
           }
-          log::info!("MPV command written to pipe");
+          log::trace!("MPV command written to pipe");
         }
         WriteMessage::Close => {
           log::info!("MPV IPC writer closing");
@@ -226,7 +226,7 @@ impl MpvIpc {
 
     // Serialize and send
     let json = serde_json::to_string(&cmd).map_err(|e| IpcError::WriteFailed(e.into()))?;
-    log::info!("Sending MPV command: {}", json);
+    log::trace!("Sending MPV command: {}", json);
 
     // Send to writer task
     self
@@ -235,12 +235,12 @@ impl MpvIpc {
       .await
       .map_err(|_| IpcError::Disconnected)?;
 
-    log::info!("MPV command queued, waiting for response...");
+    log::trace!("MPV command queued, waiting for response...");
 
     // Wait for response with timeout
     match tokio::time::timeout(Duration::from_secs(5), rx).await {
       Ok(Ok(result)) => {
-        log::info!("MPV response received: {:?}", result);
+        log::trace!("MPV response received: {:?}", result);
         result
       }
       Ok(Err(_)) => {

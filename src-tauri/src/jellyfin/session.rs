@@ -851,11 +851,8 @@ impl SessionManager {
 
           if event.event == "end-file" {
             // Check if playback ended naturally (not due to error or stop command)
-            let reason = event.data
-              .as_ref()
-              .and_then(|d| d.get("reason"))
-              .and_then(|r| r.as_str())
-              .unwrap_or("");
+            // The reason field is at the top level of the event (not in data)
+            let reason = event.reason.as_deref().unwrap_or("");
 
             log::info!("MPV end-file event, reason: {}", reason);
 

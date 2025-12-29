@@ -124,6 +124,8 @@ pub struct MpvEvent {
   pub name: Option<String>,
   /// Event data.
   pub data: Option<serde_json::Value>,
+  /// Reason for end-file events (e.g., "eof", "stop", "quit", "error").
+  pub reason: Option<String>,
 }
 
 /// Typed property values from MPV.
