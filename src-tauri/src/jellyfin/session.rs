@@ -68,11 +68,17 @@ impl SessionManager {
 
   /// Start the session (connect WebSocket and begin listening).
   pub async fn start(&self) -> Result<(), JellyfinError> {
-    // Report capabilities so we appear as a cast target
-    self.client.report_capabilities().await?;
-
+    log::info!("Starting session with Device ID: {}", self.client.device_id());
+    // IMPORTANT: Connect WebSocket FIRST, THEN report capabilities.
+    // Jellyfin's WebSocketController.SupportsMediaControl returns true
+    // only when HasOpenSockets is true. Without an active WebSocket,
+    // the session won't appear as a cast target even with correct capabilities.
     let ws_url = self.client.websocket_url()?;
+    log::info!("Connecting to WebSocket: {}", ws_url);
     self.websocket.connect(&ws_url).await?;
+
+    // Now report capabilities so we appear as a cast target
+    self.client.report_capabilities().await?;
 
     // Take the command receiver and start processing
     if let Some(mut command_rx) = self.websocket.take_command_receiver() {

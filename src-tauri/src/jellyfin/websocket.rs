@@ -59,7 +59,7 @@ impl JellyfinWebSocket {
       // Send initial capabilities message
       let capabilities = serde_json::json!({
         "MessageType": "SessionsStart",
-        "Data": "0,1500"
+        "Data": "1000,1000"
       });
       if let Err(e) = write
         .send(Message::Text(capabilities.to_string().into()))
