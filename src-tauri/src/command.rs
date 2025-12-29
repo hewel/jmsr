@@ -189,6 +189,7 @@ pub fn mpv_is_connected(state: State<'_, MpvState>) -> bool {
 #[tauri::command]
 #[specta]
 pub async fn jellyfin_connect(
+  app: tauri::AppHandle,
   state: State<'_, JellyfinState>,
   credentials: Credentials,
 ) -> Result<(), String> {
@@ -200,7 +201,7 @@ pub async fn jellyfin_connect(
     .map_err(|e| e.to_string())?;
 
   // Create and start session manager
-  let session = Arc::new(SessionManager::new(state.client.clone(), state.mpv.clone()));
+  let session = Arc::new(SessionManager::new(state.client.clone(), state.mpv.clone(), app));
   session.start().await.map_err(|e| e.to_string())?;
 
   // Store session
@@ -252,6 +253,7 @@ pub fn jellyfin_get_session(state: State<'_, JellyfinState>) -> Option<SavedSess
 #[tauri::command]
 #[specta]
 pub async fn jellyfin_restore_session(
+  app: tauri::AppHandle,
   state: State<'_, JellyfinState>,
   session: SavedSession,
 ) -> Result<(), String> {
@@ -263,7 +265,7 @@ pub async fn jellyfin_restore_session(
     .map_err(|e| e.to_string())?;
 
   // Create and start session manager
-  let session_mgr = Arc::new(SessionManager::new(state.client.clone(), state.mpv.clone()));
+  let session_mgr = Arc::new(SessionManager::new(state.client.clone(), state.mpv.clone(), app));
   session_mgr.start().await.map_err(|e| e.to_string())?;
 
   // Store session

@@ -13,76 +13,22 @@
 - [x] When MPV path/args change, update MpvClient state (applies on next spawn)
 - [x] Config applied at startup from stored values
 
-### Series-based Track Persistence
+### Series-based Track Persistence ✅
 **Goal**: Automatically select audio and subtitle tracks for TV series based on the user's last manual selection for that series. (e.g., If user selects "Japanese" audio for S01E01, S01E02 should automatically start with Japanese audio).
 
-**Context**: We currently have `MpvAction::Play` which accepts `audio_index` and `subtitle_index`. We need to intercept the play logic to override these indices if a preference exists for the target Series.
+**Status**: ✅ Complete (in-memory + disk persistence)
 
-#### Step 1: Define TrackPreference struct
-Location: `src-tauri/src/jellyfin/types.rs` or `config.rs`
-
-```rust
-#[derive(Debug, Clone, Serialize, Deserialize, Type, Default)]
-pub struct TrackPreference {
-    pub audio_language: Option<String>,   // e.g., "jpn"
-    pub subtitle_language: Option<String>, // e.g., "chi"
-    pub is_subtitle_enabled: bool,
-}
-```
-
-- [ ] Define `TrackPreference` struct
-- [ ] Add `series_preferences: HashMap<String, TrackPreference>` to `SavedSession` (key: SeriesId)
-- [ ] Or create dedicated `PreferenceManager` with file-based persistence
-
-#### Step 2: Apply Preference in `handle_play`
-Location: `src-tauri/src/jellyfin/session.rs`
-
-- [ ] Create helper: `find_stream_by_lang(streams, stream_type, lang) -> Option<i32>`
-- [ ] In `handle_play`, check if `item.series_id` exists
-- [ ] Look up `series_preferences.get(&series_id)`
-- [ ] If preference exists:
-  - Find stream matching `audio_language` → override `audio_index`
-  - If `is_subtitle_enabled`, find stream matching `subtitle_language` → override `subtitle_index`
-  - If `!is_subtitle_enabled`, set `subtitle_index = Some(-1)` to disable
-
-```rust
-// Pseudo-code for handle_play
-let series_id = item.series_id.clone();
-let mut audio_index = request.audio_stream_index;
-let mut subtitle_index = request.subtitle_stream_index;
-
-if let Some(sid) = &series_id {
-    if let Some(pref) = self.get_series_preference(sid) {
-        if let Some(lang) = &pref.audio_language {
-            if let Some(idx) = find_stream_by_lang(&media_streams, "Audio", lang) {
-                audio_index = Some(idx);
-            }
-        }
-        if pref.is_subtitle_enabled {
-            if let Some(lang) = &pref.subtitle_language {
-                if let Some(idx) = find_stream_by_lang(&media_streams, "Subtitle", lang) {
-                    subtitle_index = Some(idx);
-                }
-            }
-        } else {
-            subtitle_index = Some(-1);
-        }
-    }
-}
-```
-
-#### Step 3: Save Preference on Track Change
-Location: `src-tauri/src/jellyfin/session.rs`
-
-- [ ] Extend `MpvClient` to observe `aid`, `sid`, and `track-list` properties
-- [ ] In `SessionManager`, listen to MPV property change events
-- [ ] When `aid` or `sid` changes:
-  - Get new track ID
-  - Get `track-list` property
-  - Find language of selected track
-  - Save to `series_preferences` if currently playing a Series
-- [ ] Debounce save operation (don't save if user is rapidly cycling tracks)
-- [ ] Persist preferences to disk
+#### Implementation Details
+- [x] `TrackPreference` struct in `types.rs` with `audio_language`, `subtitle_language`, `is_subtitle_enabled`
+- [x] `find_stream_by_lang()` helper in `types.rs`
+- [x] `series_preferences: HashMap<String, TrackPreference>` in `SessionState`
+- [x] `current_series_id` and `current_media_streams` tracking in `SessionState`
+- [x] Apply preferences in `handle_play()` when playing series episodes
+- [x] Save preferences in `handle_general_command()` for `SetAudioStreamIndex` and `SetSubtitleStreamIndex`
+- [x] `MpvAction::SetAudioTrack` and `MpvAction::SetSubtitleTrack` variants
+- [x] `SessionManager::new()` accepts `AppHandle` for store access
+- [x] `load_preferences_from_store()` loads from `preferences.json` on init
+- [x] `save_preferences_static()` saves to disk when user changes tracks
 
 ## Medium Priority
 
@@ -125,3 +71,6 @@ Location: `src-tauri/src/jellyfin/session.rs`
 - [x] Configurable device name
 - [x] Settings UI with @tanstack/solid-form
 - [x] PlayPause toggle command support
+- [x] Config persistence to disk (tauri-plugin-store)
+- [x] Apply config changes live (MPV path/args, device name)
+- [x] Series-based track persistence (audio/subtitle preferences per series)

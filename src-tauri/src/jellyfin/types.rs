@@ -101,6 +101,8 @@ pub struct MediaItem {
   #[serde(rename = "Type")]
   pub item_type: String,
   #[serde(default)]
+  pub series_id: Option<String>,
+  #[serde(default)]
   pub series_name: Option<String>,
   #[serde(default)]
   pub season_name: Option<String>,
@@ -276,4 +278,27 @@ pub struct SavedSession {
   pub user_name: String,
   pub server_name: Option<String>,
   pub device_id: Option<String>,
+}
+
+/// Track preference for a series (audio/subtitle language).
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct TrackPreference {
+  /// Preferred audio language code (e.g., "jpn", "eng").
+  pub audio_language: Option<String>,
+  /// Preferred subtitle language code (e.g., "chi", "eng").
+  pub subtitle_language: Option<String>,
+  /// Whether subtitles should be enabled.
+  pub is_subtitle_enabled: bool,
+}
+
+/// Find a stream by language and type.
+/// Returns the stream index if found.
+pub fn find_stream_by_lang(streams: &[MediaStream], stream_type: &str, lang: &str) -> Option<i32> {
+  streams
+    .iter()
+    .find(|s| {
+      s.stream_type == stream_type
+        && s.language.as_deref().map(|l| l.eq_ignore_ascii_case(lang)).unwrap_or(false)
+    })
+    .map(|s| s.index)
 }
