@@ -301,6 +301,9 @@ pub async fn jellyfin_clear_session(state: State<'_, JellyfinState>) -> Result<(
 /// Config state managed by Tauri.
 pub struct ConfigState(pub Arc<RwLock<AppConfig>>);
 
+const CONFIG_STORE_FILE: &str = "config.json";
+const CONFIG_STORE_KEY: &str = "app_config";
+
 /// Get the current app configuration.
 #[tauri::command]
 #[specta]
@@ -308,12 +311,30 @@ pub fn config_get(state: State<'_, ConfigState>) -> AppConfig {
   state.0.read().clone()
 }
 
-/// Update the app configuration.
+/// Update the app configuration and persist to disk.
 #[tauri::command]
 #[specta]
-pub fn config_set(state: State<'_, ConfigState>, config: AppConfig) -> Result<(), String> {
+pub async fn config_set(
+  app: tauri::AppHandle,
+  state: State<'_, ConfigState>,
+  config: AppConfig,
+) -> Result<(), String> {
+  use tauri_plugin_store::StoreExt;
+
   config.validate()?;
-  *state.0.write() = config;
+
+  // Update in-memory state
+  *state.0.write() = config.clone();
+
+  // Persist to disk
+  let store = app.store(CONFIG_STORE_FILE).map_err(|e| e.to_string())?;
+  store.set(
+    CONFIG_STORE_KEY.to_string(),
+    serde_json::to_value(&config).map_err(|e| e.to_string())?,
+  );
+  store.save().map_err(|e| e.to_string())?;
+
+  log::info!("Config saved to disk");
   Ok(())
 }
 
@@ -329,6 +350,34 @@ pub fn config_default() -> AppConfig {
 #[specta]
 pub fn config_detect_mpv() -> Option<String> {
   crate::mpv::find_mpv().map(|p| p.to_string_lossy().to_string())
+}
+
+/// Load config from disk. Called internally during app setup.
+pub fn load_config_from_store(app: &tauri::AppHandle) -> AppConfig {
+  use tauri_plugin_store::StoreExt;
+
+  match app.store(CONFIG_STORE_FILE) {
+    Ok(store) => {
+      if let Some(value) = store.get(CONFIG_STORE_KEY) {
+        match serde_json::from_value::<AppConfig>(value.clone()) {
+          Ok(config) => {
+            log::info!("Config loaded from disk");
+            return config;
+          }
+          Err(e) => {
+            log::warn!("Failed to parse stored config, using defaults: {}", e);
+          }
+        }
+      } else {
+        log::info!("No stored config found, using defaults");
+      }
+    }
+    Err(e) => {
+      log::warn!("Failed to open config store, using defaults: {}", e);
+    }
+  }
+
+  AppConfig::default()
 }
 
 pub fn command_builder() -> Builder {

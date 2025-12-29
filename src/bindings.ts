@@ -196,7 +196,7 @@ async configGet() : Promise<AppConfig> {
     return await TAURI_INVOKE("config_get");
 },
 /**
- * Update the app configuration.
+ * Update the app configuration and persist to disk.
  */
 async configSet(config: AppConfig) : Promise<Result<null, string>> {
     try {
