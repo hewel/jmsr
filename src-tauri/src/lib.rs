@@ -17,7 +17,7 @@ use tauri_plugin_log::{Target, TargetKind};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-  let builder = command::command_builder();
+  let builder = command::specta_builder();
 
   // Create config state with defaults (will be updated in setup after store is available)
   let config = Arc::new(RwLock::new(AppConfig::default()));

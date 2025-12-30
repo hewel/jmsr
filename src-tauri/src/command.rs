@@ -8,7 +8,7 @@ use tauri_specta::{collect_commands, collect_events, Builder, Event};
 
 use crate::config::AppConfig;
 use crate::jellyfin::{ConnectionState, Credentials, JellyfinClient, SavedSession, SessionManager};
-use crate::mpv::{MpvClient, PropertyValue, write_input_conf};
+use crate::mpv::{write_input_conf, MpvClient, PropertyValue};
 
 // ============================================================================
 // Events
@@ -130,12 +130,6 @@ impl JellyfinState {
 // ============================================================================
 // MPV Commands
 // ============================================================================
-
-#[tauri::command]
-#[specta]
-pub fn hello_world(my_name: String) -> String {
-  format!("Hello, {my_name}! You've been greeted from Rust!")
-}
 
 /// Start the MPV player.
 #[tauri::command]
@@ -276,7 +270,11 @@ pub async fn jellyfin_connect(
     .map_err(|e| e.to_string())?;
 
   // Create and start session manager
-  let session = Arc::new(SessionManager::new(state.client.clone(), state.mpv.clone(), app));
+  let session = Arc::new(SessionManager::new(
+    state.client.clone(),
+    state.mpv.clone(),
+    app,
+  ));
   session.start().await.map_err(|e| e.to_string())?;
 
   // Store session
@@ -340,7 +338,11 @@ pub async fn jellyfin_restore_session(
     .map_err(|e| e.to_string())?;
 
   // Create and start session manager
-  let session_mgr = Arc::new(SessionManager::new(state.client.clone(), state.mpv.clone(), app));
+  let session_mgr = Arc::new(SessionManager::new(
+    state.client.clone(),
+    state.mpv.clone(),
+    app,
+  ));
   session_mgr.start().await.map_err(|e| e.to_string())?;
 
   // Store session
@@ -418,7 +420,9 @@ pub async fn config_set(
 
   // Apply Jellyfin device name change if connected
   if jellyfin_state.client.is_connected() {
-    jellyfin_state.client.set_device_name(config.device_name.clone());
+    jellyfin_state
+      .client
+      .set_device_name(config.device_name.clone());
     // Re-register capabilities with new device name
     if let Err(e) = jellyfin_state.client.report_capabilities().await {
       log::warn!("Failed to re-register capabilities: {}", e);
@@ -484,11 +488,9 @@ pub fn load_config_from_store(app: &tauri::AppHandle) -> AppConfig {
   AppConfig::default()
 }
 
-pub fn command_builder() -> Builder {
+pub fn specta_builder() -> Builder {
   let builder = Builder::<tauri::Wry>::new()
     .commands(collect_commands![
-      // General
-      hello_world,
       // MPV commands
       mpv_start,
       mpv_stop,
@@ -522,26 +524,9 @@ pub fn command_builder() -> Builder {
     let mut bindings_path = std::env::current_dir().unwrap();
     bindings_path.push("../src/bindings.ts");
 
-    // Export to a temp file first, then only overwrite if contents differ
-    // This prevents hot-reload loops when bindings haven't actually changed
-    let temp_path = bindings_path.with_extension("ts.tmp");
     builder
-      .export(Typescript::default(), &temp_path)
+      .export(Typescript::default(), &bindings_path)
       .expect("Failed to export typescript bindings");
-
-    // Read both files and compare
-    let new_content = std::fs::read(&temp_path).unwrap_or_default();
-    let old_content = std::fs::read(&bindings_path).unwrap_or_default();
-
-    if new_content != old_content {
-      // Contents differ, rename temp to actual
-      std::fs::rename(&temp_path, &bindings_path)
-        .expect("Failed to rename bindings file");
-      eprintln!("Updated bindings.ts");
-    } else {
-      // Contents same, remove temp file
-      let _ = std::fs::remove_file(&temp_path);
-    }
   }
 
   builder
@@ -554,6 +539,6 @@ mod tests {
   #[test]
   fn export_bindings() {
     // This test triggers binding generation
-    let _ = command_builder();
+    let _ = specta_builder();
   }
 }
