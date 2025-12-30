@@ -82,6 +82,21 @@
 - [x] Handle MPV connection loss gracefully (auto-reconnect or notify user)
 - [x] Handle Jellyfin session timeout/disconnect
 
+### Event-Driven Progress Reporting ✅
+**Goal**: Replace 5-second polling with MPV property observation for immediate UI sync.
+
+**Implementation Details**:
+- [x] Added `observe_property` and `unobserve_property` commands in `protocol.rs`
+- [x] Added `observe_property()` method in `MpvClient`
+- [x] Added `is_muted` field to `PlaybackSession` in `types.rs`
+- [x] Refactored `start_mpv_event_listener()` to:
+  - Set up property observations for `pause`, `volume`, `mute`, `time-pos`
+  - Handle `property-change` events immediately
+  - Report to Jellyfin immediately for pause/volume/mute changes
+  - Throttle `time-pos` reporting to every 5 seconds
+- [x] Volume sync now bidirectional (MPV ↔ Jellyfin web UI)
+- [x] Stop command now properly reports `PlaybackStopInfo` to Jellyfin
+
 ## Low Priority
 
 ### Code Cleanup ✅

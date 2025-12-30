@@ -254,6 +254,7 @@ pub struct PlaybackSession {
   pub play_session_id: Option<String>,
   pub position_ticks: i64,
   pub is_paused: bool,
+  pub is_muted: bool,
   pub volume: i32,
   pub audio_stream_index: Option<i32>,
   pub subtitle_stream_index: Option<i32>,

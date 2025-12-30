@@ -97,6 +97,22 @@ impl MpvCommand {
   pub fn disable_track(property: &str) -> Self {
     Self::new(vec!["set_property".into(), property.into(), "no".into()])
   }
+
+  /// Observe a property for changes.
+  /// The observer_id is used to identify which observation triggered the event.
+  pub fn observe_property(observer_id: i64, property: &str) -> Self {
+    Self::new(vec![
+      "observe_property".into(),
+      observer_id.into(),
+      property.into(),
+    ])
+  }
+
+  /// Stop observing a property.
+  #[allow(dead_code)]
+  pub fn unobserve_property(observer_id: i64) -> Self {
+    Self::new(vec!["unobserve_property".into(), observer_id.into()])
+  }
 }
 
 /// Response from MPV for a command.

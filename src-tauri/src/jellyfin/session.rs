@@ -445,6 +445,7 @@ impl SessionManager {
         play_session_id: playback_info.play_session_id.clone(),
         position_ticks: request.start_position_ticks.unwrap_or(0),
         is_paused: false,
+        is_muted: false,
         volume: 100,
         audio_stream_index: audio_index,
         subtitle_stream_index: subtitle_index,
@@ -938,80 +939,18 @@ impl SessionManager {
 
   /// Start periodic progress reporting.
   fn start_progress_reporting(&self) {
-    let client = self.client.clone();
-    let mpv = self.mpv.clone();
-    let state = self.state.clone();
-
-    tokio::spawn(async move {
-      let mut interval = tokio::time::interval(std::time::Duration::from_secs(5));
-      log::info!("Progress reporting loop started");
-
-      loop {
-        interval.tick().await;
-
-        // Get current playback session
-        let session = {
-          let s = state.read();
-          s.playback.clone()
-        };
-
-        if let Some(session) = session {
-          // Get current state from MPV
-          let position_result = mpv.get_time_pos().await;
-          let pause_result = mpv.get_pause().await;
-          let volume_result = mpv.get_volume().await;
-          let mute_result = mpv.get_mute().await;
-
-          match (position_result, pause_result) {
-            (Ok(position), Ok(is_paused)) => {
-              let position_ticks = seconds_to_ticks(position);
-              let volume = volume_result.unwrap_or(100.0) as i32;
-              let is_muted = mute_result.unwrap_or(false);
-
-              // Update state with actual MPV state
-              {
-                let mut s = state.write();
-                if let Some(ref mut playback) = s.playback {
-                  playback.position_ticks = position_ticks;
-                  playback.is_paused = is_paused;
-                  playback.volume = volume;
-                }
-              }
-
-              // Report progress with actual MPV state
-              let progress = PlaybackProgressInfo {
-                item_id: session.item_id.clone(),
-                media_source_id: session.media_source_id.clone(),
-                play_session_id: session.play_session_id.clone(),
-                position_ticks: Some(position_ticks),
-                is_paused,
-                is_muted,
-                volume_level: volume,
-                audio_stream_index: session.audio_stream_index,
-                subtitle_stream_index: session.subtitle_stream_index,
-                play_method: "DirectPlay".to_string(),
-                can_seek: true,
-              };
-
-              log::debug!("Progress payload: {:?}", progress);
-
-              if let Err(e) = client.report_playback_progress(&progress).await {
-                log::error!("Failed to report playback progress: {}", e);
-              }
-            }
-            (Err(e), _) => {
-              log::warn!("Failed to get time position from MPV: {}", e);
-            }
-            (_, Err(e)) => {
-              log::warn!("Failed to get pause state from MPV: {}", e);
-            }
-          }
-        }
-      }
-    });
+    // Progress reporting is now handled by start_mpv_event_listener via property observation.
+    // This method is kept for backwards compatibility but does nothing.
+    // The event listener observes pause, volume, mute and reports immediately on changes.
+    // A 10-second heartbeat reports time-pos for the web UI progress bar.
   }
 
-  /// Start MPV event listener for end-of-file detection, auto-play, and keyboard shortcuts.
+  /// Start MPV event listener for property changes, end-of-file detection, and keyboard shortcuts.
+  /// This is the main event-driven loop that handles:
+  /// - Property observations (pause, volume, mute) for immediate UI sync
+  /// - Periodic time-pos reporting (every 10s) for progress bar
+  /// - End-file events for auto-play next episode
+  /// - Client-message events for keyboard shortcuts
   fn start_mpv_event_listener(&self) {
     let mpv = self.mpv.clone();
     let client = self.client.clone();
@@ -1035,11 +974,63 @@ impl SessionManager {
           }
         };
 
-        log::info!("Got MPV event receiver, listening for events...");
+        log::info!("Got MPV event receiver, setting up property observations...");
+
+        // Observer IDs for different properties
+        const OBS_PAUSE: i64 = 1;
+        const OBS_VOLUME: i64 = 2;
+        const OBS_MUTE: i64 = 3;
+        const OBS_TIME_POS: i64 = 4;
+
+        // Set up property observations
+        if let Err(e) = mpv.observe_property(OBS_PAUSE, "pause").await {
+          log::warn!("Failed to observe pause: {}", e);
+        }
+        if let Err(e) = mpv.observe_property(OBS_VOLUME, "volume").await {
+          log::warn!("Failed to observe volume: {}", e);
+        }
+        if let Err(e) = mpv.observe_property(OBS_MUTE, "mute").await {
+          log::warn!("Failed to observe mute: {}", e);
+        }
+        if let Err(e) = mpv.observe_property(OBS_TIME_POS, "time-pos").await {
+          log::warn!("Failed to observe time-pos: {}", e);
+        }
+
+        log::info!("Property observations set up, listening for events...");
+
+        // Track last progress report time to throttle time-pos updates
+        let mut last_progress_report = std::time::Instant::now();
+        let progress_report_interval = std::time::Duration::from_secs(5);
 
         // Process events
         while let Ok(event) = event_rx.recv().await {
           match event.event.as_str() {
+            "property-change" => {
+              let property_name = event.name.as_deref().unwrap_or("");
+              let should_report = match property_name {
+                "pause" | "volume" | "mute" => {
+                  // Update state immediately for these properties
+                  Self::update_state_from_property(&state, &event);
+                  true // Always report immediately for user-initiated changes
+                }
+                "time-pos" => {
+                  // Update state but throttle reporting
+                  Self::update_state_from_property(&state, &event);
+                  let now = std::time::Instant::now();
+                  if now.duration_since(last_progress_report) >= progress_report_interval {
+                    last_progress_report = now;
+                    true
+                  } else {
+                    false
+                  }
+                }
+                _ => false,
+              };
+
+              if should_report {
+                Self::report_progress(&client, &state).await;
+              }
+            }
             "end-file" => {
               Self::handle_end_file_event(&event, &client, &state, &action_tx).await;
             }
@@ -1056,6 +1047,81 @@ impl SessionManager {
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
       }
     });
+  }
+
+  /// Update session state from a property-change event.
+  fn update_state_from_property(state: &RwLock<SessionState>, event: &crate::mpv::MpvEvent) {
+    let property_name = event.name.as_deref().unwrap_or("");
+    let data = match &event.data {
+      Some(d) => d,
+      None => return,
+    };
+
+    let mut s = state.write();
+    let playback = match s.playback.as_mut() {
+      Some(p) => p,
+      None => return,
+    };
+
+    match property_name {
+      "pause" => {
+        if let Some(paused) = data.as_bool() {
+          playback.is_paused = paused;
+          log::debug!("State updated: pause = {}", paused);
+        }
+      }
+      "volume" => {
+        if let Some(vol) = data.as_f64() {
+          playback.volume = vol as i32;
+          log::debug!("State updated: volume = {}", vol);
+        }
+      }
+      "mute" => {
+        if let Some(muted) = data.as_bool() {
+          playback.is_muted = muted;
+          log::debug!("State updated: mute = {}", muted);
+        }
+      }
+      "time-pos" => {
+        if let Some(pos) = data.as_f64() {
+          playback.position_ticks = seconds_to_ticks(pos);
+          // Don't log time-pos updates, too noisy
+        }
+      }
+      _ => {}
+    }
+  }
+
+  /// Report current playback progress to Jellyfin.
+  async fn report_progress(client: &JellyfinClient, state: &RwLock<SessionState>) {
+    let session = {
+      let s = state.read();
+      s.playback.clone()
+    };
+
+    let Some(session) = session else {
+      return;
+    };
+
+    let progress = PlaybackProgressInfo {
+      item_id: session.item_id.clone(),
+      media_source_id: session.media_source_id.clone(),
+      play_session_id: session.play_session_id.clone(),
+      position_ticks: Some(session.position_ticks),
+      is_paused: session.is_paused,
+      is_muted: session.is_muted,
+      volume_level: session.volume,
+      audio_stream_index: session.audio_stream_index,
+      subtitle_stream_index: session.subtitle_stream_index,
+      play_method: "DirectPlay".to_string(),
+      can_seek: true,
+    };
+
+    log::debug!("Progress payload: {:?}", progress);
+
+    if let Err(e) = client.report_playback_progress(&progress).await {
+      log::error!("Failed to report playback progress: {}", e);
+    }
   }
 
   /// Handle MPV end-file event for auto-play next episode.

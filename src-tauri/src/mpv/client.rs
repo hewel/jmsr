@@ -239,6 +239,7 @@ impl MpvClient {
   }
 
   /// Get current time position in seconds.
+  #[allow(dead_code)]
   pub async fn get_time_pos(&self) -> Result<f64, MpvError> {
     match self.get_property("time-pos").await? {
       PropertyValue::Number(n) => Ok(n),
@@ -255,6 +256,7 @@ impl MpvClient {
   }
 
   /// Get current volume (0-100).
+  #[allow(dead_code)]
   pub async fn get_volume(&self) -> Result<f64, MpvError> {
     match self.get_property("volume").await? {
       PropertyValue::Number(n) => Ok(n),
@@ -263,6 +265,7 @@ impl MpvClient {
   }
 
   /// Get current mute state.
+  #[allow(dead_code)]
   pub async fn get_mute(&self) -> Result<bool, MpvError> {
     match self.get_property("mute").await? {
       PropertyValue::Bool(b) => Ok(b),
@@ -292,6 +295,13 @@ impl MpvClient {
   pub async fn quit(&self) -> Result<(), MpvError> {
     let _ = self.send(MpvCommand::quit()).await;
     self.stop();
+    Ok(())
+  }
+
+  /// Observe a property for changes.
+  /// Returns events via the events() receiver with event="property-change".
+  pub async fn observe_property(&self, observer_id: i64, property: &str) -> Result<(), MpvError> {
+    self.send(MpvCommand::observe_property(observer_id, property)).await?;
     Ok(())
   }
 
