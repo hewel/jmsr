@@ -232,7 +232,7 @@ pub async fn mpv_start(state: State<'_, MpvState>) -> Result<(), CommandError> {
 #[tauri::command]
 #[specta]
 pub async fn mpv_stop(state: State<'_, MpvState>) -> Result<(), CommandError> {
-  state.0.stop();
+  state.0.stop().await;
   Ok(())
 }
 

@@ -85,7 +85,8 @@ impl MpvClient {
   }
 
   /// Stop MPV and disconnect.
-  pub fn stop(&self) {
+  /// This is async to avoid blocking on process kill/wait.
+  pub async fn stop(&self) {
     log::info!("stop() called - closing IPC connection");
     // Close IPC first
     {
@@ -98,22 +99,41 @@ impl MpvClient {
       }
     }
 
-    // Kill process
-    {
+    // Kill process in spawn_blocking to avoid blocking async runtime
+    let child = {
       let mut process = self.process.lock();
-      if let Some(mut child) = process.take() {
-        log::info!("Killing MPV process (pid: {:?})", child.id());
-        match child.kill() {
-          Ok(_) => log::info!("kill() succeeded"),
-          Err(e) => log::error!("kill() failed: {}", e),
+      process.take()
+    };
+
+    if let Some(mut child) = child {
+      let pid = child.id();
+      log::info!("Killing MPV process (pid: {:?})", pid);
+
+      // Use spawn_blocking for blocking kill/wait operations
+      let result = tokio::task::spawn_blocking(move || {
+        let kill_result = child.kill();
+        let wait_result = child.wait();
+        (kill_result, wait_result)
+      })
+      .await;
+
+      match result {
+        Ok((kill_result, wait_result)) => {
+          match kill_result {
+            Ok(_) => log::info!("kill() succeeded"),
+            Err(e) => log::error!("kill() failed: {}", e),
+          }
+          match wait_result {
+            Ok(status) => log::info!("MPV process exited with: {}", status),
+            Err(e) => log::error!("wait() failed: {}", e),
+          }
         }
-        match child.wait() {
-          Ok(status) => log::info!("MPV process exited with: {}", status),
-          Err(e) => log::error!("wait() failed: {}", e),
+        Err(e) => {
+          log::error!("spawn_blocking panicked during process cleanup: {}", e);
         }
-      } else {
-        log::warn!("No MPV process handle to kill");
       }
+    } else {
+      log::warn!("No MPV process handle to kill");
     }
 
     cleanup_ipc();
@@ -294,7 +314,7 @@ impl MpvClient {
   /// Quit MPV gracefully.
   pub async fn quit(&self) -> Result<(), MpvError> {
     let _ = self.send(MpvCommand::quit()).await;
-    self.stop();
+    self.stop().await;
     Ok(())
   }
 

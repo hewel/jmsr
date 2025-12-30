@@ -13,14 +13,16 @@ pub enum ProcessError {
 }
 
 /// Get the IPC socket/pipe path for MPV.
+/// Uses PID suffix to prevent collisions when multiple JMSR instances run.
 pub fn ipc_path() -> String {
+  let pid = std::process::id();
   #[cfg(windows)]
   {
-    r"\\.\pipe\jmsr-mpv".to_string()
+    format!(r"\\.\pipe\jmsr-mpv-{}", pid)
   }
   #[cfg(not(windows))]
   {
-    "/tmp/jmsr-mpv.sock".to_string()
+    format!("/tmp/jmsr-mpv-{}.sock", pid)
   }
 }
 

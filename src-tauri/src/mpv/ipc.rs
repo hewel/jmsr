@@ -3,6 +3,7 @@
 //! Handles platform-specific socket/pipe connections.
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -35,6 +36,17 @@ struct IpcState {
   pending: HashMap<i64, PendingRequest>,
 }
 
+impl IpcState {
+  /// Drain all pending requests with Disconnected error.
+  fn drain_pending(&mut self) {
+    let pending = std::mem::take(&mut self.pending);
+    for (request_id, tx) in pending {
+      log::debug!("Draining pending request {}", request_id);
+      let _ = tx.send(Err(IpcError::Disconnected));
+    }
+  }
+}
+
 /// Writer channel message.
 enum WriteMessage {
   Command(Vec<u8>),
@@ -46,8 +58,9 @@ pub struct MpvIpc {
   state: Arc<Mutex<IpcState>>,
   write_tx: async_channel::Sender<WriteMessage>,
   event_rx: Receiver<MpvEvent>,
-  _reader_handle: JoinHandle<()>,
-  _writer_handle: JoinHandle<()>,
+  closed: Arc<AtomicBool>,
+  reader_handle: JoinHandle<()>,
+  writer_handle: JoinHandle<()>,
 }
 
 impl MpvIpc {
@@ -105,26 +118,32 @@ impl MpvIpc {
       pending: HashMap::new(),
     }));
 
-    let (event_tx, event_rx) = async_channel::unbounded();
-    let (write_tx, write_rx) = async_channel::unbounded::<WriteMessage>();
+    let closed = Arc::new(AtomicBool::new(false));
+
+    let (event_tx, event_rx) = async_channel::bounded(100); // Bounded to prevent memory bloat
+    let (write_tx, write_rx) = async_channel::bounded::<WriteMessage>(100); // Bounded to prevent OOM
 
     // Spawn reader task
     let reader_state = state.clone();
+    let reader_closed = closed.clone();
     let reader_handle = tokio::spawn(async move {
-      Self::reader_loop(reader, reader_state, event_tx).await;
+      Self::reader_loop(reader, reader_state, event_tx, reader_closed).await;
     });
 
-    // Spawn writer task
+    // Spawn writer task - pass state and closed for error handling
+    let writer_state = state.clone();
+    let writer_closed = closed.clone();
     let writer_handle = tokio::spawn(async move {
-      Self::writer_loop(writer, write_rx).await;
+      Self::writer_loop(writer, write_rx, writer_state, writer_closed).await;
     });
 
     Ok(Self {
       state,
       write_tx,
       event_rx,
-      _reader_handle: reader_handle,
-      _writer_handle: writer_handle,
+      closed,
+      reader_handle,
+      writer_handle,
     })
   }
 
@@ -132,16 +151,23 @@ impl MpvIpc {
     reader: R,
     state: Arc<Mutex<IpcState>>,
     event_tx: Sender<MpvEvent>,
+    closed: Arc<AtomicBool>,
   ) {
     log::info!("MPV IPC reader loop started");
     let mut buf_reader = BufReader::new(reader);
     let mut line = String::new();
 
     loop {
+      // Check if we should exit
+      if closed.load(Ordering::Acquire) {
+        log::info!("MPV IPC reader loop: close signal received");
+        break;
+      }
+
       line.clear();
       match buf_reader.read_line(&mut line).await {
         Ok(0) => {
-          log::info!("MPV IPC connection closed");
+          log::info!("MPV IPC connection closed (EOF)");
           break;
         }
         Ok(_) => {
@@ -163,7 +189,10 @@ impl MpvIpc {
             }
             Ok(MpvMessage::Event(event)) => {
               log::debug!("MPV event: {} (reason={:?})", event.event, event.reason);
-              let _ = event_tx.send(event).await;
+              // Use try_send to avoid blocking if channel is full
+              if event_tx.try_send(event).is_err() {
+                log::warn!("Event channel full, dropping event");
+              }
             }
             Err(e) => {
               log::warn!("Failed to parse MPV message: {} - {}", e, trimmed);
@@ -176,11 +205,23 @@ impl MpvIpc {
         }
       }
     }
+
+    // Mark as closed
+    closed.store(true, Ordering::Release);
+
+    // Drain all pending requests on exit - they will never get responses
+    log::info!("MPV IPC reader exiting, draining pending requests");
+    state.lock().drain_pending();
+
+    // Close event channel by dropping sender (happens automatically when task ends)
+    log::info!("MPV IPC reader loop ended");
   }
 
   async fn writer_loop<W: tokio::io::AsyncWrite + Unpin>(
     mut writer: W,
     write_rx: async_channel::Receiver<WriteMessage>,
+    state: Arc<Mutex<IpcState>>,
+    closed: Arc<AtomicBool>,
   ) {
     log::info!("MPV IPC writer loop started");
 
@@ -207,10 +248,28 @@ impl MpvIpc {
         }
       }
     }
+
+    // On any exit (IO error or close), mark closed and drain pending
+    // so callers get immediate Disconnected instead of 5s timeout
+    log::info!("MPV IPC writer exiting, marking closed and draining pending");
+    closed.store(true, Ordering::Release);
+    state.lock().drain_pending();
+
+    log::info!("MPV IPC writer loop ended");
+  }
+
+  /// Check if the connection is closed.
+  pub fn is_closed(&self) -> bool {
+    self.closed.load(Ordering::Acquire)
   }
 
   /// Send a command to MPV and wait for response.
   pub async fn send_command(&self, cmd: MpvCommand) -> Result<MpvResponse, IpcError> {
+    // Early check for closed connection
+    if self.is_closed() {
+      return Err(IpcError::Disconnected);
+    }
+
     let request_id = cmd.request_id;
 
     // Create response channel
@@ -222,16 +281,43 @@ impl MpvIpc {
       state.pending.insert(request_id, tx);
     }
 
-    // Serialize and send
-    let json = serde_json::to_string(&cmd).map_err(|e| IpcError::WriteFailed(e.into()))?;
+    // Re-check closed after inserting to handle race with close()/drain_pending()
+    // If closed was set between our first check and insert, drain_pending() already ran
+    // and won't drain our newly inserted pending - we'd timeout after 5s instead of
+    // getting immediate Disconnected
+    if self.is_closed() {
+      if let Some(tx) = self.state.lock().pending.remove(&request_id) {
+        let _ = tx.send(Err(IpcError::Disconnected));
+      }
+      return Err(IpcError::Disconnected);
+    }
+
+    // Serialize command - if this fails, remove pending and return error
+    let json = match serde_json::to_string(&cmd) {
+      Ok(j) => j,
+      Err(e) => {
+        self.state.lock().pending.remove(&request_id);
+        return Err(IpcError::WriteFailed(std::io::Error::new(
+          std::io::ErrorKind::InvalidData,
+          e,
+        )));
+      }
+    };
+
     log::trace!("Sending MPV command: {}", json);
 
-    // Send to writer task
-    self
+    // Send to writer task - if this fails, remove pending and return error
+    if self
       .write_tx
       .send(WriteMessage::Command(json.into_bytes()))
       .await
-      .map_err(|_| IpcError::Disconnected)?;
+      .is_err()
+    {
+      if let Some(tx) = self.state.lock().pending.remove(&request_id) {
+        let _ = tx.send(Err(IpcError::Disconnected));
+      }
+      return Err(IpcError::Disconnected);
+    }
 
     log::trace!("MPV command queued, waiting for response...");
 
@@ -242,17 +328,17 @@ impl MpvIpc {
         result
       }
       Ok(Err(_)) => {
+        // Channel was closed (sender dropped) - connection died
         log::error!("MPV IPC channel closed unexpectedly");
         Err(IpcError::Disconnected)
       }
       Err(_) => {
-        // Remove pending request on timeout
+        // Timeout - remove pending request
         log::error!(
           "MPV command timeout after 5 seconds, request_id={}",
           request_id
         );
-        let mut state = self.state.lock();
-        state.pending.remove(&request_id);
+        self.state.lock().pending.remove(&request_id);
         Err(IpcError::Timeout)
       }
     }
@@ -263,8 +349,41 @@ impl MpvIpc {
     self.event_rx.clone()
   }
 
-  /// Close the connection.
+  /// Close the connection gracefully.
+  /// Note: This signals shutdown but tasks may not stop immediately if blocked on I/O.
+  /// Drop will abort tasks forcefully.
   pub fn close(&self) {
-    let _ = self.write_tx.send_blocking(WriteMessage::Close);
+    // Signal closed state with Release ordering so reader/writer see the change
+    self.closed.store(true, Ordering::Release);
+
+    // Send close message first (before closing channel)
+    let _ = self.write_tx.try_send(WriteMessage::Close);
+
+    // Close the write channel - this will cause writer_loop to exit on next recv
+    self.write_tx.close();
+
+    // Drain pending requests immediately
+    self.state.lock().drain_pending();
+
+    log::info!("MpvIpc::close() completed");
+  }
+}
+
+impl Drop for MpvIpc {
+  fn drop(&mut self) {
+    log::info!("MpvIpc::drop() - cleaning up");
+
+    // Signal closed with Release ordering
+    self.closed.store(true, Ordering::Release);
+
+    // Close write channel
+    self.write_tx.close();
+
+    // Abort tasks to release socket handles
+    self.reader_handle.abort();
+    self.writer_handle.abort();
+
+    // Drain any remaining pending requests
+    self.state.lock().drain_pending();
   }
 }

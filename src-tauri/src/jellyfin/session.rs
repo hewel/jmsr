@@ -257,7 +257,7 @@ impl SessionManager {
               log::info!("MpvAction::Stop - quitting MPV gracefully");
               if let Err(e) = mpv.quit().await {
                 log::warn!("Failed to quit MPV gracefully: {}, forcing stop", e);
-                mpv.stop();
+                mpv.stop().await;
               }
             }
             MpvAction::SetVolume(volume) => {
