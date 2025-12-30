@@ -299,6 +299,12 @@ impl MpvClient {
     Ok(())
   }
 
+  /// Toggle fullscreen state.
+  pub async fn toggle_fullscreen(&self) -> Result<(), MpvError> {
+    self.send(MpvCommand::cycle("fullscreen")).await?;
+    Ok(())
+  }
+
   /// Set a string property (e.g., force-media-title).
   pub async fn set_property_string(&self, name: &str, value: &str) -> Result<(), MpvError> {
     self.send(MpvCommand::set_property_string(name, value)).await?;

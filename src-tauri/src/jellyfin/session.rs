@@ -40,6 +40,8 @@ pub enum MpvAction {
   SetVolume(i32),
   /// Toggle mute.
   ToggleMute,
+  /// Toggle fullscreen.
+  ToggleFullscreen,
   /// Set audio track by stream index.
   SetAudioTrack(i32),
   /// Set subtitle track by stream index (-1 to disable).
@@ -132,9 +134,11 @@ impl SessionManager {
       self.client.device_id()
     );
 
-    // Connect WebSocket with capabilities for Double Report Strategy
+    // Connect WebSocket first
     let ws_url = self.client.websocket_url()?;
     self.websocket.connect(&ws_url).await?;
+
+    // Then report capabilities via HTTP (must be after WebSocket is established)
     self.client.report_capabilities().await?;
 
     if let Err(e) = self.client.validate_session().await {
@@ -268,6 +272,11 @@ impl SessionManager {
             MpvAction::ToggleMute => {
               if let Err(e) = mpv.toggle_mute().await {
                 log::error!("Failed to toggle mute: {}", e);
+              }
+            }
+            MpvAction::ToggleFullscreen => {
+              if let Err(e) = mpv.toggle_fullscreen().await {
+                log::error!("Failed to toggle fullscreen: {}", e);
               }
             }
             MpvAction::SetAudioTrack(index) => {
@@ -790,6 +799,9 @@ impl SessionManager {
       }
       "ToggleMute" => {
         let _ = action_tx.send(MpvAction::ToggleMute).await;
+      }
+      "ToggleFullscreen" => {
+        let _ = action_tx.send(MpvAction::ToggleFullscreen).await;
       }
       "SetAudioStreamIndex" => {
         if let Some(args) = &request.arguments {

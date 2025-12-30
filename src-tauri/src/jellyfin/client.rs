@@ -441,11 +441,10 @@ impl JellyfinClient {
     self.post_empty("/Sessions/Playing/Stopped", info).await
   }
 
-  /// Report session capabilities to Jellyfin via HTTP, and return the payload for WS.
+  /// Report session capabilities to Jellyfin via HTTP.
   ///
   /// This makes the client appear as a controllable cast target.
-  /// Returns the capabilities JSON so it can be sent via WebSocket too (Double Report Strategy).
-  pub async fn report_capabilities(&self) -> Result<serde_json::Value, JellyfinError> {
+  pub async fn report_capabilities(&self) -> Result<(), JellyfinError> {
     let capabilities = serde_json::json!({
       "PlayableMediaTypes": ["Video", "Audio"],
       "SupportedCommands": [
@@ -479,8 +478,7 @@ impl JellyfinClient {
       log::error!("Capabilities POST failed: HTTP {} - {}", status, text);
     }
 
-    // RETURN the JSON so we can send it via WebSocket too
-    Ok(capabilities)
+    Ok(())
   }
 
   /// Get the next episode in a series after the given episode.
