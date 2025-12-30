@@ -76,3 +76,4 @@ bunx tauri build     # Production desktop build
 - Rust backend exports bindings to `src/bindings.ts` on debug builds only
 - Test setup extends expect with jest-dom matchers (rstest.setup.ts)
 - See `doc/todos.md` for current tasks and priorities
+- When edit finished, use @oracle to review changes
