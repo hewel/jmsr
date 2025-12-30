@@ -35,8 +35,8 @@ cargo clippy          # Lint
 cargo add             # Add dependency
 
 # From project root:
-bunx tauri dev        # Hot-reload dev mode
-bunx tauri build      # Production build
+bun tauri dev        # Hot-reload dev mode
+bun tauri build      # Production build
 ```
 
 ## Conventions

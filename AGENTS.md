@@ -42,8 +42,8 @@ bun run check        # Biome check + autofix
 bun run format       # Biome format
 
 # Tauri (run from project root)
-bunx tauri dev       # Dev mode with hot reload
-bunx tauri build     # Production desktop build
+bun tauri dev       # Dev mode with hot reload
+bun tauri build     # Production desktop build
 ```
 
 ## Conventions
