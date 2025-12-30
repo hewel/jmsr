@@ -61,7 +61,7 @@ bunx tauri build      # Production build
 - `tauri-plugin-log` — Logging (debug builds)
 - `tokio` — Async runtime
 - `reqwest` + `tokio-tungstenite` — Jellyfin communication
-- `interprocess` — IPC with MPV
+- `tokio::net` — IPC with MPV
 
 ## Notes
 
