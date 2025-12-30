@@ -254,6 +254,22 @@ impl MpvClient {
     }
   }
 
+  /// Get current volume (0-100).
+  pub async fn get_volume(&self) -> Result<f64, MpvError> {
+    match self.get_property("volume").await? {
+      PropertyValue::Number(n) => Ok(n),
+      _ => Ok(100.0),
+    }
+  }
+
+  /// Get current mute state.
+  pub async fn get_mute(&self) -> Result<bool, MpvError> {
+    match self.get_property("mute").await? {
+      PropertyValue::Bool(b) => Ok(b),
+      _ => Ok(false),
+    }
+  }
+
   /// Toggle mute state.
   pub async fn toggle_mute(&self) -> Result<(), MpvError> {
     self.send(MpvCommand::cycle("mute")).await?;

@@ -598,10 +598,24 @@ impl SessionManager {
       }
       "Stop" => {
         log::info!("Processing Stop command");
-        {
+        // Take the playback session and report stop to Jellyfin
+        let session = {
           let mut s = state.write();
-          s.playback = None;
+          s.playback.take()
+        };
+
+        if let Some(session) = session {
+          let stop_info = PlaybackStopInfo {
+            item_id: session.item_id,
+            media_source_id: session.media_source_id,
+            play_session_id: session.play_session_id,
+            position_ticks: Some(session.position_ticks),
+          };
+          if let Err(e) = client.report_playback_stop(&stop_info).await {
+            log::error!("Failed to report playback stop: {}", e);
+          }
         }
+
         let _ = action_tx.send(MpvAction::Stop).await;
       }
       "NextTrack" => {
@@ -762,6 +776,13 @@ impl SessionManager {
       "SetVolume" => {
         if let Some(args) = request.arguments {
           if let Some(volume) = args.get("Volume").and_then(|v| v.as_i64()) {
+            // Update session state
+            {
+              let mut s = state.write();
+              if let Some(ref mut playback) = s.playback {
+                playback.volume = volume as i32;
+              }
+            }
             let _ = action_tx.send(MpvAction::SetVolume(volume as i32)).await;
           }
         }
@@ -935,14 +956,17 @@ impl SessionManager {
         };
 
         if let Some(session) = session {
-          // Get current position from MPV
+          // Get current state from MPV
           let position_result = mpv.get_time_pos().await;
-          // Get actual pause state from MPV (syncs web UI pause button)
           let pause_result = mpv.get_pause().await;
+          let volume_result = mpv.get_volume().await;
+          let mute_result = mpv.get_mute().await;
 
           match (position_result, pause_result) {
             (Ok(position), Ok(is_paused)) => {
               let position_ticks = seconds_to_ticks(position);
+              let volume = volume_result.unwrap_or(100.0) as i32;
+              let is_muted = mute_result.unwrap_or(false);
 
               // Update state with actual MPV state
               {
@@ -950,6 +974,7 @@ impl SessionManager {
                 if let Some(ref mut playback) = s.playback {
                   playback.position_ticks = position_ticks;
                   playback.is_paused = is_paused;
+                  playback.volume = volume;
                 }
               }
 
@@ -960,8 +985,8 @@ impl SessionManager {
                 play_session_id: session.play_session_id.clone(),
                 position_ticks: Some(position_ticks),
                 is_paused,
-                is_muted: false,
-                volume_level: session.volume,
+                is_muted,
+                volume_level: volume,
                 audio_stream_index: session.audio_stream_index,
                 subtitle_stream_index: session.subtitle_stream_index,
                 play_method: "DirectPlay".to_string(),
