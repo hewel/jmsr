@@ -82,6 +82,96 @@ impl AppNotification {
 }
 
 // ============================================================================
+// Errors
+// ============================================================================
+
+/// Error codes for frontend to distinguish error types.
+#[derive(Debug, Clone, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
+pub enum CommandErrorCode {
+  /// MPV player is not connected.
+  NotConnected,
+  /// Resource not found (e.g., MPV executable, media file).
+  NotFound,
+  /// Invalid input provided by the caller.
+  InvalidInput,
+  /// Network or connection error.
+  Network,
+  /// Authentication failed.
+  AuthFailed,
+  /// Internal error (catch-all).
+  Internal,
+}
+
+/// Typed command error for better frontend error handling.
+#[derive(Debug, Clone, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct CommandError {
+  pub code: CommandErrorCode,
+  pub message: String,
+}
+
+impl CommandError {
+  #[allow(dead_code)]
+  pub fn not_connected(message: impl Into<String>) -> Self {
+    Self {
+      code: CommandErrorCode::NotConnected,
+      message: message.into(),
+    }
+  }
+
+  #[allow(dead_code)]
+  pub fn not_found(message: impl Into<String>) -> Self {
+    Self {
+      code: CommandErrorCode::NotFound,
+      message: message.into(),
+    }
+  }
+
+  pub fn invalid_input(message: impl Into<String>) -> Self {
+    Self {
+      code: CommandErrorCode::InvalidInput,
+      message: message.into(),
+    }
+  }
+
+  pub fn network(message: impl Into<String>) -> Self {
+    Self {
+      code: CommandErrorCode::Network,
+      message: message.into(),
+    }
+  }
+
+  pub fn auth_failed(message: impl Into<String>) -> Self {
+    Self {
+      code: CommandErrorCode::AuthFailed,
+      message: message.into(),
+    }
+  }
+
+  pub fn internal(message: impl Into<String>) -> Self {
+    Self {
+      code: CommandErrorCode::Internal,
+      message: message.into(),
+    }
+  }
+}
+
+impl std::fmt::Display for CommandError {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{:?}: {}", self.code, self.message)
+  }
+}
+
+impl std::error::Error for CommandError {}
+
+/// Helper to convert any error to CommandError::Internal
+fn internal_err(e: impl std::fmt::Display) -> CommandError {
+  CommandError::internal(e.to_string())
+}
+
+// ============================================================================
 // Types
 // ============================================================================
 
@@ -134,14 +224,14 @@ impl JellyfinState {
 /// Start the MPV player.
 #[tauri::command]
 #[specta]
-pub async fn mpv_start(state: State<'_, MpvState>) -> Result<(), String> {
-  state.0.start().await.map_err(|e| e.to_string())
+pub async fn mpv_start(state: State<'_, MpvState>) -> Result<(), CommandError> {
+  state.0.start().await.map_err(internal_err)
 }
 
 /// Stop the MPV player.
 #[tauri::command]
 #[specta]
-pub async fn mpv_stop(state: State<'_, MpvState>) -> Result<(), String> {
+pub async fn mpv_stop(state: State<'_, MpvState>) -> Result<(), CommandError> {
   state.0.stop();
   Ok(())
 }
@@ -149,51 +239,65 @@ pub async fn mpv_stop(state: State<'_, MpvState>) -> Result<(), String> {
 /// Load a media file/URL for playback.
 #[tauri::command]
 #[specta]
-pub async fn mpv_loadfile(state: State<'_, MpvState>, url: String) -> Result<(), String> {
-  state.0.loadfile(&url).await.map_err(|e| e.to_string())
+pub async fn mpv_loadfile(state: State<'_, MpvState>, url: String) -> Result<(), CommandError> {
+  // Validate URL scheme for security
+  if !url.starts_with("http://") && !url.starts_with("https://") {
+    return Err(CommandError::invalid_input(
+      "Only http:// and https:// URLs are allowed",
+    ));
+  }
+  state.0.loadfile(&url).await.map_err(internal_err)
 }
 
 /// Seek to absolute position in seconds.
 #[tauri::command]
 #[specta]
-pub async fn mpv_seek(state: State<'_, MpvState>, time: f64) -> Result<(), String> {
-  state.0.seek(time).await.map_err(|e| e.to_string())
+pub async fn mpv_seek(state: State<'_, MpvState>, time: f64) -> Result<(), CommandError> {
+  if time < 0.0 {
+    return Err(CommandError::invalid_input("Seek time cannot be negative"));
+  }
+  state.0.seek(time).await.map_err(internal_err)
 }
 
 /// Set pause state.
 #[tauri::command]
 #[specta]
-pub async fn mpv_set_pause(state: State<'_, MpvState>, paused: bool) -> Result<(), String> {
-  state.0.set_pause(paused).await.map_err(|e| e.to_string())
+pub async fn mpv_set_pause(state: State<'_, MpvState>, paused: bool) -> Result<(), CommandError> {
+  state.0.set_pause(paused).await.map_err(internal_err)
 }
 
 /// Set volume (0-100).
 #[tauri::command]
 #[specta]
-pub async fn mpv_set_volume(state: State<'_, MpvState>, volume: f64) -> Result<(), String> {
-  state.0.set_volume(volume).await.map_err(|e| e.to_string())
+pub async fn mpv_set_volume(state: State<'_, MpvState>, volume: f64) -> Result<(), CommandError> {
+  if !(0.0..=100.0).contains(&volume) {
+    return Err(CommandError::invalid_input(
+      "Volume must be between 0 and 100",
+    ));
+  }
+  state.0.set_volume(volume).await.map_err(internal_err)
 }
 
 /// Set audio track by ID.
 #[tauri::command]
 #[specta]
-pub async fn mpv_set_audio_track(state: State<'_, MpvState>, id: i32) -> Result<(), String> {
+pub async fn mpv_set_audio_track(state: State<'_, MpvState>, id: i32) -> Result<(), CommandError> {
   state
     .0
     .set_audio_track(id as i64)
     .await
-    .map_err(|e| e.to_string())
+    .map_err(internal_err)
 }
 
 /// Set subtitle track by ID.
 #[tauri::command]
 #[specta]
-pub async fn mpv_set_subtitle_track(state: State<'_, MpvState>, id: i32) -> Result<(), String> {
+pub async fn mpv_set_subtitle_track(state: State<'_, MpvState>, id: i32) -> Result<(), CommandError> {
   state
     .0
     .set_subtitle_track(id as i64)
     .await
-    .map_err(|e| e.to_string())
+    .map_err(internal_err)
 }
 
 /// Get a property value from MPV.
@@ -202,36 +306,60 @@ pub async fn mpv_set_subtitle_track(state: State<'_, MpvState>, id: i32) -> Resu
 pub async fn mpv_get_property(
   state: State<'_, MpvState>,
   name: String,
-) -> Result<PropertyValue, String> {
-  state.0.get_property(&name).await.map_err(|e| e.to_string())
+) -> Result<PropertyValue, CommandError> {
+  state.0.get_property(&name).await.map_err(internal_err)
 }
 
 /// Get current player state.
 #[tauri::command]
 #[specta]
-pub async fn mpv_get_state(state: State<'_, MpvState>) -> Result<PlayerState, String> {
+pub async fn mpv_get_state(state: State<'_, MpvState>) -> Result<PlayerState, CommandError> {
   if !state.0.is_connected() {
     return Ok(PlayerState::default());
   }
 
-  let paused = match state.0.get_property("pause").await {
+  // Fetch all properties in parallel for better performance
+  let (paused_res, time_pos_res, duration_res, volume_res) = tokio::join!(
+    state.0.get_property("pause"),
+    state.0.get_property("time-pos"),
+    state.0.get_property("duration"),
+    state.0.get_property("volume"),
+  );
+
+  let paused = match paused_res {
     Ok(PropertyValue::Bool(b)) => b,
-    _ => true,
+    Ok(_) => true,
+    Err(e) => {
+      log::warn!("Failed to get pause property: {}", e);
+      true
+    }
   };
 
-  let time_pos = match state.0.get_property("time-pos").await {
+  let time_pos = match time_pos_res {
     Ok(PropertyValue::Number(n)) => n,
-    _ => 0.0,
+    Ok(_) => 0.0,
+    Err(e) => {
+      log::warn!("Failed to get time-pos property: {}", e);
+      0.0
+    }
   };
 
-  let duration = match state.0.get_property("duration").await {
+  let duration = match duration_res {
     Ok(PropertyValue::Number(n)) => n,
-    _ => 0.0,
+    Ok(_) => 0.0,
+    Err(e) => {
+      log::warn!("Failed to get duration property: {}", e);
+      0.0
+    }
   };
 
-  let volume = match state.0.get_property("volume").await {
+  let volume = match volume_res {
     Ok(PropertyValue::Number(n)) => n,
-    _ => 100.0,
+    Ok(_) => 100.0,
+    Err(e) => {
+      log::warn!("Failed to get volume property: {}", e);
+      100.0
+    }
   };
 
   Ok(PlayerState {
@@ -261,24 +389,29 @@ pub async fn jellyfin_connect(
   app: tauri::AppHandle,
   state: State<'_, JellyfinState>,
   credentials: Credentials,
-) -> Result<(), String> {
+) -> Result<(), CommandError> {
   // Authenticate with server
   state
     .client
     .authenticate(&credentials)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(|e| CommandError::auth_failed(e.to_string()))?;
 
   // Create and start session manager
-  let session = Arc::new(SessionManager::new(
+  let new_session = Arc::new(SessionManager::new(
     state.client.clone(),
     state.mpv.clone(),
     app,
   ));
-  session.start().await.map_err(|e| e.to_string())?;
+  new_session.start().await.map_err(internal_err)?;
 
-  // Store session
-  *state.session.write() = Some(session);
+  // Stop existing session before replacing (idempotent connect)
+  let old_session = state.session.write().replace(new_session);
+  if let Some(old) = old_session {
+    if let Err(e) = old.stop().await {
+      log::warn!("Failed to stop old session: {}", e);
+    }
+  }
 
   Ok(())
 }
@@ -286,13 +419,13 @@ pub async fn jellyfin_connect(
 /// Disconnect from Jellyfin server.
 #[tauri::command]
 #[specta]
-pub async fn jellyfin_disconnect(state: State<'_, JellyfinState>) -> Result<(), String> {
+pub async fn jellyfin_disconnect(state: State<'_, JellyfinState>) -> Result<(), CommandError> {
   // Take session without holding lock across await
   let session = state.session.write().take();
 
   // Stop session if active
   if let Some(session) = session {
-    session.stop().await.map_err(|e| e.to_string())?;
+    session.stop().await.map_err(internal_err)?;
   }
 
   // Disconnect client
@@ -329,24 +462,29 @@ pub async fn jellyfin_restore_session(
   app: tauri::AppHandle,
   state: State<'_, JellyfinState>,
   session: SavedSession,
-) -> Result<(), String> {
+) -> Result<(), CommandError> {
   // Restore connection from saved session
   state
     .client
     .restore_session(&session)
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(|e| CommandError::network(e.to_string()))?;
 
   // Create and start session manager
-  let session_mgr = Arc::new(SessionManager::new(
+  let new_session = Arc::new(SessionManager::new(
     state.client.clone(),
     state.mpv.clone(),
     app,
   ));
-  session_mgr.start().await.map_err(|e| e.to_string())?;
+  new_session.start().await.map_err(internal_err)?;
 
-  // Store session
-  *state.session.write() = Some(session_mgr);
+  // Stop existing session before replacing (idempotent restore)
+  let old_session = state.session.write().replace(new_session);
+  if let Some(old) = old_session {
+    if let Err(e) = old.stop().await {
+      log::warn!("Failed to stop old session: {}", e);
+    }
+  }
 
   Ok(())
 }
@@ -357,13 +495,13 @@ pub async fn jellyfin_restore_session(
 /// clearing the saved session from localStorage on the frontend.
 #[tauri::command]
 #[specta]
-pub async fn jellyfin_clear_session(state: State<'_, JellyfinState>) -> Result<(), String> {
+pub async fn jellyfin_clear_session(state: State<'_, JellyfinState>) -> Result<(), CommandError> {
   // Take session without holding lock across await
   let session = state.session.write().take();
 
   // Stop session if active
   if let Some(session) = session {
-    session.stop().await.map_err(|e| e.to_string())?;
+    session.stop().await.map_err(internal_err)?;
   }
 
   // Disconnect client (clears internal state)
@@ -399,11 +537,11 @@ pub async fn config_set(
   mpv_state: State<'_, MpvState>,
   jellyfin_state: State<'_, JellyfinState>,
   config: AppConfig,
-) -> Result<(), String> {
+) -> Result<(), CommandError> {
   use std::path::PathBuf;
   use tauri_plugin_store::StoreExt;
 
-  config.validate()?;
+  config.validate().map_err(CommandError::invalid_input)?;
 
   // Update in-memory state
   *state.0.write() = config.clone();
@@ -431,16 +569,24 @@ pub async fn config_set(
     }
   }
 
-  // Update MPV keybindings file
-  write_input_conf(&config.keybind_next, &config.keybind_prev);
+  // Update MPV keybindings file (blocking I/O, run in spawn_blocking)
+  let keybind_next = config.keybind_next.clone();
+  let keybind_prev = config.keybind_prev.clone();
+  tauri::async_runtime::spawn_blocking(move || {
+    write_input_conf(&keybind_next, &keybind_prev);
+  })
+  .await
+  .map_err(|e| CommandError::internal(format!("Failed to write input.conf: {}", e)))?;
 
   // Persist to disk
-  let store = app.store(CONFIG_STORE_FILE).map_err(|e| e.to_string())?;
+  let store = app.store(CONFIG_STORE_FILE).map_err(internal_err)?;
   store.set(
     CONFIG_STORE_KEY.to_string(),
-    serde_json::to_value(&config).map_err(|e| e.to_string())?,
+    serde_json::to_value(&config).map_err(internal_err)?,
   );
-  store.save().map_err(|e| e.to_string())?;
+  // Note: store.save() is synchronous but typically fast for small configs.
+  // For larger data, consider spawn_blocking.
+  store.save().map_err(internal_err)?;
 
   log::info!("Config saved to disk");
   Ok(())
