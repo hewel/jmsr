@@ -1190,6 +1190,38 @@ impl SessionManager {
     }
   }
 
+  /// Play the next episode. Called from system tray.
+  pub async fn play_next_episode(&self) {
+    let current_item = {
+      let s = self.state.read();
+      s.current_item.clone()
+    };
+
+    if let Some(item) = current_item {
+      log::info!("Tray: playing next episode");
+      Self::report_playback_stopped(&self.client, &self.state).await;
+      Self::play_adjacent_episode(&self.client, &self.state, &self.action_tx, &item, true).await;
+    } else {
+      log::warn!("play_next_episode: No current item");
+    }
+  }
+
+  /// Play the previous episode. Called from system tray.
+  pub async fn play_previous_episode(&self) {
+    let current_item = {
+      let s = self.state.read();
+      s.current_item.clone()
+    };
+
+    if let Some(item) = current_item {
+      log::info!("Tray: playing previous episode");
+      Self::report_playback_stopped(&self.client, &self.state).await;
+      Self::play_adjacent_episode(&self.client, &self.state, &self.action_tx, &item, false).await;
+    } else {
+      log::warn!("play_previous_episode: No current item");
+    }
+  }
+
   /// Stop the session.
   pub async fn stop(&self) -> Result<(), JellyfinError> {
     // Report playback stopped if there's an active session

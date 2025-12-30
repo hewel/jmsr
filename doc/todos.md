@@ -95,7 +95,7 @@
 - [ ] Add integration tests for MPV IPC
 
 ### Future Features
-- [ ] System tray controls (play/pause, next, volume)
+- [x] System tray controls (play/pause, next, previous, mute)
 - [ ] Keyboard shortcuts for playback control
 - [ ] Multiple server support
 - [ ] Playlist/queue display in UI
@@ -114,3 +114,4 @@
 - [x] Apply config changes live (MPV path/args, device name)
 - [x] Series-based track persistence (audio/subtitle preferences per series)
 - [x] Auto-play next episode when current finishes naturally
+- [x] System tray controls (play/pause, next, previous, mute)
