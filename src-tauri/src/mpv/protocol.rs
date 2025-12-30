@@ -34,6 +34,20 @@ impl MpvCommand {
     Self::new(vec!["loadfile".into(), url.into()])
   }
 
+  /// Load a file for playback with options.
+  /// Options are passed as comma-separated key=value pairs (e.g., "start=10,sid=2,aid=1").
+  /// Note: Since mpv 0.38.0, loadfile has a 4-argument form: loadfile <url> <flags> <index> <options>
+  /// We pass -1 for index to use the new 4-argument form correctly.
+  pub fn loadfile_with_options(url: &str, options: &str) -> Self {
+    Self::new(vec![
+      "loadfile".into(),
+      url.into(),
+      "replace".into(),
+      (-1_i64).into(), // index: -1 means use default behavior
+      options.into(),
+    ])
+  }
+
   /// Seek to absolute position in seconds.
   pub fn seek(time: f64) -> Self {
     Self::new(vec!["seek".into(), time.into(), "absolute".into()])

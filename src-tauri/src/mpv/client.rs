@@ -153,6 +153,50 @@ impl MpvClient {
     Ok(())
   }
 
+  /// Load a file for playback with options.
+  /// Options like start position, audio/subtitle track are applied atomically with the file load.
+  pub async fn loadfile_with_options(
+    &self,
+    url: &str,
+    start: Option<f64>,
+    audio_index: Option<i64>,
+    subtitle_index: Option<i64>,
+  ) -> Result<(), MpvError> {
+    let mut options = Vec::new();
+
+    if let Some(start) = start {
+      if start > 0.0 {
+        options.push(format!("start={}", start));
+      }
+    }
+
+    if let Some(aid) = audio_index {
+      options.push(format!("aid={}", aid));
+    }
+
+    match subtitle_index {
+      Some(-1) => {
+        // Disable subtitles
+        options.push("sid=no".to_string());
+      }
+      Some(sid) => {
+        options.push(format!("sid={}", sid));
+      }
+      None => {}
+    }
+
+    if options.is_empty() {
+      log::info!("Loading file: {}", url);
+      self.send(MpvCommand::loadfile(url)).await?;
+    } else {
+      let options_str = options.join(",");
+      log::info!("Loading file: {} with options: {}", url, options_str);
+      self.send(MpvCommand::loadfile_with_options(url, &options_str)).await?;
+    }
+
+    Ok(())
+  }
+
   /// Seek to absolute position in seconds.
   pub async fn seek(&self, time: f64) -> Result<(), MpvError> {
     self.send(MpvCommand::seek(time)).await?;

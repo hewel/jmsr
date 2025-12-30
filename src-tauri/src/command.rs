@@ -439,10 +439,12 @@ pub fn command_builder() -> Builder {
     config_default,
     config_detect_mpv,
   ]);
+  let mut bindings_path = std::env::current_dir().unwrap();
+  bindings_path.push("../src/bindings.ts");
 
   #[cfg(debug_assertions)] // <- Only export on non-release builds
   builder
-    .export(Typescript::default(), "../src/bindings.ts")
+    .export(Typescript::default(), bindings_path)
     .expect("Failed to export typescript bindings");
   builder
 }

@@ -285,8 +285,14 @@ pub struct SavedSession {
 pub struct TrackPreference {
   /// Preferred audio language code (e.g., "jpn", "eng").
   pub audio_language: Option<String>,
+  /// Preferred audio display title (e.g., "Japanese - AAC 2.0").
+  #[serde(default)]
+  pub audio_title: Option<String>,
   /// Preferred subtitle language code (e.g., "chi", "eng").
   pub subtitle_language: Option<String>,
+  /// Preferred subtitle display title (e.g., "English - SRT", "English SDH").
+  #[serde(default)]
+  pub subtitle_title: Option<String>,
   /// Whether subtitles should be enabled.
   pub is_subtitle_enabled: bool,
 }
@@ -301,6 +307,30 @@ pub fn find_stream_by_lang(streams: &[MediaStream], stream_type: &str, lang: &st
         && s.language.as_deref().map(|l| l.eq_ignore_ascii_case(lang)).unwrap_or(false)
     })
     .map(|s| s.index)
+}
+
+/// Find a stream by language and optionally title.
+/// Tries to match both language and title first, then falls back to language-only.
+/// This handles cases where multiple tracks share the same language (e.g., "English" vs "English SDH").
+pub fn find_stream_by_preference(
+  streams: &[MediaStream],
+  stream_type: &str,
+  lang: &str,
+  title: Option<&str>,
+) -> Option<i32> {
+  // First, try to match both language and title (if title is provided)
+  if let Some(title) = title {
+    if let Some(stream) = streams.iter().find(|s| {
+      s.stream_type == stream_type
+        && s.language.as_deref().map(|l| l.eq_ignore_ascii_case(lang)).unwrap_or(false)
+        && s.display_title.as_deref().map(|t| t == title).unwrap_or(false)
+    }) {
+      return Some(stream.index);
+    }
+  }
+
+  // Fall back to language-only match
+  find_stream_by_lang(streams, stream_type, lang)
 }
 
 /// Response from /Shows/{seriesId}/Episodes endpoint.

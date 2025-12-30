@@ -232,9 +232,18 @@ impl SessionManager {
                 log::info!("MPV started successfully");
               }
 
-              // Load the file
-              log::info!("Loading file into MPV: {}", url);
-              if let Err(e) = mpv.loadfile(&url).await {
+              // Load the file with all options (start position, audio/subtitle tracks)
+              // This ensures tracks are set atomically with the file load, avoiding race conditions
+              log::info!(
+                "Loading file into MPV: {} (start={}, aid={:?}, sid={:?})",
+                url, start_position, audio_index, subtitle_index
+              );
+              if let Err(e) = mpv.loadfile_with_options(
+                &url,
+                Some(start_position),
+                audio_index.map(|i| i as i64),
+                subtitle_index.map(|i| i as i64),
+              ).await {
                 log::error!("Failed to load file: {}", e);
                 continue;
               }
@@ -243,43 +252,6 @@ impl SessionManager {
               // Set the media title (shown in MPV window)
               if let Err(e) = mpv.set_property_string("force-media-title", &title).await {
                 log::warn!("Failed to set media title: {}", e);
-              }
-
-              // Set subtitle track (already converted to MPV 1-based index)
-              match subtitle_index {
-                Some(-1) => {
-                  // -1 means disable subtitles
-                  if let Err(e) = mpv.disable_track("sid").await {
-                    log::warn!("Failed to disable subtitles: {}", e);
-                  }
-                }
-                Some(idx) => {
-                  // idx is already MPV's 1-based track ID
-                  if let Err(e) = mpv.set_subtitle_track(idx as i64).await {
-                    log::warn!("Failed to set subtitle track: {}", e);
-                  }
-                }
-                None => {
-                  // Keep default behavior
-                }
-              }
-
-              // Set audio track (already converted to MPV 1-based index)
-              if let Some(idx) = audio_index {
-                // idx is already MPV's 1-based track ID
-                if let Err(e) = mpv.set_audio_track(idx as i64).await {
-                  log::warn!("Failed to set audio track: {}", e);
-                }
-              }
-
-              // Seek to start position if specified
-              if start_position > 0.0 {
-                log::info!("Seeking to position: {} seconds", start_position);
-                // Wait a bit for file to load before seeking
-                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-                if let Err(e) = mpv.seek(start_position).await {
-                  log::warn!("Failed to seek to start position: {}", e);
-                }
               }
 
               log::info!("Started playback: {} - {}", title, url);
@@ -432,8 +404,16 @@ impl SessionManager {
         // Apply audio preference if not explicitly set in request
         if audio_index.is_none() {
           if let Some(ref lang) = pref.audio_language {
-            if let Some(idx) = find_stream_by_lang(&media_source.media_streams, "Audio", lang) {
-              log::info!("Applying preferred audio language '{}' -> index {}", lang, idx);
+            if let Some(idx) = find_stream_by_preference(
+              &media_source.media_streams,
+              "Audio",
+              lang,
+              pref.audio_title.as_deref(),
+            ) {
+              log::info!(
+                "Applying preferred audio lang='{}' title={:?} -> index {}",
+                lang, pref.audio_title, idx
+              );
               audio_index = Some(idx);
             }
           }
@@ -443,8 +423,16 @@ impl SessionManager {
         if subtitle_index.is_none() {
           if pref.is_subtitle_enabled {
             if let Some(ref lang) = pref.subtitle_language {
-              if let Some(idx) = find_stream_by_lang(&media_source.media_streams, "Subtitle", lang) {
-                log::info!("Applying preferred subtitle language '{}' -> index {}", lang, idx);
+              if let Some(idx) = find_stream_by_preference(
+                &media_source.media_streams,
+                "Subtitle",
+                lang,
+                pref.subtitle_title.as_deref(),
+              ) {
+                log::info!(
+                  "Applying preferred subtitle lang='{}' title={:?} -> index {}",
+                  lang, pref.subtitle_title, idx
+                );
                 subtitle_index = Some(idx);
               }
             }
@@ -822,16 +810,20 @@ impl SessionManager {
               // Save preference for series (clone to avoid borrow issues)
               let series_id = s.current_series_id.clone();
               if let Some(series_id) = series_id {
-                // Find the language of the selected track
-                let lang = s.current_media_streams
+                // Find the language and title of the selected track
+                let track_info = s.current_media_streams
                   .iter()
                   .find(|stream| stream.stream_type == "Audio" && stream.index == index as i32)
-                  .and_then(|stream| stream.language.clone());
+                  .map(|stream| (stream.language.clone(), stream.display_title.clone()));
                 
-                if let Some(lang) = lang {
-                  log::info!("Saving audio preference for series {}: {}", series_id, lang);
+                if let Some((lang, title)) = track_info {
+                  log::info!(
+                    "Saving audio preference for series {}: lang={:?}, title={:?}",
+                    series_id, lang, title
+                  );
                   let pref = s.series_preferences.entry(series_id).or_default();
-                  pref.audio_language = Some(lang);
+                  pref.audio_language = lang;
+                  pref.audio_title = title;
                   should_save_prefs = true;
                 }
               }
@@ -867,19 +859,24 @@ impl SessionManager {
                   let pref = s.series_preferences.entry(series_id).or_default();
                   pref.is_subtitle_enabled = false;
                   pref.subtitle_language = None;
+                  pref.subtitle_title = None;
                   should_save_prefs = true;
                 } else {
-                  // Find the language of the selected subtitle track
-                  let lang = s.current_media_streams
+                  // Find the language and title of the selected subtitle track
+                  let track_info = s.current_media_streams
                     .iter()
                     .find(|stream| stream.stream_type == "Subtitle" && stream.index == index as i32)
-                    .and_then(|stream| stream.language.clone());
+                    .map(|stream| (stream.language.clone(), stream.display_title.clone()));
                   
                   let pref = s.series_preferences.entry(series_id.clone()).or_default();
-                  if let Some(lang) = lang {
-                    log::info!("Saving subtitle preference for series {}: {}", series_id, lang);
+                  if let Some((lang, title)) = track_info {
+                    log::info!(
+                      "Saving subtitle preference for series {}: lang={:?}, title={:?}",
+                      series_id, lang, title
+                    );
                     pref.is_subtitle_enabled = true;
-                    pref.subtitle_language = Some(lang);
+                    pref.subtitle_language = lang;
+                    pref.subtitle_title = title;
                   } else {
                     // Track selected but no language - just enable subtitles
                     pref.is_subtitle_enabled = true;
