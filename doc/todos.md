@@ -77,10 +77,10 @@
   - `Shift+p` - Previous episode
 - [x] Users can customize the keybindings by editing the generated `input.conf`
 
-### Error Handling Improvements
-- [ ] Show user-friendly error messages in UI when commands fail
-- [ ] Handle MPV connection loss gracefully (auto-reconnect or notify user)
-- [ ] Handle Jellyfin session timeout/disconnect
+### Error Handling Improvements ✅
+- [x] Show user-friendly error messages in UI when commands fail
+- [x] Handle MPV connection loss gracefully (auto-reconnect or notify user)
+- [x] Handle Jellyfin session timeout/disconnect
 
 ## Low Priority
 

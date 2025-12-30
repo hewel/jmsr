@@ -223,6 +223,11 @@ async configDetectMpv() : Promise<string | null> {
 /** user-defined events **/
 
 
+export const events = __makeEvents__<{
+appNotification: AppNotification
+}>({
+appNotification: "app-notification"
+})
 
 /** user-defined constants **/
 
@@ -263,6 +268,10 @@ keybindNext?: string;
  */
 keybindPrev?: string }
 /**
+ * App notification event emitted to frontend.
+ */
+export type AppNotification = { level: NotificationLevel; message: string }
+/**
  * Connection state exposed to frontend.
  */
 export type ConnectionState = { connected: boolean; serverUrl: string | null; serverName: string | null; userName: string | null }
@@ -270,6 +279,10 @@ export type ConnectionState = { connected: boolean; serverUrl: string | null; se
  * Credentials for authentication.
  */
 export type Credentials = { serverUrl: string; username: string; password: string }
+/**
+ * Notification level for UI display.
+ */
+export type NotificationLevel = "error" | "warning" | "info" | "success"
 /**
  * Player state returned to frontend.
  */

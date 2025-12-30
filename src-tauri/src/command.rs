@@ -4,11 +4,86 @@ use specta::specta;
 use specta_typescript::Typescript;
 use std::sync::Arc;
 use tauri::State;
-use tauri_specta::{collect_commands, Builder};
+use tauri_specta::{collect_commands, collect_events, Builder, Event};
 
 use crate::config::AppConfig;
 use crate::jellyfin::{ConnectionState, Credentials, JellyfinClient, SavedSession, SessionManager};
 use crate::mpv::{MpvClient, PropertyValue, write_input_conf};
+
+// ============================================================================
+// Events
+// ============================================================================
+
+/// Notification level for UI display.
+#[derive(Debug, Clone, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
+pub enum NotificationLevel {
+  Error,
+  Warning,
+  Info,
+  Success,
+}
+
+/// App notification event emitted to frontend.
+#[derive(Debug, Clone, Serialize, specta::Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct AppNotification {
+  pub level: NotificationLevel,
+  pub message: String,
+}
+
+impl AppNotification {
+  /// Emit an error notification to the frontend.
+  pub fn error(app: &tauri::AppHandle, message: impl Into<String>) {
+    let notification = Self {
+      level: NotificationLevel::Error,
+      message: message.into(),
+    };
+    if let Err(e) = notification.emit(app) {
+      log::error!("Failed to emit error notification: {}", e);
+    }
+  }
+
+  /// Emit a warning notification to the frontend.
+  pub fn warning(app: &tauri::AppHandle, message: impl Into<String>) {
+    let notification = Self {
+      level: NotificationLevel::Warning,
+      message: message.into(),
+    };
+    if let Err(e) = notification.emit(app) {
+      log::error!("Failed to emit warning notification: {}", e);
+    }
+  }
+
+  /// Emit an info notification to the frontend.
+  #[allow(dead_code)]
+  pub fn info(app: &tauri::AppHandle, message: impl Into<String>) {
+    let notification = Self {
+      level: NotificationLevel::Info,
+      message: message.into(),
+    };
+    if let Err(e) = notification.emit(app) {
+      log::error!("Failed to emit info notification: {}", e);
+    }
+  }
+
+  /// Emit a success notification to the frontend.
+  #[allow(dead_code)]
+  pub fn success(app: &tauri::AppHandle, message: impl Into<String>) {
+    let notification = Self {
+      level: NotificationLevel::Success,
+      message: message.into(),
+    };
+    if let Err(e) = notification.emit(app) {
+      log::error!("Failed to emit success notification: {}", e);
+    }
+  }
+}
+
+// ============================================================================
+// Types
+// ============================================================================
 
 /// Player state returned to frontend.
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
@@ -410,35 +485,37 @@ pub fn load_config_from_store(app: &tauri::AppHandle) -> AppConfig {
 }
 
 pub fn command_builder() -> Builder {
-  let builder = Builder::<tauri::Wry>::new().commands(collect_commands![
-    // General
-    hello_world,
-    // MPV commands
-    mpv_start,
-    mpv_stop,
-    mpv_loadfile,
-    mpv_seek,
-    mpv_set_pause,
-    mpv_set_volume,
-    mpv_set_audio_track,
-    mpv_set_subtitle_track,
-    mpv_get_property,
-    mpv_get_state,
-    mpv_is_connected,
-    // Jellyfin commands
-    jellyfin_connect,
-    jellyfin_disconnect,
-    jellyfin_get_state,
-    jellyfin_is_connected,
-    jellyfin_get_session,
-    jellyfin_restore_session,
-    jellyfin_clear_session,
-    // Config commands
-    config_get,
-    config_set,
-    config_default,
-    config_detect_mpv,
-  ]);
+  let builder = Builder::<tauri::Wry>::new()
+    .commands(collect_commands![
+      // General
+      hello_world,
+      // MPV commands
+      mpv_start,
+      mpv_stop,
+      mpv_loadfile,
+      mpv_seek,
+      mpv_set_pause,
+      mpv_set_volume,
+      mpv_set_audio_track,
+      mpv_set_subtitle_track,
+      mpv_get_property,
+      mpv_get_state,
+      mpv_is_connected,
+      // Jellyfin commands
+      jellyfin_connect,
+      jellyfin_disconnect,
+      jellyfin_get_state,
+      jellyfin_is_connected,
+      jellyfin_get_session,
+      jellyfin_restore_session,
+      jellyfin_clear_session,
+      // Config commands
+      config_get,
+      config_set,
+      config_default,
+      config_detect_mpv,
+    ])
+    .events(collect_events![AppNotification]);
 
   #[cfg(debug_assertions)] // <- Only export on non-release builds
   {

@@ -11,6 +11,7 @@ use super::client::JellyfinClient;
 use super::error::JellyfinError;
 use super::types::*;
 use super::websocket::{JellyfinCommand, JellyfinWebSocket};
+use crate::command::AppNotification;
 use crate::mpv::MpvClient;
 
 const PREFERENCES_STORE_FILE: &str = "preferences.json";
@@ -154,8 +155,12 @@ impl SessionManager {
         while let Some(cmd) = command_rx.recv().await {
           if let Err(e) = Self::handle_command(&client, &state, &action_tx, &app_handle, &mpv, cmd).await {
             log::error!("Failed to handle Jellyfin command: {}", e);
+            AppNotification::error(&app_handle, format!("Command failed: {}", e));
           }
         }
+        // WebSocket command channel closed - notify user
+        log::warn!("Jellyfin WebSocket connection closed");
+        AppNotification::warning(&app_handle, "Jellyfin connection lost. Please reconnect.");
       });
     }
 
@@ -175,6 +180,7 @@ impl SessionManager {
   fn start_action_consumer(&self) {
     if let Some(mut action_rx) = self.action_rx.write().take() {
       let mpv = self.mpv.clone();
+      let app_handle = self.app_handle.clone();
 
       tokio::spawn(async move {
         log::info!("MPV action consumer started, waiting for actions...");
@@ -195,6 +201,7 @@ impl SessionManager {
                 log::info!("MPV not connected, starting...");
                 if let Err(e) = mpv.start().await {
                   log::error!("Failed to start MPV: {}", e);
+                  AppNotification::error(&app_handle, format!("Failed to start MPV: {}", e));
                   continue;
                 }
                 log::info!("MPV started successfully");
@@ -213,6 +220,7 @@ impl SessionManager {
                 subtitle_index.map(|i| i as i64),
               ).await {
                 log::error!("Failed to load file: {}", e);
+                AppNotification::error(&app_handle, format!("Failed to load media: {}", e));
                 continue;
               }
               log::info!("File loaded successfully");
