@@ -439,13 +439,34 @@ pub fn command_builder() -> Builder {
     config_default,
     config_detect_mpv,
   ]);
-  let mut bindings_path = std::env::current_dir().unwrap();
-  bindings_path.push("../src/bindings.ts");
 
   #[cfg(debug_assertions)] // <- Only export on non-release builds
-  builder
-    .export(Typescript::default(), bindings_path)
-    .expect("Failed to export typescript bindings");
+  {
+    let mut bindings_path = std::env::current_dir().unwrap();
+    bindings_path.push("../src/bindings.ts");
+
+    // Export to a temp file first, then only overwrite if contents differ
+    // This prevents hot-reload loops when bindings haven't actually changed
+    let temp_path = bindings_path.with_extension("ts.tmp");
+    builder
+      .export(Typescript::default(), &temp_path)
+      .expect("Failed to export typescript bindings");
+
+    // Read both files and compare
+    let new_content = std::fs::read(&temp_path).unwrap_or_default();
+    let old_content = std::fs::read(&bindings_path).unwrap_or_default();
+
+    if new_content != old_content {
+      // Contents differ, rename temp to actual
+      std::fs::rename(&temp_path, &bindings_path)
+        .expect("Failed to rename bindings file");
+      eprintln!("Updated bindings.ts");
+    } else {
+      // Contents same, remove temp file
+      let _ = std::fs::remove_file(&temp_path);
+    }
+  }
+
   builder
 }
 
