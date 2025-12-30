@@ -73,16 +73,6 @@ impl MpvCommand {
     Self::new(vec!["set_property".into(), "sid".into(), id.into()])
   }
 
-  /// Observe a property for changes.
-  pub fn observe_property(id: i64, name: &str) -> Self {
-    Self::new(vec!["observe_property".into(), id.into(), name.into()])
-  }
-
-  /// Stop observing a property.
-  pub fn unobserve_property(id: i64) -> Self {
-    Self::new(vec!["unobserve_property".into(), id.into()])
-  }
-
   /// Get a property value.
   pub fn get_property(name: &str) -> Self {
     Self::new(vec!["get_property".into(), name.into()])
@@ -129,6 +119,7 @@ impl MpvResponse {
 
 /// Event sent by MPV (property changes, playback events, etc.).
 #[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)] // MPV protocol fields - may be used later
 pub struct MpvEvent {
   /// Event type (e.g., "property-change", "end-file", "client-message").
   pub event: String,

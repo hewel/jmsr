@@ -58,11 +58,6 @@ impl JellyfinClient {
     self.state.write().device_name = name;
   }
 
-  /// Get the current device name.
-  pub fn device_name(&self) -> String {
-    self.state.read().device_name.clone()
-  }
-
   /// Get the device ID.
   pub fn device_id(&self) -> String {
     self.state.read().device_id.clone()

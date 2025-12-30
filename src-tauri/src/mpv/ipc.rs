@@ -23,8 +23,6 @@ pub enum IpcError {
   WriteFailed(#[from] std::io::Error),
   #[error("Command timeout")]
   Timeout,
-  #[error("MPV error: {0}")]
-  MpvError(String),
   #[error("Disconnected")]
   Disconnected,
 }

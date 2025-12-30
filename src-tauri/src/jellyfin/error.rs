@@ -28,7 +28,4 @@ pub enum JellyfinError {
 
   #[error("Session not found")]
   SessionNotFound,
-
-  #[error("Playback session not active")]
-  NoActivePlayback,
 }

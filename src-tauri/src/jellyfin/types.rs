@@ -8,6 +8,7 @@ use specta::Type;
 /// Authentication response from Jellyfin.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "PascalCase")]
+#[allow(dead_code)] // API response fields - may be used later
 pub struct AuthResponse {
   pub user: User,
   pub access_token: String,
@@ -62,6 +63,7 @@ pub struct WsMessage {
 /// Play command from Jellyfin (via WebSocket).
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "PascalCase")]
+#[allow(dead_code)] // API response fields - may be used later
 pub struct PlayRequest {
   pub item_ids: Vec<String>,
   pub start_position_ticks: Option<i64>,
@@ -119,6 +121,7 @@ pub struct MediaItem {
 /// Media source for playback.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "PascalCase")]
+#[allow(dead_code)] // API response fields - may be used later
 pub struct MediaSource {
   pub id: String,
   pub path: Option<String>,
@@ -140,6 +143,7 @@ pub struct MediaSource {
 /// Individual stream (video, audio, subtitle).
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "PascalCase")]
+#[allow(dead_code)] // API response fields - may be used later
 pub struct MediaStream {
   pub index: i32,
   #[serde(rename = "Type")]
@@ -336,6 +340,7 @@ pub fn find_stream_by_preference(
 /// Response from /Shows/{seriesId}/Episodes endpoint.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "PascalCase")]
+#[allow(dead_code)] // API response fields - may be used later
 pub struct EpisodesResponse {
   pub items: Vec<MediaItem>,
   pub total_record_count: i32,

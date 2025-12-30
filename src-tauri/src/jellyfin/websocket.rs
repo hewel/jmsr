@@ -192,11 +192,6 @@ impl JellyfinWebSocket {
     *self.connected.write() = false;
   }
 
-  /// Check if connected.
-  pub fn is_connected(&self) -> bool {
-    *self.connected.read()
-  }
-
   /// Take the command receiver (can only be called once).
   pub fn take_command_receiver(&self) -> Option<mpsc::Receiver<JellyfinCommand>> {
     self.command_rx.write().take()

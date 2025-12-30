@@ -16,9 +16,6 @@ use crate::mpv::MpvClient;
 const PREFERENCES_STORE_FILE: &str = "preferences.json";
 const SERIES_PREFERENCES_KEY: &str = "series_track_preferences";
 
-/// Callback for MPV commands from Jellyfin.
-pub type MpvCommandCallback = Box<dyn Fn(MpvAction) + Send + Sync>;
-
 /// Actions to perform on MPV.
 #[derive(Debug, Clone)]
 pub enum MpvAction {
@@ -125,35 +122,6 @@ impl SessionManager {
       }
     }
     HashMap::new()
-  }
-
-  /// Save series preferences to disk.
-  fn save_preferences_to_store(&self) {
-    let prefs = {
-      let s = self.state.read();
-      s.series_preferences.clone()
-    };
-
-    match self.app_handle.store(PREFERENCES_STORE_FILE) {
-      Ok(store) => {
-        match serde_json::to_value(&prefs) {
-          Ok(value) => {
-            store.set(SERIES_PREFERENCES_KEY.to_string(), value);
-            if let Err(e) = store.save() {
-              log::error!("Failed to save preferences to disk: {}", e);
-            } else {
-              log::debug!("Saved {} series track preferences to disk", prefs.len());
-            }
-          }
-          Err(e) => {
-            log::error!("Failed to serialize preferences: {}", e);
-          }
-        }
-      }
-      Err(e) => {
-        log::error!("Failed to open preferences store for writing: {}", e);
-      }
-    }
   }
 
   /// Start the session (connect WebSocket and begin listening).
@@ -1233,46 +1201,6 @@ impl SessionManager {
     }
 
     self.websocket.disconnect().await;
-    Ok(())
-  }
-
-  /// Take the action receiver (can only be called once).
-  pub fn take_action_receiver(&self) -> Option<mpsc::Receiver<MpvAction>> {
-    self.action_rx.write().take()
-  }
-
-  /// Check if there's an active playback session.
-  pub fn has_active_playback(&self) -> bool {
-    self.state.read().playback.is_some()
-  }
-
-  /// Update playback state from MPV.
-  pub fn update_playback_state(&self, position: f64, is_paused: bool, volume: i32) {
-    let mut s = self.state.write();
-    if let Some(ref mut playback) = s.playback {
-      playback.position_ticks = seconds_to_ticks(position);
-      playback.is_paused = is_paused;
-      playback.volume = volume;
-    }
-  }
-
-  /// End current playback session.
-  pub async fn end_playback(&self) -> Result<(), JellyfinError> {
-    let session = {
-      let mut s = self.state.write();
-      s.playback.take()
-    };
-
-    if let Some(session) = session {
-      let stop_info = PlaybackStopInfo {
-        item_id: session.item_id,
-        media_source_id: session.media_source_id,
-        play_session_id: session.play_session_id,
-        position_ticks: Some(session.position_ticks),
-      };
-      self.client.report_playback_stop(&stop_info).await?;
-    }
-
     Ok(())
   }
 }

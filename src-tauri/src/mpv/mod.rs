@@ -13,4 +13,4 @@ mod protocol;
 
 pub use client::MpvClient;
 pub use process::{find_mpv, write_input_conf};
-pub use protocol::{MpvCommand, MpvEvent, MpvResponse, PropertyValue};
+pub use protocol::{MpvEvent, PropertyValue};

@@ -84,10 +84,10 @@
 
 ## Low Priority
 
-### Code Cleanup
-- [ ] Remove unused Rust imports (jellyfin/mod.rs, mpv/mod.rs)
-- [ ] Remove dead code warnings (unused methods in session.rs, client.rs)
-- [ ] Add doc comments to public Rust APIs
+### Code Cleanup ✅
+- [x] Remove unused Rust imports (jellyfin/mod.rs, mpv/mod.rs)
+- [x] Remove dead code warnings (unused methods in session.rs, client.rs)
+- [x] Add `#[allow(dead_code)]` for API response struct fields (may be used later)
 
 ### Testing
 - [ ] Add frontend tests for SettingsPage form validation

@@ -254,26 +254,6 @@ impl MpvClient {
     }
   }
 
-  /// Get current volume.
-  pub async fn get_volume(&self) -> Result<f64, MpvError> {
-    match self.get_property("volume").await? {
-      PropertyValue::Number(n) => Ok(n),
-      _ => Ok(100.0),
-    }
-  }
-
-  /// Start observing a property.
-  pub async fn observe_property(&self, id: i64, name: &str) -> Result<(), MpvError> {
-    self.send(MpvCommand::observe_property(id, name)).await?;
-    Ok(())
-  }
-
-  /// Stop observing a property.
-  pub async fn unobserve_property(&self, id: i64) -> Result<(), MpvError> {
-    self.send(MpvCommand::unobserve_property(id)).await?;
-    Ok(())
-  }
-
   /// Toggle mute state.
   pub async fn toggle_mute(&self) -> Result<(), MpvError> {
     self.send(MpvCommand::cycle("mute")).await?;
