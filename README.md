@@ -60,7 +60,7 @@ JMSR follows a three-actor architecture:
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
 │    Sentinel     │     │     Bridge      │     │     Player      │
-│   (Tauri GUI)   │────▶│   (Rust IPC)    │────▶│  (External MPV) │
+│   (Tauri GUI)   │───▶│   (Rust IPC)    │───▶│  (External MPV) │
 │                 │     │                 │     │                 │
 │ - Settings UI   │     │ - Command       │     │ - mpv.exe       │
 │ - System Tray   │     │   Translation   │     │ - User configs  │
@@ -69,7 +69,7 @@ JMSR follows a three-actor architecture:
         │                                               │
         │         Jellyfin Server                       │
         │    ┌──────────────────────┐                   │
-        └───▶│  WebSocket + REST    │◀──────────────────┘
+        └──▶│  WebSocket + REST    │◀─────────────────┘
              │  - Cast commands     │    Progress reports
              │  - Playback state    │
              └──────────────────────┘
