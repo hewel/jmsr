@@ -69,3 +69,4 @@ bunx tauri build      # Production build
 - Window title: "jellyfin-mpv-shim-rust" (tauri.conf.json)
 - CSP disabled (`null`) for development flexibility
 - When edit finished, use @oracle to review changes
+- [Jellyfin api docs](https://api.jellyfin.org)

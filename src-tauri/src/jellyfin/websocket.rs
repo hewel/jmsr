@@ -4,7 +4,9 @@ use futures_util::{SinkExt, StreamExt};
 use parking_lot::RwLock;
 use std::sync::Arc;
 use tokio::sync::mpsc;
+use tokio::task::JoinHandle;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
+use tokio_util::sync::CancellationToken;
 
 use super::error::JellyfinError;
 use super::types::*;
@@ -20,12 +22,18 @@ pub enum JellyfinCommand {
   GeneralCommand(GeneralCommand),
 }
 
+/// Internal state for channel management.
+struct ChannelState {
+  command_tx: mpsc::Sender<JellyfinCommand>,
+  command_rx: Option<mpsc::Receiver<JellyfinCommand>>,
+}
+
 /// WebSocket connection to Jellyfin server.
 pub struct JellyfinWebSocket {
-  command_tx: mpsc::Sender<JellyfinCommand>,
-  command_rx: Arc<RwLock<Option<mpsc::Receiver<JellyfinCommand>>>>,
+  channel: Arc<RwLock<ChannelState>>,
   connected: Arc<RwLock<bool>>,
-  shutdown_tx: Arc<RwLock<Option<mpsc::Sender<()>>>>,
+  cancel_token: Arc<RwLock<Option<CancellationToken>>>,
+  task_handle: Arc<RwLock<Option<JoinHandle<()>>>>,
 }
 
 impl JellyfinWebSocket {
@@ -33,11 +41,23 @@ impl JellyfinWebSocket {
   pub fn new() -> Self {
     let (command_tx, command_rx) = mpsc::channel(32);
     Self {
-      command_tx,
-      command_rx: Arc::new(RwLock::new(Some(command_rx))),
+      channel: Arc::new(RwLock::new(ChannelState {
+        command_tx,
+        command_rx: Some(command_rx),
+      })),
       connected: Arc::new(RwLock::new(false)),
-      shutdown_tx: Arc::new(RwLock::new(None)),
+      cancel_token: Arc::new(RwLock::new(None)),
+      task_handle: Arc::new(RwLock::new(None)),
     }
+  }
+
+  /// Reset channels for a fresh connection.
+  /// This creates new tx/rx pairs, allowing the receiver to be taken again.
+  pub fn reset_channels(&self) {
+    let (command_tx, command_rx) = mpsc::channel(32);
+    let mut channel = self.channel.write();
+    channel.command_tx = command_tx;
+    channel.command_rx = Some(command_rx);
   }
 
   /// Connect to Jellyfin WebSocket.
@@ -45,22 +65,27 @@ impl JellyfinWebSocket {
   pub async fn connect(
     &self,
     url: &str,
-    capabilities: Option<serde_json::Value>,
   ) -> Result<(), JellyfinError> {
+    // Cancel any existing connection
+    self.disconnect().await;
+
+    // Reset channels for fresh receiver
+    self.reset_channels();
+
     let (ws_stream, _) = connect_async(url).await?;
     let (mut write, mut read) = ws_stream.split();
 
     *self.connected.write() = true;
 
-    // Create shutdown channel
-    let (shutdown_tx, mut shutdown_rx) = mpsc::channel::<()>(1);
-    *self.shutdown_tx.write() = Some(shutdown_tx);
+    // Create cancellation token
+    let cancel_token = CancellationToken::new();
+    *self.cancel_token.write() = Some(cancel_token.clone());
 
     let connected = self.connected.clone();
-    let command_tx = self.command_tx.clone();
+    let command_tx = self.channel.read().command_tx.clone();
 
     // Spawn WebSocket reader task
-    tokio::spawn(async move {
+    let handle = tokio::spawn(async move {
       // FIX 1: "1000,1000" tells the server we are an ACTIVE client
       let session_start = serde_json::json!({
         "MessageType": "SessionsStart",
@@ -75,26 +100,16 @@ impl JellyfinWebSocket {
         return;
       }
 
-      // FIX 2: Send Capabilities via WebSocket (Double Report Strategy)
-      if let Some(caps) = capabilities {
-        let report_caps = serde_json::json!({
-          "MessageType": "ReportCapabilities",
-          "Data": caps
-        });
-        log::info!("Reporting capabilities via WebSocket");
-        if let Err(e) = write
-          .send(Message::Text(report_caps.to_string().into()))
-          .await
-        {
-          log::error!("Failed to send ReportCapabilities via WS: {}", e);
-        }
-      }
-
       // Keep-alive interval
       let mut keepalive_interval = tokio::time::interval(std::time::Duration::from_secs(30));
 
       loop {
         tokio::select! {
+          _ = cancel_token.cancelled() => {
+            log::info!("WebSocket shutdown requested via cancellation");
+            let _ = write.close().await;
+            break;
+          }
           msg = read.next() => {
             match msg {
               Some(Ok(Message::Text(text))) => {
@@ -126,16 +141,13 @@ impl JellyfinWebSocket {
               break;
             }
           }
-          _ = shutdown_rx.recv() => {
-            log::info!("WebSocket shutdown requested");
-            let _ = write.close().await;
-            break;
-          }
         }
       }
 
       *connected.write() = false;
     });
+
+    *self.task_handle.write() = Some(handle);
 
     Ok(())
   }
@@ -184,17 +196,29 @@ impl JellyfinWebSocket {
 
   /// Disconnect from WebSocket.
   pub async fn disconnect(&self) {
-    // Take the sender without holding lock across await
-    let tx = self.shutdown_tx.write().take();
-    if let Some(tx) = tx {
-      let _ = tx.send(()).await;
+    // Cancel the task via token
+    if let Some(token) = self.cancel_token.write().take() {
+      token.cancel();
     }
+
+    // Take the handle without holding the lock across await
+    let handle = self.task_handle.write().take();
+    if let Some(handle) = handle {
+      let _ = tokio::time::timeout(std::time::Duration::from_secs(2), handle).await;
+    }
+
     *self.connected.write() = false;
   }
 
-  /// Take the command receiver (can only be called once).
+  /// Check if connected.
+  #[allow(dead_code)]
+  pub fn is_connected(&self) -> bool {
+    *self.connected.read()
+  }
+
+  /// Take the command receiver (can be called after each connect).
   pub fn take_command_receiver(&self) -> Option<mpsc::Receiver<JellyfinCommand>> {
-    self.command_rx.write().take()
+    self.channel.write().command_rx.take()
   }
 }
 

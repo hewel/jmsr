@@ -104,6 +104,12 @@
 - [x] Remove dead code warnings (unused methods in session.rs, client.rs)
 - [x] Add `#[allow(dead_code)]` for API response struct fields (may be used later)
 
+### Oracle Review Fixes ✅
+- [x] HTTP `get()`/`post()` now check status before JSON parsing
+- [x] Token logging fixed - `api_key` redacted from logged URLs via `redact_url()` helper
+- [x] Lifecycle bug fixed - `JellyfinWebSocket` now uses `CancellationToken` and `reset_channels()` for proper reconnection
+- [x] MPV death handling - `clear_playback_context()` reports stop to Jellyfin and clears state when MPV disconnects
+
 ### Testing
 - [ ] Add frontend tests for SettingsPage form validation
 - [ ] Add Rust unit tests for config validation

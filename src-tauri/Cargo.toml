@@ -37,3 +37,4 @@ uuid = { version = "1.19.0", features = ["v4", "serde"] }
 futures-util = "0.3.31"
 tauri-plugin-store = "2.4.1"
 dirs = "6.0.0"
+tokio-util = "0.7.17"

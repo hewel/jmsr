@@ -8,7 +8,7 @@ export const commands = {
 /**
  * Start the MPV player.
  */
-async mpvStart() : Promise<Result<null, string>> {
+async mpvStart() : Promise<Result<null, CommandError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("mpv_start") };
 } catch (e) {
@@ -19,7 +19,7 @@ async mpvStart() : Promise<Result<null, string>> {
 /**
  * Stop the MPV player.
  */
-async mpvStop() : Promise<Result<null, string>> {
+async mpvStop() : Promise<Result<null, CommandError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("mpv_stop") };
 } catch (e) {
@@ -30,7 +30,7 @@ async mpvStop() : Promise<Result<null, string>> {
 /**
  * Load a media file/URL for playback.
  */
-async mpvLoadfile(url: string) : Promise<Result<null, string>> {
+async mpvLoadfile(url: string) : Promise<Result<null, CommandError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("mpv_loadfile", { url }) };
 } catch (e) {
@@ -41,7 +41,7 @@ async mpvLoadfile(url: string) : Promise<Result<null, string>> {
 /**
  * Seek to absolute position in seconds.
  */
-async mpvSeek(time: number) : Promise<Result<null, string>> {
+async mpvSeek(time: number) : Promise<Result<null, CommandError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("mpv_seek", { time }) };
 } catch (e) {
@@ -52,7 +52,7 @@ async mpvSeek(time: number) : Promise<Result<null, string>> {
 /**
  * Set pause state.
  */
-async mpvSetPause(paused: boolean) : Promise<Result<null, string>> {
+async mpvSetPause(paused: boolean) : Promise<Result<null, CommandError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("mpv_set_pause", { paused }) };
 } catch (e) {
@@ -63,7 +63,7 @@ async mpvSetPause(paused: boolean) : Promise<Result<null, string>> {
 /**
  * Set volume (0-100).
  */
-async mpvSetVolume(volume: number) : Promise<Result<null, string>> {
+async mpvSetVolume(volume: number) : Promise<Result<null, CommandError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("mpv_set_volume", { volume }) };
 } catch (e) {
@@ -74,7 +74,7 @@ async mpvSetVolume(volume: number) : Promise<Result<null, string>> {
 /**
  * Set audio track by ID.
  */
-async mpvSetAudioTrack(id: number) : Promise<Result<null, string>> {
+async mpvSetAudioTrack(id: number) : Promise<Result<null, CommandError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("mpv_set_audio_track", { id }) };
 } catch (e) {
@@ -85,7 +85,7 @@ async mpvSetAudioTrack(id: number) : Promise<Result<null, string>> {
 /**
  * Set subtitle track by ID.
  */
-async mpvSetSubtitleTrack(id: number) : Promise<Result<null, string>> {
+async mpvSetSubtitleTrack(id: number) : Promise<Result<null, CommandError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("mpv_set_subtitle_track", { id }) };
 } catch (e) {
@@ -96,7 +96,7 @@ async mpvSetSubtitleTrack(id: number) : Promise<Result<null, string>> {
 /**
  * Get a property value from MPV.
  */
-async mpvGetProperty(name: string) : Promise<Result<PropertyValue, string>> {
+async mpvGetProperty(name: string) : Promise<Result<PropertyValue, CommandError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("mpv_get_property", { name }) };
 } catch (e) {
@@ -107,7 +107,7 @@ async mpvGetProperty(name: string) : Promise<Result<PropertyValue, string>> {
 /**
  * Get current player state.
  */
-async mpvGetState() : Promise<Result<PlayerState, string>> {
+async mpvGetState() : Promise<Result<PlayerState, CommandError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("mpv_get_state") };
 } catch (e) {
@@ -124,7 +124,7 @@ async mpvIsConnected() : Promise<boolean> {
 /**
  * Connect to a Jellyfin server.
  */
-async jellyfinConnect(credentials: Credentials) : Promise<Result<null, string>> {
+async jellyfinConnect(credentials: Credentials) : Promise<Result<null, CommandError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("jellyfin_connect", { credentials }) };
 } catch (e) {
@@ -135,7 +135,7 @@ async jellyfinConnect(credentials: Credentials) : Promise<Result<null, string>> 
 /**
  * Disconnect from Jellyfin server.
  */
-async jellyfinDisconnect() : Promise<Result<null, string>> {
+async jellyfinDisconnect() : Promise<Result<null, CommandError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("jellyfin_disconnect") };
 } catch (e) {
@@ -164,7 +164,7 @@ async jellyfinGetSession() : Promise<SavedSession | null> {
 /**
  * Restore a session from saved data.
  */
-async jellyfinRestoreSession(session: SavedSession) : Promise<Result<null, string>> {
+async jellyfinRestoreSession(session: SavedSession) : Promise<Result<null, CommandError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("jellyfin_restore_session", { session }) };
 } catch (e) {
@@ -178,7 +178,7 @@ async jellyfinRestoreSession(session: SavedSession) : Promise<Result<null, strin
  * This disconnects from the server and should be paired with
  * clearing the saved session from localStorage on the frontend.
  */
-async jellyfinClearSession() : Promise<Result<null, string>> {
+async jellyfinClearSession() : Promise<Result<null, CommandError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("jellyfin_clear_session") };
 } catch (e) {
@@ -195,7 +195,7 @@ async configGet() : Promise<AppConfig> {
 /**
  * Update the app configuration, apply changes live, and persist to disk.
  */
-async configSet(config: AppConfig) : Promise<Result<null, string>> {
+async configSet(config: AppConfig) : Promise<Result<null, CommandError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("config_set", { config }) };
 } catch (e) {
@@ -268,6 +268,38 @@ keybindPrev?: string }
  * App notification event emitted to frontend.
  */
 export type AppNotification = { level: NotificationLevel; message: string }
+/**
+ * Typed command error for better frontend error handling.
+ */
+export type CommandError = { code: CommandErrorCode; message: string }
+/**
+ * Error codes for frontend to distinguish error types.
+ */
+export type CommandErrorCode = 
+/**
+ * MPV player is not connected.
+ */
+"notConnected" | 
+/**
+ * Resource not found (e.g., MPV executable, media file).
+ */
+"notFound" | 
+/**
+ * Invalid input provided by the caller.
+ */
+"invalidInput" | 
+/**
+ * Network or connection error.
+ */
+"network" | 
+/**
+ * Authentication failed.
+ */
+"authFailed" | 
+/**
+ * Internal error (catch-all).
+ */
+"internal"
 /**
  * Connection state exposed to frontend.
  */

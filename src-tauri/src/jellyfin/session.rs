@@ -132,10 +132,10 @@ impl SessionManager {
       self.client.device_id()
     );
 
+    // Connect WebSocket with capabilities for Double Report Strategy
     let ws_url = self.client.websocket_url()?;
-    self.websocket.connect(&ws_url, None).await?;
-
-    let _caps_payload = self.client.report_capabilities().await?;
+    self.websocket.connect(&ws_url).await?;
+    self.client.report_capabilities().await?;
 
     if let Err(e) = self.client.validate_session().await {
       log::warn!("Session validation failed: {} - cast may not work", e);
@@ -195,7 +195,7 @@ impl SessionManager {
               audio_index,
               subtitle_index,
             } => {
-              log::info!("MpvAction::Play received, url={}, title={}", url, title);
+              log::info!("MpvAction::Play received, url={}, title={}", redact_url(&url), title);
               // Start MPV if not already running
               if !mpv.is_connected() {
                 log::info!("MPV not connected, starting...");
@@ -211,7 +211,7 @@ impl SessionManager {
               // This ensures tracks are set atomically with the file load, avoiding race conditions
               log::info!(
                 "Loading file into MPV: {} (start={}, aid={:?}, sid={:?})",
-                url, start_position, audio_index, subtitle_index
+                redact_url(&url), start_position, audio_index, subtitle_index
               );
               if let Err(e) = mpv.loadfile_with_options(
                 &url,
@@ -230,7 +230,7 @@ impl SessionManager {
                 log::warn!("Failed to set media title: {}", e);
               }
 
-              log::info!("Started playback: {} - {}", title, url);
+              log::info!("Started playback: {} - {}", title, redact_url(&url));
             }
             MpvAction::Pause => {
               log::info!("MpvAction::Pause - setting pause=true");
@@ -425,7 +425,7 @@ impl SessionManager {
     let url = client
       .build_stream_url(item_id, media_source)
       .ok_or(JellyfinError::NotConnected)?;
-    log::info!("Built stream URL: {}", url);
+    log::info!("Built stream URL: {}", redact_url(&url));
 
     // Calculate start position
     let start_position = request
@@ -1043,7 +1043,10 @@ impl SessionManager {
           }
         }
 
-        log::info!("MPV event receiver closed, waiting for reconnection...");
+        // MPV event receiver closed - this means MPV died or disconnected
+        // Clear playback context and notify Jellyfin
+        log::warn!("MPV event receiver closed, clearing playback context...");
+        Self::clear_playback_context(&client, &state).await;
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
       }
     });
@@ -1232,6 +1235,20 @@ impl SessionManager {
     }
   }
 
+  /// Clear all playback context - reports stop to Jellyfin and clears all state.
+  /// Call this when MPV dies unexpectedly or WebSocket disconnects during playback.
+  async fn clear_playback_context(client: &JellyfinClient, state: &RwLock<SessionState>) {
+    // First report stopped to Jellyfin
+    Self::report_playback_stopped(client, state).await;
+
+    // Then clear all related state
+    let mut s = state.write();
+    s.current_item = None;
+    s.current_series_id = None;
+    s.current_media_streams.clear();
+    log::info!("Playback context cleared");
+  }
+
   /// Play the next or previous episode.
   async fn play_adjacent_episode(
     client: &JellyfinClient,
@@ -1352,4 +1369,17 @@ fn jellyfin_to_mpv_track_index(streams: &[MediaStream], stream_type: &str, jelly
   }
   // Fallback: return 1 (first track of type) if not found
   1
+}
+
+/// Redact sensitive query parameters from URLs for logging.
+/// Replaces api_key=XXX with api_key=[REDACTED].
+fn redact_url(url: &str) -> String {
+  // Use regex-like replacement for api_key parameter
+  if let Some(idx) = url.find("api_key=") {
+    let start = idx + 8; // length of "api_key="
+    let end = url[start..].find('&').map(|i| start + i).unwrap_or(url.len());
+    format!("{}[REDACTED]{}", &url[..start], &url[end..])
+  } else {
+    url.to_string()
+  }
 }

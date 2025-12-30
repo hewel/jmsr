@@ -270,6 +270,15 @@ impl JellyfinClient {
       .send()
       .await?;
 
+    let status = response.status();
+    if !status.is_success() {
+      let body = response.text().await.unwrap_or_default();
+      return Err(JellyfinError::HttpError(format!(
+        "GET {} failed: HTTP {} - {}",
+        path, status, body
+      )));
+    }
+
     Ok(response.json().await?)
   }
 
@@ -291,6 +300,15 @@ impl JellyfinClient {
       .json(body)
       .send()
       .await?;
+
+    let status = response.status();
+    if !status.is_success() {
+      let body = response.text().await.unwrap_or_default();
+      return Err(JellyfinError::HttpError(format!(
+        "POST {} failed: HTTP {} - {}",
+        path, status, body
+      )));
+    }
 
     Ok(response.json().await?)
   }
