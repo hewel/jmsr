@@ -78,10 +78,46 @@ fn ensure_input_conf() -> Option<PathBuf> {
   Some(path)
 }
 
+/// Canonicalize a path to resolve symlinks and junctions.
+/// This fixes "os error 448" (Untrusted Mount Point) with Scoop's `current` junction.
+fn canonicalize_path(path: PathBuf) -> PathBuf {
+  match path.canonicalize() {
+    Ok(canonical) => {
+      log::debug!("Canonicalized {:?} -> {:?}", path, canonical);
+      canonical
+    }
+    Err(e) => {
+      log::warn!("Failed to canonicalize {:?}: {}", path, e);
+      path
+    }
+  }
+}
+
+/// On Windows, ensure we use mpv.exe instead of mpv.com.
+/// mpv.com is a console wrapper that spawns a black terminal window.
+#[cfg(windows)]
+fn ensure_mpv_exe(path: PathBuf) -> PathBuf {
+  if path.extension().map(|e| e == "com").unwrap_or(false) {
+    let exe_path = path.with_extension("exe");
+    if exe_path.exists() {
+      log::info!("Switching from mpv.com to mpv.exe: {:?}", exe_path);
+      return exe_path;
+    }
+  }
+  path
+}
+
+#[cfg(not(windows))]
+fn ensure_mpv_exe(path: PathBuf) -> PathBuf {
+  path
+}
+
 /// Find MPV executable in common locations.
 pub fn find_mpv() -> Option<PathBuf> {
   // Check PATH first
   if let Ok(path) = which::which("mpv") {
+    let path = ensure_mpv_exe(path);
+    let path = canonicalize_path(path);
     return Some(path);
   }
 
@@ -96,7 +132,7 @@ pub fn find_mpv() -> Option<PathBuf> {
     for path in common_paths {
       let p = PathBuf::from(path);
       if p.exists() {
-        return Some(p);
+        return Some(canonicalize_path(p));
       }
     }
   }
@@ -111,7 +147,7 @@ pub fn find_mpv() -> Option<PathBuf> {
     for path in common_paths {
       let p = PathBuf::from(path);
       if p.exists() {
-        return Some(p);
+        return Some(canonicalize_path(p));
       }
     }
   }
@@ -122,7 +158,7 @@ pub fn find_mpv() -> Option<PathBuf> {
     for path in common_paths {
       let p = PathBuf::from(path);
       if p.exists() {
-        return Some(p);
+        return Some(canonicalize_path(p));
       }
     }
   }
@@ -150,7 +186,8 @@ pub fn spawn_mpv(mpv_path: Option<&PathBuf>, extra_args: &[String]) -> Result<Ch
     .arg("--idle")
     .arg("--force-window")
     .arg("--keep-open=no")
-    .arg("--no-terminal");
+    .arg("--no-terminal")
+    .arg("--osc");
 
   // Add JMSR keybindings via input.conf
   // Using --input-conf appends to (not replaces) the user's input.conf

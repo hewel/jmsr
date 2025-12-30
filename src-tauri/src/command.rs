@@ -603,7 +603,11 @@ pub fn config_default() -> AppConfig {
 #[tauri::command]
 #[specta]
 pub fn config_detect_mpv() -> Option<String> {
-  crate::mpv::find_mpv().map(|p| p.to_string_lossy().to_string())
+  crate::mpv::find_mpv().map(|p| {
+    let s = p.to_string_lossy().to_string();
+    // Strip Windows extended-length path prefix for cleaner display
+    s.strip_prefix(r"\\?\").map(String::from).unwrap_or(s)
+  })
 }
 
 /// Load config from disk. Called internally during app setup.
