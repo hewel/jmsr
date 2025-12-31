@@ -75,7 +75,7 @@ graph LR
 
 #### Download Pre-built Binaries (Recommended)
 
-Download the latest release for your platform from the [Releases page](https://github.com/your-username/jmsr/releases):
+Download the latest release for your platform from the [Releases page](https://github.com/hewel/jmsr/releases):
 
 | Platform | Download |
 | :--- | :--- |
