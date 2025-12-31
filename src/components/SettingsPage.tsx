@@ -506,7 +506,7 @@ export default function SettingsPage(props: SettingsPageProps) {
         {/* Version Footer */}
         <div class="mt-8 text-center">
           <p class="text-gray-500 text-sm">JMSR - Jellyfin MPV Shim Rust</p>
-          <p class="text-gray-600 text-xs mt-1">Version 1.0.0</p>
+          <p class="text-gray-600 text-xs mt-1">Version 1.1.0</p>
         </div>
       </div>
     </div>

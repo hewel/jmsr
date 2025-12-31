@@ -280,7 +280,7 @@ export default function LoginPage(props: LoginPageProps) {
 
         {/* Footer */}
         <p class="text-center text-gray-500 text-sm mt-6">
-          Jellyfin MPV Shim Rust v1.0.0
+          Jellyfin MPV Shim Rust v1.1.0
         </p>
       </div>
     </div>
