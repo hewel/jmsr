@@ -2,6 +2,25 @@
 
 ## High Priority
 
+### v1.0.0 Release Prep ✅
+- [x] Version bumped to 1.0.0 across all manifests (package.json, Cargo.toml, tauri.conf.json)
+- [x] CI/CD workflows created:
+  - `.github/workflows/ci.yml` - Runs on push/PR: Biome lint, Clippy, tests
+  - `.github/workflows/release.yml` - Runs on `v*` tags: cross-platform builds, GitHub Release
+- [x] MPV spawning fixes (Windows):
+  - `ensure_mpv_exe()` swaps `mpv.com` → `mpv.exe` to prevent black console window
+  - `canonicalize_path()` resolves Scoop symlinks to fix error 448
+  - Added `--border`, `--title-bar`, `--osc` flags for proper window decorations
+  - `config_detect_mpv()` strips `\\?\` prefix for clean UI display
+- [x] WebSocket auto-reconnect with exponential backoff (1s → 2s → 5s → 10s → 30s → 60s)
+  - On disconnect: clears playback context, shows warning toast
+  - On reconnect: re-reports capabilities, shows success notification
+- [x] Lucide icons integration (`lucide-solid@0.562.0`):
+  - `LoginPage.tsx`: `Loader2` spinner
+  - `SettingsPage.tsx`: `RefreshCw`, `CheckCircle`, `Play`, `Keyboard`
+  - `Toast.tsx`: `Check`, `X`, `AlertTriangle`, `Info`
+- [x] Footer versions updated to 1.0.0
+
 ### Config Persistence to Disk ✅
 - [x] Add `tauri-plugin-store` for file-based config storage
 - [x] Load config on app startup (in lib.rs setup)
