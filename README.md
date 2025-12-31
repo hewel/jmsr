@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![CI](https://github.com/your-username/jmsr/actions/workflows/ci.yml/badge.svg)](https://github.com/your-username/jmsr/actions/workflows/ci.yml)
+[![CI](https://github.com/hewel/jmsr/actions/workflows/ci.yml/badge.svg)](https://github.com/hewel/jmsr/actions/workflows/ci.yml)
 [![Rust](https://img.shields.io/badge/Rust-1.70+-orange?logo=rust)](https://www.rust-lang.org/)
 [![Tauri](https://img.shields.io/badge/Tauri-v2-blue?logo=tauri)](https://v2.tauri.app/)
 [![Solid.js](https://img.shields.io/badge/Solid.js-1.x-blue?logo=solid)](https://www.solidjs.com/)
@@ -47,13 +47,18 @@ JMSR utilizes a robust three-actor architecture to ensure stability and separati
 ```mermaid
 graph LR
     subgraph JMSR[JMSR Desktop App]
-        A[Sentinel<br>Tauri GUI]
-        B[Bridge<br>Rust Backend]
+        A[<b>Sentinel</b><br>Tauri GUI]
+        B[<b>Bridge</b><br>Rust Backend]
         A <--> B
     end
     
-    B <-->|JSON IPC| C[Player<br>External MPV]
-    B <-->|WebSocket + REST| D[Jellyfin Server]
+    B <-->|JSON IPC| C[<b>Player</b><br>External MPV]
+    B <-->|WebSocket + REST| D[<b>Jellyfin Server</b>]
+    
+    style A fill:#00a4dc,stroke:#333,color:white
+    style B fill:#dea584,stroke:#333,color:black
+    style C fill:#4c3c69,stroke:#333,color:white
+    style D fill:#aa5cc3,stroke:#333,color:white
 ```
 
 1.  **Sentinel (Tauri GUI)**: Handles UI, WebSocket connection to Jellyfin, and state management.
