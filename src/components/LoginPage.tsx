@@ -1,9 +1,9 @@
 import { createForm } from '@tanstack/solid-form';
-import { getVersion } from '@tauri-apps/api/app';
 import { LoaderCircle } from 'lucide-solid';
-import { createResource, createSignal, onMount, Show } from 'solid-js';
+import { createSignal, onMount, Show } from 'solid-js';
 import { type Credentials, commands } from '../bindings';
 import { saveSession } from '../router';
+import AppVersion from './AppVersion';
 
 interface LoginPageProps {
   onConnected: () => void;
@@ -280,17 +280,11 @@ export default function LoginPage(props: LoginPageProps) {
         </div>
 
         {/* Footer */}
-        <AppVersion />
+        <div class="text-center mt-6">
+          <p class="text-gray-500 text-sm">Jellyfin MPV Shim Rust</p>
+          <AppVersion class="text-gray-500 text-sm" />
+        </div>
       </div>
     </div>
-  );
-}
-
-function AppVersion() {
-  const [version] = createResource(() => getVersion());
-  return (
-    <p class="text-center text-gray-500 text-sm mt-6">
-      Jellyfin MPV Shim Rust v{version() ?? '...'}
-    </p>
   );
 }

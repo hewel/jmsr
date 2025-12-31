@@ -1,9 +1,9 @@
 import { createForm } from '@tanstack/solid-form';
-import { getVersion } from '@tauri-apps/api/app';
 import { Cast, CircleCheckBig, Keyboard, Play, RefreshCw } from 'lucide-solid';
 import { createEffect, createResource, createSignal, Show } from 'solid-js';
 import { type AppConfig, type ConnectionState, commands } from '../bindings';
 import { clearSavedSession } from '../router';
+import AppVersion from './AppVersion';
 import LogPanel from './LogPanel';
 
 interface SettingsPageProps {
@@ -512,9 +512,4 @@ export default function SettingsPage(props: SettingsPageProps) {
       </div>
     </div>
   );
-}
-
-function AppVersion() {
-  const [version] = createResource(() => getVersion());
-  return <p class="text-gray-600 text-xs mt-1">Version {version() ?? '...'}</p>;
 }

@@ -1,7 +1,8 @@
 import { Check, Info, TriangleAlert, X } from 'lucide-solid';
 import { onCleanup, onMount } from 'solid-js';
+import type { NotificationLevel } from '../bindings';
 
-export type NotificationLevel = 'error' | 'warning' | 'info' | 'success';
+export type { NotificationLevel };
 
 interface ToastProps {
   id: string;
