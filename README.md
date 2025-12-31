@@ -1,37 +1,93 @@
 # JMSR - Jellyfin MPV Shim Rust
 
+<div align="center">
+
+[![CI](https://github.com/your-username/jmsr/actions/workflows/ci.yml/badge.svg)](https://github.com/your-username/jmsr/actions/workflows/ci.yml)
 [![Rust](https://img.shields.io/badge/Rust-1.70+-orange?logo=rust)](https://www.rust-lang.org/)
 [![Tauri](https://img.shields.io/badge/Tauri-v2-blue?logo=tauri)](https://v2.tauri.app/)
 [![Solid.js](https://img.shields.io/badge/Solid.js-1.x-blue?logo=solid)](https://www.solidjs.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-A high-performance Jellyfin cast receiver that controls an external MPV player. Built with Tauri v2, Solid.js, and Rust.
+**A high-performance Jellyfin cast receiver that controls an external MPV player.**  
+Built with Tauri v2, Solid.js, and Rust.
 
-## Overview
+[Features](#-features) • [Quick Start](#-quick-start) • [Architecture](#-architecture) • [Troubleshooting](#-troubleshooting)
+
+</div>
+
+---
+
+## 📖 Overview
 
 JMSR allows you to cast media from any Jellyfin client (web, mobile, TV) to your desktop, where it plays in MPV with full support for your custom configurations, shaders, and scripts.
 
-**Key Philosophy**: JMSR does NOT embed libmpv. It spawns and controls a standalone MPV process via JSON IPC, preserving your `mpv.conf`, shader packs (Anime4K, FSR, etc.), and all customizations.
+> **💡 Key Philosophy**
+>
+> JMSR does **NOT** embed `libmpv`. Instead, it spawns and controls a standalone MPV process via JSON IPC. This preserves your existing `mpv.conf`, shader packs (Anime4K, FSR, etc.), and all local customizations without compromise.
 
-## Features
+## ✨ Features
 
-- **Cast Target**: Appears as a controllable device in Jellyfin's cast menu
-- **External MPV**: Full compatibility with your MPV configuration and shaders
-- **Cross-Platform**: Windows, macOS, and Linux support
-- **Type-Safe**: 100% type-safe Rust-to-TypeScript communication via tauri-specta
-- **System Tray**: Runs in background, minimizes to tray
-- **Persistent Auth**: Login once, stay connected
+| Feature | Description |
+| :--- | :--- |
+| 📺 **Cast Target** | Appears as a controllable device in Jellyfin's cast menu |
+| 🚀 **External MPV** | Full compatibility with your system MPV configuration and shaders |
+| 🔒 **Persistent Auth** | Login once, stay connected with secure token storage |
+| 🔄 **Auto-Reconnect** | Resilient WebSocket connection with exponential backoff strategy |
+| ⏭️ **Smart Playback** | Automatically plays the next episode when the current one finishes |
+| 🧠 **Series Memory** | Remembers audio/subtitle language preferences per TV series |
+| ⌨️ **Shortcuts** | Use `Shift+N` / `Shift+P` directly in MPV to skip episodes |
+| 🖥️ **System Tray** | Runs quietly in the background with quick access controls |
+| 🛡️ **Type-Safe** | 100% type-safe Rust-to-TypeScript communication via `tauri-specta` |
+| 🍏 **Cross-Platform** | Native support for Windows, macOS, and Linux |
 
-## Quick Start
+## 🏗️ Architecture
+
+JMSR utilizes a robust three-actor architecture to ensure stability and separation of concerns.
+
+```mermaid
+graph LR
+    subgraph JMSR[JMSR Desktop App]
+        A[Sentinel<br>Tauri GUI]
+        B[Bridge<br>Rust Backend]
+        A <--> B
+    end
+    
+    B <-->|JSON IPC| C[Player<br>External MPV]
+    B <-->|WebSocket + REST| D[Jellyfin Server]
+```
+
+1.  **Sentinel (Tauri GUI)**: Handles UI, WebSocket connection to Jellyfin, and state management.
+2.  **Bridge (Rust IPC)**: Translates commands and manages the external process.
+3.  **Player (MPV)**: The standalone media player instance running your config.
+
+## 🚀 Quick Start
 
 ### Prerequisites
 
-- [Bun](https://bun.sh/) (or npm/yarn)
-- [Rust](https://rustup.rs/) (latest stable)
-- [MPV](https://mpv.io/) installed and in PATH
-- Tauri CLI: `bun add -g @tauri-apps/cli`
+*   [MPV](https://mpv.io/) installed and in PATH
 
 ### Installation
+
+#### Download Pre-built Binaries (Recommended)
+
+Download the latest release for your platform from the [Releases page](https://github.com/your-username/jmsr/releases):
+
+| Platform | Download |
+| :--- | :--- |
+| **Windows** | `.msi` (installer) or `.exe` (NSIS) |
+| **macOS** | `.dmg` |
+| **Linux** | `.deb` or `.AppImage` |
+
+#### Build from Source
+
+<details>
+<summary>Development prerequisites</summary>
+
+*   [Bun](https://bun.sh/) (or npm/yarn)
+*   [Rust](https://rustup.rs/) (latest stable)
+*   Tauri CLI: `bun add -g @tauri-apps/cli`
+
+</details>
 
 ```bash
 # Clone the repository
@@ -41,157 +97,136 @@ cd jmsr
 # Install dependencies
 bun install
 
-# Run in development mode
-bunx tauri dev
+# Build production binaries
+bunx tauri build
 ```
 
-### Usage
+Binaries will be in `src-tauri/target/release/bundle/`.
 
-1. Launch JMSR
-2. Enter your Jellyfin server URL and credentials
-3. JMSR registers as a cast target named "JMSR"
-4. From any Jellyfin client, click the cast icon and select "JMSR"
-5. Media plays in MPV on your desktop
+### Usage Steps
 
-## Architecture
+1.  **Launch JMSR** from your application menu or terminal.
+2.  **Authenticate** by entering your Jellyfin server URL and credentials.
+3.  **Cast Media**: JMSR will appear as "JMSR" in your Jellyfin client's cast menu.
+4.  **Enjoy**: Media plays in MPV on your desktop with full control syncing.
 
-JMSR follows a three-actor architecture:
+## 🛠️ How It Works
 
-```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│    Sentinel     │     │     Bridge      │     │     Player      │
-│   (Tauri GUI)   │───▶│   (Rust IPC)    │───▶│  (External MPV) │
-│                 │     │                 │     │                 │
-│ - Settings UI   │     │ - Command       │     │ - mpv.exe       │
-│ - System Tray   │     │   Translation   │     │ - User configs  │
-│ - WebSocket     │     │ - JSON IPC      │     │ - Shaders       │
-└─────────────────┘     └─────────────────┘     └─────────────────┘
-        │                                               │
-        │         Jellyfin Server                       │
-        │    ┌──────────────────────┐                   │
-        └──▶│  WebSocket + REST    │◀─────────────────┘
-             │  - Cast commands     │    Progress reports
-             │  - Playback state    │
-             └──────────────────────┘
-```
+1.  **Authentication**: User logs into Jellyfin and receives an access token.
+2.  **Registration**: JMSR posts capabilities to `/Sessions/Capabilities/Full`.
+3.  **WebSocket**: Connects to Jellyfin for real-time play state control.
+4.  **Cast Event**: When user casts, Jellyfin sends a `Play` command.
+5.  **MPV Control**: JMSR spawns MPV (if needed) and sends JSON IPC commands.
+6.  **Progress**: Event-driven progress reporting via MPV property observation.
+7.  **Sync**: Pause/seek/volume commands flow bidirectionally (Jellyfin ↔ MPV).
+8.  **Auto-Play**: Automatically fetches the next episode upon natural file end.
 
-## Project Structure
+## 💻 Development
 
-```
+### Project Structure
+
+```bash
 jmsr/
 ├── src/                    # Solid.js frontend
 │   ├── index.tsx          # Entry point
-│   ├── App.tsx            # Root component
-│   ├── bindings.ts        # Auto-generated (DO NOT EDIT)
+│   ├── bindings.ts        # Auto-generated IPC bindings
 │   └── components/        # UI components
 ├── src-tauri/             # Rust backend
 │   ├── src/
-│   │   ├── lib.rs         # Tauri setup
-│   │   ├── command.rs     # Tauri commands
-│   │   ├── tray.rs        # System tray
-│   │   ├── jellyfin/      # Jellyfin client
-│   │   └── mpv/           # MPV IPC driver
-│   └── tauri.conf.json
-├── tests/                 # Frontend tests
+│   │   ├── jellyfin/      # Jellyfin client implementation
+│   │   └── mpv/           # MPV IPC driver logic
+│   └── tauri.conf.json    # Tauri configuration
 └── doc/PRD.md            # Product requirements
 ```
 
-## Development
-
 ### Commands
 
-```bash
-# Frontend development
-bun run dev              # Start dev server (port 3000)
-bun run build            # Production build
-bun run test             # Run tests
-bun run check            # Lint and format
+| Task | Command |
+| :--- | :--- |
+| **Frontend Dev** | `bun run dev` |
+| **Tauri Dev** | `bunx tauri dev` |
+| **Build Prod** | `bunx tauri build` |
+| **Test** | `bun run test` |
+| **Lint/Format** | `bun run check` |
 
-# Tauri
-bunx tauri dev           # Full app with hot reload
-bunx tauri build         # Production build
+### 📏 Code Conventions
 
-# Rust (from src-tauri/)
-cargo check              # Type-check
-cargo fmt                # Format
-cargo clippy             # Lint
-```
+*   **TypeScript**: Single quotes, Biome formatting.
+*   **Rust**: 2-space indent (standard `rustfmt.toml`).
+*   **IPC**: Always use typed `commands.*` from bindings, never raw `invoke()`.
+*   **Solid.js**: Use `createSignal`, `createResource` — **NOT** React hooks.
 
-### Code Conventions
+### ➕ Adding a Tauri Command
 
-- **TypeScript**: Single quotes, Biome formatting
-- **Rust**: 2-space indent (rustfmt.toml)
-- **IPC**: Always use typed `commands.*` from bindings, never raw `invoke()`
-- **Solid.js**: Use `createSignal`, `createResource` - NOT React hooks
+1.  **Add function** in `src-tauri/src/command.rs` with `#[tauri::command]` and `#[specta]`.
+2.  **Register** in `src-tauri/src/lib.rs` inside `collect_commands![]`.
+3.  **Regenerate** bindings by running `bunx tauri dev`.
+4.  **Import** from `commands` in your TypeScript file.
 
-### Adding a Tauri Command
-
-1. Add function in `src-tauri/src/command.rs` with `#[tauri::command]` and `#[specta]`
-2. Register in `src-tauri/src/lib.rs` in `collect_commands![]`
-3. Run `bunx tauri dev` to regenerate `src/bindings.ts`
-4. Import from `commands` in TypeScript
-
-## Technology Stack
+### Technology Stack
 
 | Component | Technology |
-|-----------|------------|
-| Framework | Tauri v2 |
-| Frontend | Solid.js + TypeScript |
-| Backend | Rust |
-| Bundler | Rsbuild |
-| Styling | TailwindCSS |
-| Type Bindings | tauri-specta |
-| Package Manager | Bun |
-| Linting | Biome |
-| Testing | Rstest |
+| :--- | :--- |
+| **Framework** | [Tauri v2](https://v2.tauri.app) |
+| **Frontend** | [Solid.js](https://www.solidjs.com) + TypeScript |
+| **Backend** | Rust |
+| **Bundler** | Rsbuild |
+| **Styling** | TailwindCSS |
+| **IPC** | tauri-specta |
+| **Linting** | Biome |
+| **Testing** | Rstest |
 
-## How It Works
+## ❓ Troubleshooting
 
-1. **Authentication**: User logs into Jellyfin, receives access token
-2. **Registration**: JMSR posts capabilities to `/Sessions/Capabilities/Full`
-3. **WebSocket**: Connects to Jellyfin WebSocket for real-time commands
-4. **Cast**: When user casts, Jellyfin sends `Play` command via WebSocket
-5. **MPV Control**: JMSR spawns MPV (if needed) and sends JSON IPC commands
-6. **Progress**: Every 5 seconds, JMSR reports playback position to Jellyfin
-7. **Controls**: Pause/seek/volume commands flow from Jellyfin to MPV
+<details>
+<summary><strong>JMSR doesn't appear as cast target</strong></summary>
 
-## Troubleshooting
+*   Ensure you're logged in (check Settings page shows "Connected").
+*   Refresh the Jellyfin web page after JMSR connects.
+*   Check Jellyfin Dashboard > Activity for the JMSR session.
+</details>
 
-### JMSR doesn't appear as cast target
+<details>
+<summary><strong>MPV doesn't start</strong></summary>
 
-- Ensure you're logged in (check Settings page shows "Connected")
-- Refresh the Jellyfin web page after JMSR connects
-- Check Jellyfin Dashboard > Activity for the JMSR session
+*   Verify MPV is installed: `mpv --version`.
+*   Check MPV is in PATH (or set explicit path in Settings).
+*   **Windows (Scoop)**: JMSR auto-resolves symlinks, but ensure the shim is valid.
+*   Check Settings > MPV Player for detected path.
+</details>
 
-### MPV doesn't start
+<details>
+<summary><strong>Video doesn't play</strong></summary>
 
-- Verify MPV is installed: `mpv --version`
-- Check MPV is in PATH
-- On Windows, ensure no firewall blocking named pipes
+*   Check Jellyfin transcoding settings.
+*   Verify network connectivity to Jellyfin server.
+*   Check JMSR log panel (Settings page) for error messages.
+</details>
 
-### Video doesn't play
+<details>
+<summary><strong>Connection lost</strong></summary>
 
-- Check Jellyfin transcoding settings
-- Verify network connectivity to Jellyfin server
-- Check JMSR console for error messages
+*   JMSR auto-reconnects with exponential backoff (1s → 60s).
+*   Check network connectivity.
+*   Toast notifications will indicate connection status.
+</details>
 
-## Contributing
+## 🤝 Contributing
 
-Contributions are welcome! Please:
+Contributions are welcome! Please follow these steps:
 
-1. Fork the repository
-2. Create a feature branch
-3. Follow existing code conventions
-4. Run `bun run check` before committing
-5. Submit a pull request
+1.  Fork the repository.
+2.  Create a feature branch.
+3.  Follow existing code conventions (Biome for TS, rustfmt for Rust).
+4.  Run `bun run check` before committing.
+5.  Submit a pull request.
 
-## License
+## 📄 License
 
 MIT License - see [LICENSE](LICENSE) for details.
 
-## Acknowledgments
+## 🙏 Acknowledgments
 
-- [jellyfin-mpv-shim](https://github.com/jellyfin/jellyfin-mpv-shim) - Original Python implementation
-- [Tauri](https://tauri.app/) - Desktop app framework
-- [Solid.js](https://www.solidjs.com/) - Reactive UI library
-- [MPV](https://mpv.io/) - The best media player
+*   [jellyfin-mpv-shim](https://github.com/jellyfin/jellyfin-mpv-shim) - The original Python inspiration.
+*   [Tauri](https://tauri.app/) - For the amazing desktop framework.
+*   [MPV](https://mpv.io/) - The best media player in existence.
