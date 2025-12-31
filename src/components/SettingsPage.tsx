@@ -1,4 +1,5 @@
 import { createForm } from '@tanstack/solid-form';
+import { Cast, CircleCheckBig, Keyboard, Play, RefreshCw } from 'lucide-solid';
 import { createEffect, createResource, createSignal, Show } from 'solid-js';
 import { type AppConfig, type ConnectionState, commands } from '../bindings';
 import { clearSavedSession } from '../router';
@@ -77,7 +78,7 @@ export default function SettingsPage(props: SettingsPageProps) {
           });
           setTimeout(() => setSaveMessage(null), 3000);
         } else {
-          setSaveMessage({ type: 'error', text: result.error });
+          setSaveMessage({ type: 'error', text: result.error.message });
         }
       } catch (e) {
         setSaveMessage({ type: 'error', text: String(e) });
@@ -159,35 +160,14 @@ export default function SettingsPage(props: SettingsPageProps) {
             class="p-2 text-gray-400 hover:text-white hover:bg-surface-lighter rounded-lg transition-colors"
             title="Refresh status"
           >
-            <svg
-              class="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              role="img"
-              aria-label="Refresh"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-              />
-            </svg>
+            <RefreshCw class="w-5 h-5" />
           </button>
         </div>
 
         {/* Jellyfin Connection Card */}
         <div class="bg-surface-light rounded-xl p-6 border border-surface-lighter mb-6">
           <h2 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-            <svg
-              class="w-5 h-5 text-jellyfin"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
-            </svg>
+            <CircleCheckBig class="w-5 h-5 text-jellyfin" />
             Jellyfin Connection
           </h2>
 
@@ -241,7 +221,8 @@ export default function SettingsPage(props: SettingsPageProps) {
         >
           {/* Device Settings Card */}
           <div class="bg-surface-light rounded-xl p-6 border border-surface-lighter mb-6">
-            <h2 class="text-lg font-semibold text-white mb-4">
+            <h2 class="flex items-center gap-2 text-lg font-semibold text-white mb-4">
+              <Cast class="w-5 h-5 text-jellyfin" />
               Device Settings
             </h2>
             <div class="space-y-4">
@@ -289,14 +270,7 @@ export default function SettingsPage(props: SettingsPageProps) {
           {/* MPV Player Card */}
           <div class="bg-surface-light rounded-xl p-6 border border-surface-lighter mb-6">
             <h2 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-              <svg
-                class="w-5 h-5 text-jellyfin"
-                fill="currentColor"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path d="M8 5v14l11-7z" />
-              </svg>
+              <Play class="w-5 h-5 text-jellyfin" />
               MPV Player
             </h2>
 
@@ -380,14 +354,7 @@ export default function SettingsPage(props: SettingsPageProps) {
           {/* Keybindings Card */}
           <div class="bg-surface-light rounded-xl p-6 border border-surface-lighter mb-6">
             <h2 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-              <svg
-                class="w-5 h-5 text-jellyfin"
-                fill="currentColor"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path d="M20 5H4c-1.1 0-1.99.9-1.99 2L2 17c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zm-1 2H5v-2h2v2zm0-3H5V8h2v2zm9 7H8v-2h8v2zm0-4h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z" />
-              </svg>
+              <Keyboard class="w-5 h-5 text-jellyfin" />
               Keybindings
             </h2>
 
@@ -539,7 +506,7 @@ export default function SettingsPage(props: SettingsPageProps) {
         {/* Version Footer */}
         <div class="mt-8 text-center">
           <p class="text-gray-500 text-sm">JMSR - Jellyfin MPV Shim Rust</p>
-          <p class="text-gray-600 text-xs mt-1">Version 0.1.0</p>
+          <p class="text-gray-600 text-xs mt-1">Version 1.0.0</p>
         </div>
       </div>
     </div>

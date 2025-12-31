@@ -12,6 +12,7 @@
         "@tanstack/solid-router": "^1.144.0",
         "@tauri-apps/api": "^2.9.1",
         "@tauri-apps/plugin-log": "^2.7.1",
+        "lucide-solid": "^0.562.0",
         "solid-js": "^1.9.10",
         "tailwindcss": "^4.1.18",
       },
@@ -455,6 +456,8 @@
     "lightningcss-win32-x64-msvc": ["lightningcss-win32-x64-msvc@1.30.2", "", { "os": "win32", "cpu": "x64" }, "sha512-5g1yc73p+iAkid5phb4oVFMB45417DkRevRbt/El/gKXJk4jid+vPFF/AXbxn05Aky8PapwzZrdJShv5C0avjw=="],
 
     "lru-cache": ["lru-cache@11.2.4", "", {}, "sha512-B5Y16Jr9LB9dHVkh6ZevG+vAbOsNOYCX+sXvFWFu7B3Iz5mijW3zdbMyhsh8ANd2mSWBYdJgnqi+mL7/LrOPYg=="],
+
+    "lucide-solid": ["lucide-solid@0.562.0", "", { "peerDependencies": { "solid-js": "^1.4.7" } }, "sha512-RzxujbWUoa4KqnV+/mYPINzyf1W969bv0jukSKcGExIl96QmRuylvBQ+d0UcOeZL/ASToPOWS34p9MfdzdvS9Q=="],
 
     "lz-string": ["lz-string@1.5.0", "", { "bin": { "lz-string": "bin/bin.js" } }, "sha512-h5bgJWpxJNswbU7qCrV0tIKQCaS3blPDrqKWx+QxzuzL1zGUzij9XCWLrSLsJPu5t+eWA/ycetzYAO5IOMcWAQ=="],
 
