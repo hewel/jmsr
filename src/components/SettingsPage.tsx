@@ -1,4 +1,5 @@
 import { createForm } from '@tanstack/solid-form';
+import { getVersion } from '@tauri-apps/api/app';
 import { Cast, CircleCheckBig, Keyboard, Play, RefreshCw } from 'lucide-solid';
 import { createEffect, createResource, createSignal, Show } from 'solid-js';
 import { type AppConfig, type ConnectionState, commands } from '../bindings';
@@ -506,9 +507,14 @@ export default function SettingsPage(props: SettingsPageProps) {
         {/* Version Footer */}
         <div class="mt-8 text-center">
           <p class="text-gray-500 text-sm">JMSR - Jellyfin MPV Shim Rust</p>
-          <p class="text-gray-600 text-xs mt-1">Version 1.1.0</p>
+          <AppVersion />
         </div>
       </div>
     </div>
   );
+}
+
+function AppVersion() {
+  const [version] = createResource(() => getVersion());
+  return <p class="text-gray-600 text-xs mt-1">Version {version() ?? '...'}</p>;
 }

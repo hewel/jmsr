@@ -1,6 +1,7 @@
 import { createForm } from '@tanstack/solid-form';
+import { getVersion } from '@tauri-apps/api/app';
 import { LoaderCircle } from 'lucide-solid';
-import { createSignal, onMount, Show } from 'solid-js';
+import { createResource, createSignal, onMount, Show } from 'solid-js';
 import { type Credentials, commands } from '../bindings';
 import { saveSession } from '../router';
 
@@ -279,10 +280,17 @@ export default function LoginPage(props: LoginPageProps) {
         </div>
 
         {/* Footer */}
-        <p class="text-center text-gray-500 text-sm mt-6">
-          Jellyfin MPV Shim Rust v1.1.0
-        </p>
+        <AppVersion />
       </div>
     </div>
+  );
+}
+
+function AppVersion() {
+  const [version] = createResource(() => getVersion());
+  return (
+    <p class="text-center text-gray-500 text-sm mt-6">
+      Jellyfin MPV Shim Rust v{version() ?? '...'}
+    </p>
   );
 }
