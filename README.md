@@ -1,6 +1,6 @@
-# JMSR - Jellyfin MPV Shim Rust
-
 <div align="center">
+
+# JMSR - Jellyfin MPV Shim Rust
 
 [![CI](https://github.com/hewel/jmsr/actions/workflows/ci.yml/badge.svg)](https://github.com/hewel/jmsr/actions/workflows/ci.yml)
 [![Rust](https://img.shields.io/badge/Rust-1.70+-orange?logo=rust)](https://www.rust-lang.org/)
