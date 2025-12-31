@@ -147,37 +147,106 @@ impl SessionManager {
       log::info!("Session validated - we should appear as cast target");
     }
 
-    // Take the command receiver and start processing
-    if let Some(mut command_rx) = self.websocket.take_command_receiver() {
-      let client = self.client.clone();
-      let state = self.state.clone();
-      let action_tx = self.action_tx.clone();
-      let app_handle = self.app_handle.clone();
-      let mpv = self.mpv.clone();
+    // Start WebSocket command consumer with auto-reconnect
+    self.start_websocket_consumer();
 
-      tokio::spawn(async move {
+    // Start MPV action consumer
+    self.start_action_consumer();
+
+    // Start MPV event listener for end-of-file detection
+    self.start_mpv_event_listener();
+
+    Ok(())
+  }
+
+  /// Start WebSocket command consumer with auto-reconnect capability.
+  fn start_websocket_consumer(&self) {
+    let client = self.client.clone();
+    let websocket = self.websocket.clone();
+    let state = self.state.clone();
+    let action_tx = self.action_tx.clone();
+    let app_handle = self.app_handle.clone();
+    let mpv = self.mpv.clone();
+
+    tokio::spawn(async move {
+      const RECONNECT_DELAYS: &[u64] = &[1, 2, 5, 10, 30, 60]; // seconds
+      let mut reconnect_attempt: usize = 0;
+      let mut first_connect = true;
+
+      loop {
+        // Take the command receiver for this connection
+        let command_rx = match websocket.take_command_receiver() {
+          Some(rx) => rx,
+          None => {
+            log::warn!("No command receiver available, waiting...");
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            continue;
+          }
+        };
+
+        log::info!("WebSocket command consumer started");
+        if !first_connect {
+          reconnect_attempt = 0; // Reset on successful reconnection
+        }
+        first_connect = false;
+
+        // Process commands until channel closes
+        let mut command_rx = command_rx;
         while let Some(cmd) = command_rx.recv().await {
           if let Err(e) = Self::handle_command(&client, &state, &action_tx, &app_handle, &mpv, cmd).await {
             log::error!("Failed to handle Jellyfin command: {}", e);
             AppNotification::error(&app_handle, format!("Command failed: {}", e));
           }
         }
-        // WebSocket command channel closed - notify user
-        log::warn!("Jellyfin WebSocket connection closed");
-        AppNotification::warning(&app_handle, "Jellyfin connection lost. Please reconnect.");
-      });
-    }
 
-    // Start MPV action consumer
-    self.start_action_consumer();
+        // Channel closed - WebSocket disconnected
+        log::warn!("Jellyfin WebSocket connection lost");
+        
+        // Clear playback context since we lost connection
+        Self::clear_playback_context(&client, &state).await;
 
-    // Start progress reporting loop
-    self.start_progress_reporting();
+        // Calculate reconnect delay with exponential backoff
+        let delay_idx = reconnect_attempt.min(RECONNECT_DELAYS.len() - 1);
+        let delay = RECONNECT_DELAYS[delay_idx];
+        reconnect_attempt += 1;
 
-    // Start MPV event listener for end-of-file detection
-    self.start_mpv_event_listener();
+        log::info!(
+          "Attempting WebSocket reconnection in {} seconds (attempt {})",
+          delay, reconnect_attempt
+        );
+        AppNotification::warning(
+          &app_handle,
+          format!("Connection lost. Reconnecting in {} seconds...", delay)
+        );
 
-    Ok(())
+        tokio::time::sleep(std::time::Duration::from_secs(delay)).await;
+
+        // Attempt to reconnect
+        let ws_url = match client.websocket_url() {
+          Ok(url) => url,
+          Err(e) => {
+            log::error!("Failed to get WebSocket URL: {}", e);
+            continue;
+          }
+        };
+
+        match websocket.connect(&ws_url).await {
+          Ok(_) => {
+            log::info!("WebSocket reconnected successfully");
+            AppNotification::info(&app_handle, "Reconnected to Jellyfin");
+
+            // Re-report capabilities after reconnection
+            if let Err(e) = client.report_capabilities().await {
+              log::error!("Failed to report capabilities after reconnect: {}", e);
+            }
+          }
+          Err(e) => {
+            log::error!("WebSocket reconnection failed: {}", e);
+            // Will retry on next loop iteration
+          }
+        }
+      }
+    });
   }
 
   /// Start the MPV action consumer task.
@@ -947,14 +1016,6 @@ impl SessionManager {
         log::error!("Failed to open preferences store for writing: {}", e);
       }
     }
-  }
-
-  /// Start periodic progress reporting.
-  fn start_progress_reporting(&self) {
-    // Progress reporting is now handled by start_mpv_event_listener via property observation.
-    // This method is kept for backwards compatibility but does nothing.
-    // The event listener observes pause, volume, mute and reports immediately on changes.
-    // A 10-second heartbeat reports time-pos for the web UI progress bar.
   }
 
   /// Start MPV event listener for property changes, end-of-file detection, and keyboard shortcuts.
