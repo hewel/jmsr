@@ -73,33 +73,42 @@ export default function LogPanel() {
   };
 
   return (
-    <div class="bg-surface-container rounded-xl border border-outline-variant overflow-hidden">
+    <div class="bg-surface-container rounded-3xl border border-outline-variant/30 overflow-hidden shadow-sm">
       {/* Header */}
       <button
         type="button"
-        class="w-full flex items-center justify-between p-4 hover:bg-surface-container-high/50 transition-colors"
+        class="w-full flex items-center justify-between p-6 hover:bg-surface-container-high/50 transition-colors group"
         onClick={toggleExpand}
       >
-        <div class="flex items-center gap-2">
-          <svg
-            class="w-5 h-5 text-primary"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-            />
-          </svg>
-          <h2 class="text-lg font-semibold text-on-surface">Logs</h2>
-          <span class="text-outline text-sm">({logs().length})</span>
+        <div class="flex items-center gap-3">
+          <div class="p-2 bg-primary/10 rounded-full group-hover:bg-primary/20 transition-colors">
+            <svg
+              class="w-5 h-5 text-primary"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
+            </svg>
+          </div>
+          <div>
+            <h2 class="text-lg font-medium text-on-surface text-left">Logs</h2>
+            <div class="text-on-surface-variant text-xs mt-0.5 flex gap-2">
+              <span>System events & debugging</span>
+              <span class="px-1.5 py-0.5 bg-surface-container-highest rounded-md text-[10px] font-mono">
+                {logs().length} entries
+              </span>
+            </div>
+          </div>
         </div>
         <svg
-          class={`w-5 h-5 text-on-surface-variant transition-transform ${expanded() ? 'rotate-180' : ''}`}
+          class={`w-5 h-5 text-on-surface-variant transition-transform duration-300 ${expanded() ? 'rotate-180' : ''}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -116,9 +125,9 @@ export default function LogPanel() {
 
       {/* Log content */}
       <Show when={expanded()}>
-        <div class="border-t border-outline-variant">
+        <div class="border-t border-outline-variant/30 animate-in slide-in-from-top-2 fade-in duration-200">
           {/* Toolbar */}
-          <div class="flex items-center justify-between px-4 py-2 bg-surface/50">
+          <div class="flex items-center justify-between px-6 py-3 bg-surface-container-low">
             <div class="flex items-center gap-2">
               <label class="flex items-center gap-1.5 text-xs text-on-surface-variant cursor-pointer">
                 <input

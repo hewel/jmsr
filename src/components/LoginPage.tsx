@@ -1,5 +1,5 @@
 import { createForm } from '@tanstack/solid-form';
-import { LoaderCircle } from 'lucide-solid';
+import { Check, CircleAlert, LoaderCircle } from 'lucide-solid';
 import { createSignal, onMount, Show } from 'solid-js';
 import { type Credentials, commands } from '../bindings';
 import { saveSession } from '../router';
@@ -102,189 +102,215 @@ export default function LoginPage(props: LoginPageProps) {
     <div class="min-h-screen bg-background flex items-center justify-center p-6">
       <div class="w-full max-w-md">
         {/* Logo */}
-        <div class="text-center mb-8">
-          <h1 class="text-4xl font-bold text-primary tracking-tight">JMSR</h1>
-          <p class="text-on-surface-variant mt-2">Jellyfin MPV Shim</p>
+        <div class="text-center mb-10">
+          <h1 class="text-5xl font-bold text-primary tracking-tighter drop-shadow-sm">
+            JMSR
+          </h1>
+          <p class="text-on-surface-variant mt-3 text-base tracking-wide font-medium">
+            Jellyfin MPV Shim
+          </p>
         </div>
 
         {/* Login Card */}
-        <div class="bg-surface-container rounded-2xl p-8 shadow-xl border border-outline-variant">
-          <h2 class="text-xl font-semibold text-on-surface mb-6">
-            Connect to Server
-          </h2>
+        <div class="bg-surface-container rounded-3xl p-8 shadow-xl border border-outline-variant/30 relative overflow-hidden">
+          {/* Surface Tint Overlay for Elevation 1 */}
+          <div class="absolute inset-0 bg-surface-tint/[0.05] pointer-events-none" />
 
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              form.handleSubmit();
-            }}
-            class="space-y-5"
-          >
-            {/* Server URL */}
-            <form.Field
-              name="serverUrl"
-              validators={{
-                onBlur: ({ value }) => {
-                  if (!value) return 'Server URL is required';
-                  try {
-                    new URL(value);
-                    return undefined;
-                  } catch {
-                    return 'Please enter a valid URL';
-                  }
-                },
+          <div class="relative z-10">
+            <h2 class="text-2xl font-normal text-on-surface mb-8 tracking-tight">
+              Connect to Server
+            </h2>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                form.handleSubmit();
               }}
-              children={(field) => {
-                const errors = () => field().state.meta.errors;
-                const touched = () => field().state.meta.isTouched;
-                return (
-                  <div>
-                    <label
-                      for={field().name}
-                      class="block text-sm font-medium text-on-surface-variant mb-2"
-                    >
-                      Server URL
-                    </label>
-                    <input
-                      id={field().name}
-                      name={field().name}
-                      type="url"
-                      value={field().state.value}
-                      onInput={(e) =>
-                        field().handleChange(e.currentTarget.value)
-                      }
-                      onBlur={field().handleBlur}
-                      placeholder="https://jellyfin.example.com"
-                      disabled={isSubmitting()}
-                      class="w-full px-4 py-3 bg-surface-container-high border border-outline-variant rounded-lg text-on-surface placeholder-outline focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200 disabled:opacity-50"
-                    />
-                    <Show when={touched() && errors().length > 0}>
-                      <p class="text-error text-sm mt-1">{errors()[0]}</p>
-                    </Show>
-                  </div>
-                );
-              }}
-            />
-
-            {/* Username */}
-            <form.Field
-              name="username"
-              validators={{
-                onBlur: ({ value }) => {
-                  if (!value) return 'Username is required';
-                  return undefined;
-                },
-              }}
-              children={(field) => {
-                const errors = () => field().state.meta.errors;
-                const touched = () => field().state.meta.isTouched;
-                return (
-                  <div>
-                    <label
-                      for={field().name}
-                      class="block text-sm font-medium text-on-surface-variant mb-2"
-                    >
-                      Username
-                    </label>
-                    <input
-                      id={field().name}
-                      name={field().name}
-                      type="text"
-                      value={field().state.value}
-                      onInput={(e) =>
-                        field().handleChange(e.currentTarget.value)
-                      }
-                      onBlur={field().handleBlur}
-                      placeholder="Enter your username"
-                      disabled={isSubmitting()}
-                      class="w-full px-4 py-3 bg-surface-container-high border border-outline-variant rounded-lg text-on-surface placeholder-outline focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200 disabled:opacity-50"
-                    />
-                    <Show when={touched() && errors().length > 0}>
-                      <p class="text-error text-sm mt-1">{errors()[0]}</p>
-                    </Show>
-                  </div>
-                );
-              }}
-            />
-
-            {/* Password */}
-            <form.Field
-              name="password"
-              children={(field) => (
-                <div>
-                  <label
-                    for={field().name}
-                    class="block text-sm font-medium text-on-surface-variant mb-2"
-                  >
-                    Password
-                  </label>
-                  <input
-                    id={field().name}
-                    name={field().name}
-                    type="password"
-                    value={field().state.value}
-                    onInput={(e) => field().handleChange(e.currentTarget.value)}
-                    onBlur={field().handleBlur}
-                    placeholder="Enter your password"
-                    disabled={isSubmitting()}
-                    class="w-full px-4 py-3 bg-surface-container-high border border-outline-variant rounded-lg text-on-surface placeholder-outline focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200 disabled:opacity-50"
-                  />
-                </div>
-              )}
-            />
-
-            {/* Remember Me */}
-            <form.Field
-              name="rememberMe"
-              children={(field) => (
-                <div class="flex items-center gap-3">
-                  <input
-                    id={field().name}
-                    name={field().name}
-                    type="checkbox"
-                    checked={field().state.value}
-                    onChange={(e) =>
-                      field().handleChange(e.currentTarget.checked)
-                    }
-                    disabled={isSubmitting()}
-                    class="w-4 h-4 rounded border-outline-variant bg-surface-container text-primary focus:ring-primary focus:ring-2 focus:ring-offset-0"
-                  />
-                  <label
-                    for={field().name}
-                    class="text-sm text-on-surface-variant"
-                  >
-                    Remember server and username
-                  </label>
-                </div>
-              )}
-            />
-
-            {/* Error Message */}
-            <Show when={error()}>
-              <div class="p-3 bg-error-container/30 border border-error/50 rounded-lg">
-                <p class="text-error text-sm">{error()}</p>
-              </div>
-            </Show>
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={isSubmitting()}
-              class="w-full py-3 px-6 bg-primary hover:bg-primary-container text-on-primary hover:text-on-primary-container font-medium rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              class="space-y-6"
             >
-              <Show when={isSubmitting()} fallback="Connect">
-                <LoaderCircle class="animate-spin h-5 w-5" />
-                <span>Connecting...</span>
+              {/* Server URL */}
+              <form.Field
+                name="serverUrl"
+                validators={{
+                  onBlur: ({ value }) => {
+                    if (!value) return 'Server URL is required';
+                    try {
+                      new URL(value);
+                      return undefined;
+                    } catch {
+                      return 'Please enter a valid URL';
+                    }
+                  },
+                }}
+                children={(field) => {
+                  const errors = () => field().state.meta.errors;
+                  const touched = () => field().state.meta.isTouched;
+                  return (
+                    <div class="group">
+                      <label
+                        for={field().name}
+                        class="block text-xs font-medium text-on-surface-variant mb-1.5 ml-1 uppercase tracking-wider group-focus-within:text-primary transition-colors"
+                      >
+                        Server URL
+                      </label>
+                      <input
+                        id={field().name}
+                        name={field().name}
+                        type="url"
+                        value={field().state.value}
+                        onInput={(e) =>
+                          field().handleChange(e.currentTarget.value)
+                        }
+                        onBlur={field().handleBlur}
+                        placeholder="https://jellyfin.example.com"
+                        disabled={isSubmitting()}
+                        class="w-full px-4 py-3.5 bg-surface-container-high border border-outline-variant/50 rounded-xl text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200 disabled:opacity-50"
+                      />
+                      <Show when={touched() && errors().length > 0}>
+                        <p class="text-error text-xs mt-1.5 ml-1 animate-in slide-in-from-top-1 fade-in duration-200">
+                          {errors()[0]}
+                        </p>
+                      </Show>
+                    </div>
+                  );
+                }}
+              />
+
+              {/* Username */}
+              <form.Field
+                name="username"
+                validators={{
+                  onBlur: ({ value }) => {
+                    if (!value) return 'Username is required';
+                    return undefined;
+                  },
+                }}
+                children={(field) => {
+                  const errors = () => field().state.meta.errors;
+                  const touched = () => field().state.meta.isTouched;
+                  return (
+                    <div class="group">
+                      <label
+                        for={field().name}
+                        class="block text-xs font-medium text-on-surface-variant mb-1.5 ml-1 uppercase tracking-wider group-focus-within:text-primary transition-colors"
+                      >
+                        Username
+                      </label>
+                      <input
+                        id={field().name}
+                        name={field().name}
+                        type="text"
+                        value={field().state.value}
+                        onInput={(e) =>
+                          field().handleChange(e.currentTarget.value)
+                        }
+                        onBlur={field().handleBlur}
+                        placeholder="Enter your username"
+                        disabled={isSubmitting()}
+                        class="w-full px-4 py-3.5 bg-surface-container-high border border-outline-variant/50 rounded-xl text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200 disabled:opacity-50"
+                      />
+                      <Show when={touched() && errors().length > 0}>
+                        <p class="text-error text-xs mt-1.5 ml-1 animate-in slide-in-from-top-1 fade-in duration-200">
+                          {errors()[0]}
+                        </p>
+                      </Show>
+                    </div>
+                  );
+                }}
+              />
+
+              {/* Password */}
+              <form.Field
+                name="password"
+                children={(field) => (
+                  <div class="group">
+                    <label
+                      for={field().name}
+                      class="block text-xs font-medium text-on-surface-variant mb-1.5 ml-1 uppercase tracking-wider group-focus-within:text-primary transition-colors"
+                    >
+                      Password
+                    </label>
+                    <input
+                      id={field().name}
+                      name={field().name}
+                      type="password"
+                      value={field().state.value}
+                      onInput={(e) =>
+                        field().handleChange(e.currentTarget.value)
+                      }
+                      onBlur={field().handleBlur}
+                      placeholder="Enter your password"
+                      disabled={isSubmitting()}
+                      class="w-full px-4 py-3.5 bg-surface-container-high border border-outline-variant/50 rounded-xl text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200 disabled:opacity-50"
+                    />
+                  </div>
+                )}
+              />
+
+              {/* Remember Me */}
+              <form.Field
+                name="rememberMe"
+                children={(field) => (
+                  <div class="flex items-center gap-3 py-1">
+                    <div class="relative flex items-center">
+                      <input
+                        id={field().name}
+                        name={field().name}
+                        type="checkbox"
+                        checked={field().state.value}
+                        onChange={(e) =>
+                          field().handleChange(e.currentTarget.checked)
+                        }
+                        disabled={isSubmitting()}
+                        class="peer w-5 h-5 rounded border-2 border-on-surface-variant checked:border-primary bg-transparent checked:bg-primary text-primary focus:ring-primary focus:ring-2 focus:ring-offset-0 focus:ring-offset-surface transition-all duration-200 cursor-pointer appearance-none"
+                      />
+                      <Check
+                        class="absolute pointer-events-none opacity-0 peer-checked:opacity-100 text-on-primary w-3.5 h-3.5 left-1 top-1 transition-opacity duration-200"
+                        stroke-width={4}
+                      />
+                    </div>
+                    <label
+                      for={field().name}
+                      class="text-sm text-on-surface select-none cursor-pointer"
+                    >
+                      Remember server and username
+                    </label>
+                  </div>
+                )}
+              />
+
+              {/* Error Message */}
+              <Show when={error()}>
+                <div class="p-4 bg-error-container text-on-error-container rounded-xl animate-in slide-in-from-top-2 fade-in duration-300 flex items-start gap-3">
+                  <div class="mt-0.5">
+                    <CircleAlert class="w-5 h-5" />
+                  </div>
+                  <p class="text-sm font-medium">{error()}</p>
+                </div>
               </Show>
-            </button>
-          </form>
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={isSubmitting()}
+                class="w-full py-3.5 px-6 bg-primary hover:bg-primary/90 active:bg-primary/80 text-on-primary font-semibold rounded-full shadow-sm hover:shadow-md active:shadow-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2 transform active:scale-[0.99]"
+              >
+                <Show when={isSubmitting()} fallback="Connect">
+                  <LoaderCircle class="animate-spin h-5 w-5" />
+                  <span>Connecting...</span>
+                </Show>
+              </button>
+            </form>
+          </div>
         </div>
 
         {/* Footer */}
-        <div class="text-center mt-6">
-          <p class="text-on-surface-variant text-sm">Jellyfin MPV Shim Rust</p>
-          <AppVersion class="text-on-surface-variant text-sm" />
+        <div class="text-center mt-8">
+          <p class="text-on-surface-variant/70 text-sm">
+            Jellyfin MPV Shim Rust
+          </p>
+          <AppVersion class="text-on-surface-variant/50 text-xs mt-1" />
         </div>
       </div>
     </div>

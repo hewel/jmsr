@@ -8,8 +8,13 @@ interface AppVersionProps {
 export default function AppVersion(props: AppVersionProps) {
   const [version] = createResource(() => getVersion());
   return (
-    <p class={props.class ?? 'text-gray-600 text-xs mt-1'}>
-      Version {version() ?? '...'}
+    <p
+      class={
+        props.class ??
+        'text-on-surface-variant/50 text-xs mt-1 font-mono tracking-wider'
+      }
+    >
+      v{version() ?? '...'}
     </p>
   );
 }

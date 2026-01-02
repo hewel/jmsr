@@ -27,32 +27,32 @@ export default function Toast(props: ToastProps) {
   const getStyles = () => {
     switch (props.level) {
       case 'success':
-        return 'bg-tertiary-container/30 text-tertiary border-tertiary-container/50';
+        return 'bg-surface-container-high text-on-surface border-outline-variant/30 shadow-lg shadow-black/20';
       case 'error':
-        return 'bg-error-container/30 text-error border-error-container/50';
+        return 'bg-error-container text-on-error-container border-transparent shadow-lg shadow-error-container/20';
       case 'warning':
-        return 'bg-secondary-container/30 text-secondary border-secondary-container/50';
+        return 'bg-secondary-container text-on-secondary-container border-transparent shadow-lg shadow-secondary-container/20';
       default:
-        return 'bg-primary-container/30 text-primary border-primary-container/50';
+        return 'bg-surface-container-high text-on-surface border-outline-variant/30 shadow-lg shadow-black/20';
     }
   };
 
   const getIcon = () => {
     switch (props.level) {
       case 'success':
-        return <Check class="w-5 h-5" />;
+        return <Check class="w-5 h-5 text-tertiary" />;
       case 'error':
         return <X class="w-5 h-5" />;
       case 'warning':
         return <TriangleAlert class="w-5 h-5" />;
       default:
-        return <Info class="w-5 h-5" />;
+        return <Info class="w-5 h-5 text-primary" />;
     }
   };
 
   return (
     <div
-      class={`flex items-center w-full max-w-sm p-4 mb-4 rounded-lg shadow border backdrop-blur-sm animate-in slide-in-from-right duration-300 ${getStyles()}`}
+      class={`flex items-center w-full max-w-sm p-4 mb-4 rounded-xl border animate-in slide-in-from-right duration-300 ${getStyles()}`}
       role="alert"
     >
       <div class="inline-flex items-center justify-center flex-shrink-0">
