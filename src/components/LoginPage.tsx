@@ -3,7 +3,7 @@ import { Check, CircleAlert, LoaderCircle } from 'lucide-solid';
 import { createSignal, onMount, Show } from 'solid-js';
 import { type Credentials, commands } from '../bindings';
 import { saveSession } from '../router';
-import AppVersion from './AppVersion';
+import { Card, PageFooter } from './ui';
 
 interface LoginPageProps {
   onConnected: () => void;
@@ -112,7 +112,7 @@ export default function LoginPage(props: LoginPageProps) {
         </div>
 
         {/* Login Card */}
-        <div class="card-elevated relative overflow-hidden">
+        <Card variant="elevated" class="relative overflow-hidden">
           {/* Surface Tint Overlay for Elevation 1 */}
           <div class="absolute inset-0 bg-surface-tint/[0.05] pointer-events-none" />
 
@@ -303,15 +303,10 @@ export default function LoginPage(props: LoginPageProps) {
               </button>
             </form>
           </div>
-        </div>
+        </Card>
 
         {/* Footer */}
-        <div class="text-center mt-8">
-          <p class="text-on-surface-variant/70 text-body-small">
-            Jellyfin MPV Shim Rust
-          </p>
-          <AppVersion />
-        </div>
+        <PageFooter class="mt-8" />
       </div>
     </div>
   );

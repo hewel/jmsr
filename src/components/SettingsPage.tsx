@@ -11,9 +11,16 @@ import {
 import { createEffect, createResource, createSignal, Show } from 'solid-js';
 import { type AppConfig, type ConnectionState, commands } from '../bindings';
 import { clearSavedSession } from '../router';
-import AppVersion from './AppVersion';
 import LogPanel from './LogPanel';
 import { useToast } from './ToastProvider';
+import {
+  InfoCard,
+  PageFooter,
+  PageHeader,
+  SectionCard,
+  StatusBadge,
+  StatusIndicator,
+} from './ui';
 
 interface SettingsPageProps {
   onDisconnected: () => void;
@@ -165,102 +172,72 @@ export default function SettingsPage(props: SettingsPageProps) {
     <div class="min-h-screen bg-background p-6 md:p-10">
       <div class="max-w-3xl mx-auto space-y-6">
         {/* Header */}
-        <div class="flex items-center justify-between pb-4">
-          <div>
-            <h1 class="text-headline-large text-on-surface tracking-tight">
-              Settings
-            </h1>
-            <p class="text-body-large text-on-surface-variant mt-1">
-              Manage your connection and preferences
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={handleRefresh}
-            class="btn-icon hover:rotate-180 transition-transform"
-            title="Refresh status"
-          >
-            <RefreshCw class="w-6 h-6" />
-          </button>
-        </div>
+        <PageHeader
+          title="Settings"
+          description="Manage your connection and preferences"
+          trailing={
+            <button
+              type="button"
+              onClick={handleRefresh}
+              class="btn-icon hover:rotate-180 transition-transform"
+              title="Refresh status"
+            >
+              <RefreshCw class="w-6 h-6" />
+            </button>
+          }
+        />
 
         {/* Jellyfin Connection Card */}
-        <div class="card-filled relative overflow-hidden group">
-          <div class="absolute inset-0 bg-surface-tint/[0.03] pointer-events-none" />
-          <div class="relative z-10">
-            <h2 class="text-title-medium text-primary mb-6 flex items-center gap-3">
-              <CircleCheckBig class="w-6 h-6" />
-              Jellyfin Connection
-            </h2>
+        <SectionCard
+          icon={<CircleCheckBig class="w-6 h-6" />}
+          title="Jellyfin Connection"
+        >
+          <Show
+            when={!connectionState.loading}
+            fallback={
+              <div class="animate-pulse h-24 bg-surface-container-high rounded-xl" />
+            }
+          >
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <InfoCard label="Status">
+                <StatusIndicator connected={state()?.connected ?? false} />
+              </InfoCard>
 
-            <Show
-              when={!connectionState.loading}
-              fallback={
-                <div class="animate-pulse h-24 bg-surface-container-high rounded-xl"></div>
-              }
-            >
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="bg-surface-container-high/50 p-4 rounded-xl border border-outline-variant/30">
-                  <span class="text-label-small text-on-surface-variant uppercase tracking-wider block mb-1">
-                    Status
+              <Show when={state()?.serverName}>
+                <InfoCard label="Server">
+                  <span
+                    class="text-on-surface font-medium truncate block"
+                    title={state()?.serverName ?? ''}
+                  >
+                    {state()?.serverName}
                   </span>
-                  <div class="flex items-center gap-2">
-                    <span
-                      class={`w-2.5 h-2.5 rounded-full ${state()?.connected ? 'bg-tertiary shadow-[0_0_8px_rgba(var(--color-tertiary),0.5)]' : 'bg-error'}`}
-                    ></span>
-                    <span
-                      class={`font-medium ${state()?.connected ? 'text-on-surface' : 'text-error'}`}
-                    >
-                      {state()?.connected ? 'Connected' : 'Disconnected'}
-                    </span>
-                  </div>
-                </div>
+                </InfoCard>
+              </Show>
 
-                <Show when={state()?.serverName}>
-                  <div class="bg-surface-container-high/50 p-4 rounded-xl border border-outline-variant/30">
-                    <span class="text-label-small text-on-surface-variant uppercase tracking-wider block mb-1">
-                      Server
-                    </span>
-                    <span
-                      class="text-on-surface font-medium truncate block"
-                      title={state()?.serverName ?? ''}
-                    >
-                      {state()?.serverName}
-                    </span>
-                  </div>
-                </Show>
+              <Show when={state()?.serverUrl}>
+                <InfoCard label="URL">
+                  <span
+                    class="text-on-surface font-medium truncate block"
+                    title={state()?.serverUrl ?? ''}
+                  >
+                    {state()?.serverUrl}
+                  </span>
+                </InfoCard>
+              </Show>
 
-                <Show when={state()?.serverUrl}>
-                  <div class="bg-surface-container-high/50 p-4 rounded-xl border border-outline-variant/30">
-                    <span class="text-label-small text-on-surface-variant uppercase tracking-wider block mb-1">
-                      URL
-                    </span>
-                    <span
-                      class="text-on-surface font-medium truncate block"
-                      title={state()?.serverUrl ?? ''}
-                    >
-                      {state()?.serverUrl}
-                    </span>
-                  </div>
-                </Show>
-
-                <Show when={state()?.userName}>
-                  <div class="bg-surface-container-high/50 p-4 rounded-xl border border-outline-variant/30">
-                    <span class="text-label-small text-on-surface-variant uppercase tracking-wider block mb-1">
-                      User
-                    </span>
-                    <span
-                      class="text-on-surface font-medium truncate block"
-                      title={state()?.userName ?? ''}
-                    >
-                      {state()?.userName}
-                    </span>
-                  </div>
-                </Show>
-              </div>
-            </Show>
-          </div>
-        </div>
+              <Show when={state()?.userName}>
+                <InfoCard label="User">
+                  <span
+                    class="text-on-surface font-medium truncate block"
+                    title={state()?.userName ?? ''}
+                  >
+                    {state()?.userName}
+                  </span>
+                </InfoCard>
+              </Show>
+            </div>
+          </Show>
+        </SectionCard>
 
         {/* Settings Form */}
         <form
@@ -272,235 +249,209 @@ export default function SettingsPage(props: SettingsPageProps) {
           class="space-y-6"
         >
           {/* Device Settings Card */}
-          <div class="card-filled relative overflow-hidden">
-            <div class="absolute inset-0 bg-surface-tint/[0.03] pointer-events-none" />
-            <div class="relative z-10">
-              <h2 class="flex items-center gap-3 text-title-medium text-primary mb-6">
-                <Cast class="w-6 h-6" />
-                Device Settings
-              </h2>
-              <div class="space-y-4">
-                <form.Field
-                  name="deviceName"
-                  validators={{
-                    onChange: ({ value }) =>
-                      !value.trim() ? 'Device name is required' : undefined,
-                  }}
-                >
-                  {(field) => (
-                    <div class="group">
-                      <label
-                        for={field().name}
-                        class="block text-label-small text-on-surface-variant mb-1.5 ml-1 uppercase tracking-wider group-focus-within:text-primary transition-colors"
-                      >
-                        Device Name
-                      </label>
-                      <input
-                        id={field().name}
-                        name={field().name}
-                        type="text"
-                        value={field().state.value}
-                        onInput={(e) =>
-                          field().handleChange(e.currentTarget.value)
-                        }
-                        onBlur={() => field().handleBlur()}
-                        class="input-filled"
-                        placeholder="JMSR"
-                      />
-                      <Show when={field().state.meta.errors.length > 0}>
-                        <p class="text-error text-body-small mt-1.5 ml-1">
-                          {field().state.meta.errors[0]}
-                        </p>
-                      </Show>
-                      <p class="text-on-surface-variant/70 text-body-small mt-1.5 ml-1">
-                        Name displayed in Jellyfin cast menu
+          <SectionCard icon={<Cast class="w-6 h-6" />} title="Device Settings">
+            <div class="space-y-4">
+              <form.Field
+                name="deviceName"
+                validators={{
+                  onChange: ({ value }) =>
+                    !value.trim() ? 'Device name is required' : undefined,
+                }}
+              >
+                {(field) => (
+                  <div class="group">
+                    <label
+                      for={field().name}
+                      class="block text-label-small text-on-surface-variant mb-1.5 ml-1 uppercase tracking-wider group-focus-within:text-primary transition-colors"
+                    >
+                      Device Name
+                    </label>
+                    <input
+                      id={field().name}
+                      name={field().name}
+                      type="text"
+                      value={field().state.value}
+                      onInput={(e) =>
+                        field().handleChange(e.currentTarget.value)
+                      }
+                      onBlur={() => field().handleBlur()}
+                      class="input-filled"
+                      placeholder="JMSR"
+                    />
+                    <Show when={field().state.meta.errors.length > 0}>
+                      <p class="text-error text-body-small mt-1.5 ml-1">
+                        {field().state.meta.errors[0]}
                       </p>
-                    </div>
-                  )}
-                </form.Field>
-              </div>
+                    </Show>
+                    <p class="text-on-surface-variant/70 text-body-small mt-1.5 ml-1">
+                      Name displayed in Jellyfin cast menu
+                    </p>
+                  </div>
+                )}
+              </form.Field>
             </div>
-          </div>
+          </SectionCard>
 
           {/* MPV Player Card */}
-          <div class="card-filled relative overflow-hidden">
-            <div class="absolute inset-0 bg-surface-tint/[0.03] pointer-events-none" />
-            <div class="relative z-10">
-              <div class="flex items-center justify-between mb-6">
-                <h2 class="text-title-medium text-primary flex items-center gap-3">
-                  <Play class="w-6 h-6" />
-                  MPV Player
-                </h2>
-                <Show when={!mpvConnected.loading}>
-                  <span
-                    class={`px-3 py-1 rounded-full text-label-small border ${
-                      mpvConnected()
-                        ? 'bg-tertiary-container text-on-tertiary-container border-tertiary/20'
-                        : 'bg-surface-container-highest text-on-surface-variant border-outline-variant'
-                    }`}
-                  >
-                    {mpvConnected() ? 'Running' : 'Not Started'}
-                  </span>
-                </Show>
-              </div>
-
-              <div class="space-y-6">
-                <form.Field name="mpvPath">
-                  {(field) => (
-                    <div class="group">
-                      <label
-                        for={field().name}
-                        class="block text-label-small text-on-surface-variant mb-1.5 ml-1 uppercase tracking-wider group-focus-within:text-primary transition-colors"
-                      >
-                        MPV Executable Path
-                      </label>
-                      <div class="flex gap-2 items-start">
-                        <input
-                          id={field().name}
-                          name={field().name}
-                          type="text"
-                          value={field().state.value}
-                          onInput={(e) =>
-                            field().handleChange(e.currentTarget.value)
-                          }
-                          onBlur={() => field().handleBlur()}
-                          placeholder="Path to mpv.exe or mpv binary"
-                          class="input-filled flex-1 min-w-0"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleDetectMpv}
-                          disabled={detectingMpv()}
-                          class="btn-tonal h-14"
-                        >
-                          {detectingMpv() ? '...' : 'Auto-detect'}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </form.Field>
-
-                <form.Field name="mpvArgs">
-                  {(field) => (
-                    <div class="group">
-                      <label
-                        for={field().name}
-                        class="block text-label-small text-on-surface-variant mb-1.5 ml-1 uppercase tracking-wider group-focus-within:text-primary transition-colors"
-                      >
-                        Extra Arguments (one per line)
-                      </label>
-                      <textarea
+          <SectionCard
+            icon={<Play class="w-6 h-6" />}
+            title="MPV Player"
+            trailing={
+              <Show when={!mpvConnected.loading}>
+                <StatusBadge variant={mpvConnected() ? 'success' : 'neutral'}>
+                  {mpvConnected() ? 'Running' : 'Not Started'}
+                </StatusBadge>
+              </Show>
+            }
+          >
+            <div class="space-y-6">
+              <form.Field name="mpvPath">
+                {(field) => (
+                  <div class="group">
+                    <label
+                      for={field().name}
+                      class="block text-label-small text-on-surface-variant mb-1.5 ml-1 uppercase tracking-wider group-focus-within:text-primary transition-colors"
+                    >
+                      MPV Executable Path
+                    </label>
+                    <div class="flex gap-2 items-start">
+                      <input
                         id={field().name}
                         name={field().name}
+                        type="text"
                         value={field().state.value}
                         onInput={(e) =>
                           field().handleChange(e.currentTarget.value)
                         }
                         onBlur={() => field().handleBlur()}
-                        rows={4}
-                        placeholder="--fullscreen&#10;--force-window"
-                        class="w-full bg-surface-container-highest rounded-t-lg border-b border-on-surface-variant px-4 py-3 text-on-surface placeholder-on-surface-variant focus:border-b-2 focus:border-primary focus:outline-none transition-colors font-mono text-body-small leading-relaxed"
+                        placeholder="Path to mpv.exe or mpv binary"
+                        class="input-filled flex-1 min-w-0"
                       />
+                      <button
+                        type="button"
+                        onClick={handleDetectMpv}
+                        disabled={detectingMpv()}
+                        class="btn-tonal h-14"
+                      >
+                        {detectingMpv() ? '...' : 'Auto-detect'}
+                      </button>
                     </div>
-                  )}
-                </form.Field>
-              </div>
+                  </div>
+                )}
+              </form.Field>
+
+              <form.Field name="mpvArgs">
+                {(field) => (
+                  <div class="group">
+                    <label
+                      for={field().name}
+                      class="block text-label-small text-on-surface-variant mb-1.5 ml-1 uppercase tracking-wider group-focus-within:text-primary transition-colors"
+                    >
+                      Extra Arguments (one per line)
+                    </label>
+                    <textarea
+                      id={field().name}
+                      name={field().name}
+                      value={field().state.value}
+                      onInput={(e) =>
+                        field().handleChange(e.currentTarget.value)
+                      }
+                      onBlur={() => field().handleBlur()}
+                      rows={4}
+                      placeholder="--fullscreen&#10;--force-window"
+                      class="w-full bg-surface-container-highest rounded-t-lg border-b border-on-surface-variant px-4 py-3 text-on-surface placeholder-on-surface-variant focus:border-b-2 focus:border-primary focus:outline-none transition-colors font-mono text-body-small leading-relaxed"
+                    />
+                  </div>
+                )}
+              </form.Field>
             </div>
-          </div>
+          </SectionCard>
 
           {/* Keybindings Card */}
-          <div class="card-filled relative overflow-hidden">
-            <div class="absolute inset-0 bg-surface-tint/[0.03] pointer-events-none" />
-            <div class="relative z-10">
-              <h2 class="text-title-medium text-primary mb-2 flex items-center gap-3">
-                <Keyboard class="w-6 h-6" />
-                Keybindings
-              </h2>
+          <SectionCard icon={<Keyboard class="w-6 h-6" />} title="Keybindings">
+            <p class="text-on-surface-variant/80 text-body-medium mb-6 -mt-4 ml-9">
+              Keyboard shortcuts for MPV episode navigation. Changes take effect
+              on next MPV restart.
+            </p>
 
-              <p class="text-on-surface-variant/80 text-body-medium mb-6 ml-9">
-                Keyboard shortcuts for MPV episode navigation. Changes take
-                effect on next MPV restart.
-              </p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <form.Field
+                name="keybindNext"
+                validators={{
+                  onChange: ({ value }) =>
+                    !value.trim() ? 'Keybinding is required' : undefined,
+                }}
+              >
+                {(field) => (
+                  <div class="group">
+                    <label
+                      for={field().name}
+                      class="block text-label-small text-on-surface-variant mb-1.5 ml-1 uppercase tracking-wider group-focus-within:text-primary transition-colors"
+                    >
+                      Next Episode
+                    </label>
+                    <input
+                      id={field().name}
+                      name={field().name}
+                      type="text"
+                      value={field().state.value}
+                      onInput={(e) =>
+                        field().handleChange(e.currentTarget.value)
+                      }
+                      onBlur={() => field().handleBlur()}
+                      class="input-filled font-mono text-center"
+                      placeholder="Shift+n"
+                    />
+                    <Show when={field().state.meta.errors.length > 0}>
+                      <p class="text-error text-body-small mt-1.5 ml-1">
+                        {field().state.meta.errors[0]}
+                      </p>
+                    </Show>
+                  </div>
+                )}
+              </form.Field>
 
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <form.Field
-                  name="keybindNext"
-                  validators={{
-                    onChange: ({ value }) =>
-                      !value.trim() ? 'Keybinding is required' : undefined,
-                  }}
-                >
-                  {(field) => (
-                    <div class="group">
-                      <label
-                        for={field().name}
-                        class="block text-label-small text-on-surface-variant mb-1.5 ml-1 uppercase tracking-wider group-focus-within:text-primary transition-colors"
-                      >
-                        Next Episode
-                      </label>
-                      <input
-                        id={field().name}
-                        name={field().name}
-                        type="text"
-                        value={field().state.value}
-                        onInput={(e) =>
-                          field().handleChange(e.currentTarget.value)
-                        }
-                        onBlur={() => field().handleBlur()}
-                        class="input-filled font-mono text-center"
-                        placeholder="Shift+n"
-                      />
-                      <Show when={field().state.meta.errors.length > 0}>
-                        <p class="text-error text-body-small mt-1.5 ml-1">
-                          {field().state.meta.errors[0]}
-                        </p>
-                      </Show>
-                    </div>
-                  )}
-                </form.Field>
-
-                <form.Field
-                  name="keybindPrev"
-                  validators={{
-                    onChange: ({ value }) =>
-                      !value.trim() ? 'Keybinding is required' : undefined,
-                  }}
-                >
-                  {(field) => (
-                    <div class="group">
-                      <label
-                        for={field().name}
-                        class="block text-label-small text-on-surface-variant mb-1.5 ml-1 uppercase tracking-wider group-focus-within:text-primary transition-colors"
-                      >
-                        Previous Episode
-                      </label>
-                      <input
-                        id={field().name}
-                        name={field().name}
-                        type="text"
-                        value={field().state.value}
-                        onInput={(e) =>
-                          field().handleChange(e.currentTarget.value)
-                        }
-                        onBlur={() => field().handleBlur()}
-                        class="input-filled font-mono text-center"
-                        placeholder="Shift+p"
-                      />
-                      <Show when={field().state.meta.errors.length > 0}>
-                        <p class="text-error text-body-small mt-1.5 ml-1">
-                          {field().state.meta.errors[0]}
-                        </p>
-                      </Show>
-                    </div>
-                  )}
-                </form.Field>
-              </div>
-
-              <p class="text-on-surface-variant/60 text-body-small mt-6 text-center border-t border-outline-variant/20 pt-4">
-                Use MPV keybinding syntax (e.g., Shift+n, Ctrl+Left, Alt+q)
-              </p>
+              <form.Field
+                name="keybindPrev"
+                validators={{
+                  onChange: ({ value }) =>
+                    !value.trim() ? 'Keybinding is required' : undefined,
+                }}
+              >
+                {(field) => (
+                  <div class="group">
+                    <label
+                      for={field().name}
+                      class="block text-label-small text-on-surface-variant mb-1.5 ml-1 uppercase tracking-wider group-focus-within:text-primary transition-colors"
+                    >
+                      Previous Episode
+                    </label>
+                    <input
+                      id={field().name}
+                      name={field().name}
+                      type="text"
+                      value={field().state.value}
+                      onInput={(e) =>
+                        field().handleChange(e.currentTarget.value)
+                      }
+                      onBlur={() => field().handleBlur()}
+                      class="input-filled font-mono text-center"
+                      placeholder="Shift+p"
+                    />
+                    <Show when={field().state.meta.errors.length > 0}>
+                      <p class="text-error text-body-small mt-1.5 ml-1">
+                        {field().state.meta.errors[0]}
+                      </p>
+                    </Show>
+                  </div>
+                )}
+              </form.Field>
             </div>
-          </div>
+
+            <p class="text-on-surface-variant/60 text-body-small mt-6 text-center border-t border-outline-variant/20 pt-4">
+              Use MPV keybinding syntax (e.g., Shift+n, Ctrl+Left, Alt+q)
+            </p>
+          </SectionCard>
 
           {/* Save Settings Button */}
           <div class="sticky bottom-6 z-20">
@@ -568,12 +519,7 @@ export default function SettingsPage(props: SettingsPageProps) {
         <LogPanel />
 
         {/* Version Footer */}
-        <div class="py-8 text-center">
-          <p class="text-on-surface-variant/70 text-body-small">
-            JMSR - Jellyfin MPV Shim Rust
-          </p>
-          <AppVersion />
-        </div>
+        <PageFooter />
       </div>
     </div>
   );
