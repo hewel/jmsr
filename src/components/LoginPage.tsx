@@ -40,28 +40,14 @@ function clearSavedCredentials(): void {
 
 export default function LoginPage(props: LoginPageProps) {
   const [error, setError] = createSignal<string | null>(null);
-  const [initialValues, setInitialValues] = createSignal({
-    serverUrl: '',
-    username: '',
-    password: '',
-    rememberMe: false,
-  });
-
-  // Load saved credentials on mount
-  onMount(() => {
-    const saved = loadSavedCredentials();
-    if (saved) {
-      setInitialValues({
-        serverUrl: saved.serverUrl,
-        username: saved.username,
-        password: '',
-        rememberMe: saved.rememberMe,
-      });
-    }
-  });
 
   const form = createForm(() => ({
-    defaultValues: initialValues(),
+    defaultValues: {
+      serverUrl: '',
+      username: '',
+      password: '',
+      rememberMe: false,
+    },
     onSubmit: async ({ value }) => {
       setError(null);
 
@@ -98,6 +84,19 @@ export default function LoginPage(props: LoginPageProps) {
   }));
 
   const isSubmitting = form.useStore((state) => state.isSubmitting);
+
+  // Load saved credentials on mount
+  onMount(() => {
+    const saved = loadSavedCredentials();
+    if (saved) {
+      form.reset({
+        serverUrl: saved.serverUrl,
+        username: saved.username,
+        password: '',
+        rememberMe: saved.rememberMe,
+      });
+    }
+  });
 
   return (
     <div class="min-h-screen bg-surface flex items-center justify-center p-6">

@@ -5,6 +5,7 @@ import { type AppConfig, type ConnectionState, commands } from '../bindings';
 import { clearSavedSession } from '../router';
 import AppVersion from './AppVersion';
 import LogPanel from './LogPanel';
+import { useToast } from './ToastProvider';
 
 interface SettingsPageProps {
   onDisconnected: () => void;
@@ -19,6 +20,7 @@ async function fetchMpvStatus(): Promise<boolean> {
 }
 
 export default function SettingsPage(props: SettingsPageProps) {
+  const { showToast } = useToast();
   const [disconnecting, setDisconnecting] = createSignal(false);
   const [clearingSession, setClearingSession] = createSignal(false);
   const [detectingMpv, setDetectingMpv] = createSignal(false);
@@ -134,9 +136,16 @@ export default function SettingsPage(props: SettingsPageProps) {
       const path = await commands.configDetectMpv();
       if (path) {
         form.setFieldValue('mpvPath', path);
+        showToast('success', 'MPV detected successfully');
+      } else {
+        showToast(
+          'warning',
+          'MPV not found in PATH. Please specify path manually.',
+        );
       }
     } catch (e) {
       console.error('Failed to detect MPV:', e);
+      showToast('error', 'Failed to detect MPV');
     } finally {
       setDetectingMpv(false);
     }
