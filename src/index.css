@@ -1,17 +1,78 @@
 @import "tailwindcss";
 
-/* Custom theme configuration */
+/* ==========================================================================
+   Material Design 3 - Dark Theme
+   Generated from Jellyfin seed color #00A4DC
+   ========================================================================== */
+
 @theme {
-  --color-jellyfin: #00a4dc;
-  --color-jellyfin-dark: #0086b3;
-  --color-surface: #101725;
-  --color-surface-light: #1a2332;
-  --color-surface-lighter: #243040;
+  /* Primary colors */
+  --color-primary: #8fcef3;
+  --color-on-primary: #003549;
+  --color-primary-container: #004c69;
+  --color-on-primary-container: #c3e7ff;
+
+  /* Secondary colors */
+  --color-secondary: #b5c9d7;
+  --color-on-secondary: #20333e;
+  --color-secondary-container: #364955;
+  --color-on-secondary-container: #d1e5f4;
+
+  /* Tertiary colors */
+  --color-tertiary: #cac1ea;
+  --color-on-tertiary: #322c4c;
+  --color-tertiary-container: #484264;
+  --color-on-tertiary-container: #e6deff;
+
+  /* Error colors */
+  --color-error: #ffb4ab;
+  --color-on-error: #690005;
+  --color-error-container: #93000a;
+  --color-on-error-container: #ffdad6;
+
+  /* Surface colors */
+  --color-surface: #0f1417;
+  --color-on-surface: #dfe3e7;
+  --color-surface-variant: #41484d;
+  --color-on-surface-variant: #c0c7cd;
+  --color-surface-dim: #0f1417;
+  --color-surface-bright: #353a3d;
+  --color-surface-container-lowest: #0a0f12;
+  --color-surface-container-low: #181c1f;
+  --color-surface-container: #1c2023;
+  --color-surface-container-high: #262b2e;
+  --color-surface-container-highest: #313539;
+
+  /* Background */
+  --color-background: #0f1417;
+  --color-on-background: #dfe3e7;
+
+  /* Outline */
+  --color-outline: #8b9297;
+  --color-outline-variant: #41484d;
+
+  /* Inverse colors */
+  --color-inverse-surface: #dfe3e7;
+  --color-inverse-on-surface: #2c3134;
+  --color-inverse-primary: #1c6585;
+
+  /* Surface tint */
+  --color-surface-tint: #8fcef3;
+
+  /* Shadow & Scrim */
+  --color-shadow: #000000;
+  --color-scrim: #000000;
+
+  /* Legacy aliases for backwards compatibility */
+  --color-jellyfin: #8fcef3;
+  --color-jellyfin-dark: #004c69;
+  --color-surface-light: #1c2023;
+  --color-surface-lighter: #262b2e;
 }
 
 /* Base styles */
 body {
-  @apply bg-surface text-white font-sans antialiased;
+  @apply bg-background text-on-surface font-sans antialiased;
   margin: 0;
 }
 
@@ -19,14 +80,36 @@ body {
 input[type="text"],
 input[type="password"],
 input[type="url"] {
-  @apply w-full px-4 py-3 bg-surface-light border border-surface-lighter rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-jellyfin focus:border-transparent transition-all duration-200;
+  @apply w-full px-4 py-3 bg-surface-container border border-outline-variant rounded-lg text-on-surface placeholder-on-surface-variant focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200;
 }
 
 /* Button styles */
 .btn-primary {
-  @apply px-6 py-3 bg-jellyfin hover:bg-jellyfin-dark text-white font-medium rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+  @apply px-6 py-3 bg-primary hover:bg-primary-container text-on-primary hover:text-on-primary-container font-medium rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
 }
 
 .btn-secondary {
-  @apply px-6 py-3 bg-surface-lighter hover:bg-surface-light text-white font-medium rounded-lg border border-surface-lighter transition-all duration-200;
+  @apply px-6 py-3 bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-medium rounded-lg border border-outline-variant transition-all duration-200;
+}
+
+/* Card styles */
+.card {
+  @apply bg-surface-container rounded-xl p-6 border border-outline-variant;
+}
+
+.card-elevated {
+  @apply bg-surface-container-low rounded-xl p-6 shadow-lg;
+}
+
+/* Text styles */
+.text-label {
+  @apply text-on-surface-variant text-sm;
+}
+
+.text-body {
+  @apply text-on-surface;
+}
+
+.text-headline {
+  @apply text-on-surface font-semibold;
 }

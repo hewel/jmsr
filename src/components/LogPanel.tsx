@@ -16,11 +16,11 @@ interface LogEntry {
 const MAX_LOGS = 200;
 
 const LogLevel: Record<number, { name: string; color: string }> = {
-  1: { name: 'ERROR', color: 'text-red-500' },
-  2: { name: 'WARN', color: 'text-yellow-500' },
-  3: { name: 'INFO', color: 'text-blue-500' },
-  4: { name: 'DEBUG', color: 'text-gray-400' },
-  5: { name: 'TRACE', color: 'text-gray-600' },
+  1: { name: 'ERROR', color: 'text-error' },
+  2: { name: 'WARN', color: 'text-secondary' },
+  3: { name: 'INFO', color: 'text-primary' },
+  4: { name: 'DEBUG', color: 'text-on-surface-variant' },
+  5: { name: 'TRACE', color: 'text-outline' },
 };
 
 export default function LogPanel() {
@@ -73,16 +73,16 @@ export default function LogPanel() {
   };
 
   return (
-    <div class="bg-surface-light rounded-xl border border-surface-lighter overflow-hidden">
+    <div class="bg-surface-container rounded-xl border border-outline-variant overflow-hidden">
       {/* Header */}
       <button
         type="button"
-        class="w-full flex items-center justify-between p-4 hover:bg-surface-lighter/50 transition-colors"
+        class="w-full flex items-center justify-between p-4 hover:bg-surface-container-high/50 transition-colors"
         onClick={toggleExpand}
       >
         <div class="flex items-center gap-2">
           <svg
-            class="w-5 h-5 text-jellyfin"
+            class="w-5 h-5 text-primary"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -95,11 +95,11 @@ export default function LogPanel() {
               d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
             />
           </svg>
-          <h2 class="text-lg font-semibold text-white">Logs</h2>
-          <span class="text-gray-500 text-sm">({logs().length})</span>
+          <h2 class="text-lg font-semibold text-on-surface">Logs</h2>
+          <span class="text-outline text-sm">({logs().length})</span>
         </div>
         <svg
-          class={`w-5 h-5 text-gray-400 transition-transform ${expanded() ? 'rotate-180' : ''}`}
+          class={`w-5 h-5 text-on-surface-variant transition-transform ${expanded() ? 'rotate-180' : ''}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -116,16 +116,16 @@ export default function LogPanel() {
 
       {/* Log content */}
       <Show when={expanded()}>
-        <div class="border-t border-surface-lighter">
+        <div class="border-t border-outline-variant">
           {/* Toolbar */}
           <div class="flex items-center justify-between px-4 py-2 bg-surface/50">
             <div class="flex items-center gap-2">
-              <label class="flex items-center gap-1.5 text-xs text-gray-400 cursor-pointer">
+              <label class="flex items-center gap-1.5 text-xs text-on-surface-variant cursor-pointer">
                 <input
                   type="checkbox"
                   checked={autoScroll()}
                   onChange={(e) => setAutoScroll(e.target.checked)}
-                  class="rounded bg-surface-lighter border-surface-lighter text-jellyfin focus:ring-jellyfin/50"
+                  class="rounded bg-surface-container-high border-outline-variant text-primary focus:ring-primary/50"
                 />
                 Auto-scroll
               </label>
@@ -133,7 +133,7 @@ export default function LogPanel() {
             <button
               type="button"
               onClick={clearLogs}
-              class="text-xs text-gray-400 hover:text-white transition-colors px-2 py-1 rounded hover:bg-surface-lighter"
+              class="text-xs text-on-surface-variant hover:text-on-surface transition-colors px-2 py-1 rounded hover:bg-surface-container-high"
             >
               Clear
             </button>
@@ -143,23 +143,25 @@ export default function LogPanel() {
           <div
             ref={containerRef}
             onScroll={handleScroll}
-            class="h-64 overflow-y-auto bg-black/30 font-mono text-xs p-2 space-y-0.5"
+            class="h-64 overflow-y-auto bg-surface-container-lowest/50 font-mono text-xs p-2 space-y-0.5"
           >
             <Show
               when={logs().length > 0}
               fallback={
-                <p class="text-gray-500 text-center py-8">
+                <p class="text-outline text-center py-8">
                   No logs yet. Logs from the Rust backend will appear here.
                 </p>
               }
             >
               <For each={logs()}>
                 {(log) => (
-                  <div class="flex gap-2 hover:bg-white/5 px-1 rounded">
+                  <div class="flex gap-2 hover:bg-on-surface/5 px-1 rounded">
                     <span class={`shrink-0 w-12 ${getLevelColor(log.level)}`}>
                       {getLevelName(log.level)}
                     </span>
-                    <span class="text-gray-300 break-all">{log.message}</span>
+                    <span class="text-on-surface-variant break-all">
+                      {log.message}
+                    </span>
                   </div>
                 )}
               </For>

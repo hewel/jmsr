@@ -27,13 +27,13 @@ export default function Toast(props: ToastProps) {
   const getStyles = () => {
     switch (props.level) {
       case 'success':
-        return 'bg-green-900/30 text-green-400 border-green-900/50';
+        return 'bg-tertiary-container/30 text-tertiary border-tertiary-container/50';
       case 'error':
-        return 'bg-red-900/30 text-red-400 border-red-900/50';
+        return 'bg-error-container/30 text-error border-error-container/50';
       case 'warning':
-        return 'bg-yellow-900/30 text-yellow-400 border-yellow-900/50';
+        return 'bg-secondary-container/30 text-secondary border-secondary-container/50';
       default:
-        return 'bg-[#00a4dc]/20 text-[#00a4dc] border-[#00a4dc]/30';
+        return 'bg-primary-container/30 text-primary border-primary-container/50';
     }
   };
 
