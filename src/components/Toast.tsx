@@ -52,18 +52,18 @@ export default function Toast(props: ToastProps) {
 
   return (
     <div
-      class={`flex items-center w-full max-w-sm p-4 mb-4 rounded-xl border animate-in slide-in-from-right duration-300 ${getStyles()}`}
+      class={`flex items-center w-full max-w-sm p-4 mb-4 rounded-xl border animate-in slide-in-from-right duration-300 shadow-md ${getStyles()}`}
       role="alert"
     >
       <div class="inline-flex items-center justify-center flex-shrink-0">
         {getIcon()}
       </div>
-      <div class="ml-3 text-sm font-normal break-words flex-1">
+      <div class="ml-3 text-body-medium font-normal break-words flex-1">
         {props.message}
       </div>
       <button
         type="button"
-        class="ml-auto -mx-1.5 -my-1.5 rounded-lg focus:ring-2 p-1.5 inline-flex h-8 w-8 hover:bg-white/10 transition-colors"
+        class="ml-auto -mx-1.5 -my-1.5 rounded-full p-1.5 inline-flex h-8 w-8 hover:bg-on-surface/10 transition-colors items-center justify-center"
         onClick={() => props.onDismiss(props.id)}
         aria-label="Close"
       >

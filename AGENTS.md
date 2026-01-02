@@ -77,3 +77,4 @@ bun tauri build     # Production desktop build
 - Test setup extends expect with jest-dom matchers (rstest.setup.ts)
 - See `doc/todos.md` for current tasks and priorities
 - When edit finished, use @oracle to review changes
+- Design system at `doc/m3.md` with predefined CSS classes based on Tailwind + M3

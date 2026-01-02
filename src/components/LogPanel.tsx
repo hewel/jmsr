@@ -73,11 +73,11 @@ export default function LogPanel() {
   };
 
   return (
-    <div class="bg-surface-container rounded-3xl border border-outline-variant/30 overflow-hidden shadow-sm">
+    <div class="card-outlined overflow-hidden p-0">
       {/* Header */}
       <button
         type="button"
-        class="w-full flex items-center justify-between p-6 hover:bg-surface-container-high/50 transition-colors group"
+        class="w-full flex items-center justify-between p-4 hover:bg-surface-container-high/50 transition-colors group"
         onClick={toggleExpand}
       >
         <div class="flex items-center gap-3">
@@ -98,10 +98,10 @@ export default function LogPanel() {
             </svg>
           </div>
           <div>
-            <h2 class="text-lg font-medium text-on-surface text-left">Logs</h2>
-            <div class="text-on-surface-variant text-xs mt-0.5 flex gap-2">
+            <h2 class="text-title-medium text-on-surface text-left">Logs</h2>
+            <div class="text-on-surface-variant text-label-small mt-0.5 flex gap-2">
               <span>System events & debugging</span>
-              <span class="px-1.5 py-0.5 bg-surface-container-highest rounded-md text-[10px] font-mono">
+              <span class="px-1.5 py-0.5 bg-surface-container-highest rounded-md font-mono">
                 {logs().length} entries
               </span>
             </div>
@@ -127,9 +127,9 @@ export default function LogPanel() {
       <Show when={expanded()}>
         <div class="border-t border-outline-variant/30 animate-in slide-in-from-top-2 fade-in duration-200">
           {/* Toolbar */}
-          <div class="flex items-center justify-between px-6 py-3 bg-surface-container-low">
+          <div class="flex items-center justify-between px-4 py-2 bg-surface-container-low">
             <div class="flex items-center gap-2">
-              <label class="flex items-center gap-1.5 text-xs text-on-surface-variant cursor-pointer">
+              <label class="flex items-center gap-1.5 text-label-small text-on-surface-variant cursor-pointer">
                 <input
                   type="checkbox"
                   checked={autoScroll()}
@@ -142,7 +142,7 @@ export default function LogPanel() {
             <button
               type="button"
               onClick={clearLogs}
-              class="text-xs text-on-surface-variant hover:text-on-surface transition-colors px-2 py-1 rounded hover:bg-surface-container-high"
+              class="btn-text h-8 min-w-0 px-3 text-label-small"
             >
               Clear
             </button>
@@ -152,7 +152,7 @@ export default function LogPanel() {
           <div
             ref={containerRef}
             onScroll={handleScroll}
-            class="h-64 overflow-y-auto bg-surface-container-lowest/50 font-mono text-xs p-2 space-y-0.5"
+            class="h-64 overflow-y-auto bg-surface-container-lowest/50 font-mono text-body-small p-2 space-y-0.5"
           >
             <Show
               when={logs().length > 0}

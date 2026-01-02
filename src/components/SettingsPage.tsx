@@ -167,17 +167,17 @@ export default function SettingsPage(props: SettingsPageProps) {
         {/* Header */}
         <div class="flex items-center justify-between pb-4">
           <div>
-            <h1 class="text-3xl font-bold text-on-surface tracking-tight">
+            <h1 class="text-headline-large text-on-surface tracking-tight">
               Settings
             </h1>
-            <p class="text-on-surface-variant mt-1">
+            <p class="text-body-large text-on-surface-variant mt-1">
               Manage your connection and preferences
             </p>
           </div>
           <button
             type="button"
             onClick={handleRefresh}
-            class="p-3 text-on-surface-variant hover:text-primary hover:bg-surface-container-high rounded-full transition-all duration-200 hover:rotate-180"
+            class="btn-icon hover:rotate-180 transition-transform"
             title="Refresh status"
           >
             <RefreshCw class="w-6 h-6" />
@@ -185,10 +185,10 @@ export default function SettingsPage(props: SettingsPageProps) {
         </div>
 
         {/* Jellyfin Connection Card */}
-        <div class="bg-surface-container rounded-3xl p-6 shadow-sm border border-outline-variant/30 relative overflow-hidden group">
+        <div class="card-filled relative overflow-hidden group">
           <div class="absolute inset-0 bg-surface-tint/[0.03] pointer-events-none" />
           <div class="relative z-10">
-            <h2 class="text-lg font-medium text-primary mb-6 flex items-center gap-3">
+            <h2 class="text-title-medium text-primary mb-6 flex items-center gap-3">
               <CircleCheckBig class="w-6 h-6" />
               Jellyfin Connection
             </h2>
@@ -201,7 +201,7 @@ export default function SettingsPage(props: SettingsPageProps) {
             >
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="bg-surface-container-high/50 p-4 rounded-xl border border-outline-variant/30">
-                  <span class="text-xs font-medium text-on-surface-variant uppercase tracking-wider block mb-1">
+                  <span class="text-label-small text-on-surface-variant uppercase tracking-wider block mb-1">
                     Status
                   </span>
                   <div class="flex items-center gap-2">
@@ -218,7 +218,7 @@ export default function SettingsPage(props: SettingsPageProps) {
 
                 <Show when={state()?.serverName}>
                   <div class="bg-surface-container-high/50 p-4 rounded-xl border border-outline-variant/30">
-                    <span class="text-xs font-medium text-on-surface-variant uppercase tracking-wider block mb-1">
+                    <span class="text-label-small text-on-surface-variant uppercase tracking-wider block mb-1">
                       Server
                     </span>
                     <span
@@ -232,7 +232,7 @@ export default function SettingsPage(props: SettingsPageProps) {
 
                 <Show when={state()?.serverUrl}>
                   <div class="bg-surface-container-high/50 p-4 rounded-xl border border-outline-variant/30">
-                    <span class="text-xs font-medium text-on-surface-variant uppercase tracking-wider block mb-1">
+                    <span class="text-label-small text-on-surface-variant uppercase tracking-wider block mb-1">
                       URL
                     </span>
                     <span
@@ -246,7 +246,7 @@ export default function SettingsPage(props: SettingsPageProps) {
 
                 <Show when={state()?.userName}>
                   <div class="bg-surface-container-high/50 p-4 rounded-xl border border-outline-variant/30">
-                    <span class="text-xs font-medium text-on-surface-variant uppercase tracking-wider block mb-1">
+                    <span class="text-label-small text-on-surface-variant uppercase tracking-wider block mb-1">
                       User
                     </span>
                     <span
@@ -272,10 +272,10 @@ export default function SettingsPage(props: SettingsPageProps) {
           class="space-y-6"
         >
           {/* Device Settings Card */}
-          <div class="bg-surface-container rounded-3xl p-6 shadow-sm border border-outline-variant/30 relative overflow-hidden">
+          <div class="card-filled relative overflow-hidden">
             <div class="absolute inset-0 bg-surface-tint/[0.03] pointer-events-none" />
             <div class="relative z-10">
-              <h2 class="flex items-center gap-3 text-lg font-medium text-primary mb-6">
+              <h2 class="flex items-center gap-3 text-title-medium text-primary mb-6">
                 <Cast class="w-6 h-6" />
                 Device Settings
               </h2>
@@ -291,7 +291,7 @@ export default function SettingsPage(props: SettingsPageProps) {
                     <div class="group">
                       <label
                         for={field().name}
-                        class="block text-xs font-medium text-on-surface-variant mb-1.5 ml-1 uppercase tracking-wider group-focus-within:text-primary transition-colors"
+                        class="block text-label-small text-on-surface-variant mb-1.5 ml-1 uppercase tracking-wider group-focus-within:text-primary transition-colors"
                       >
                         Device Name
                       </label>
@@ -304,15 +304,15 @@ export default function SettingsPage(props: SettingsPageProps) {
                           field().handleChange(e.currentTarget.value)
                         }
                         onBlur={() => field().handleBlur()}
-                        class="w-full bg-surface-container-high border border-outline-variant/50 rounded-xl px-4 py-3 text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200"
+                        class="input-filled"
                         placeholder="JMSR"
                       />
                       <Show when={field().state.meta.errors.length > 0}>
-                        <p class="text-error text-xs mt-1.5 ml-1">
+                        <p class="text-error text-body-small mt-1.5 ml-1">
                           {field().state.meta.errors[0]}
                         </p>
                       </Show>
-                      <p class="text-on-surface-variant/70 text-xs mt-1.5 ml-1">
+                      <p class="text-on-surface-variant/70 text-body-small mt-1.5 ml-1">
                         Name displayed in Jellyfin cast menu
                       </p>
                     </div>
@@ -323,17 +323,17 @@ export default function SettingsPage(props: SettingsPageProps) {
           </div>
 
           {/* MPV Player Card */}
-          <div class="bg-surface-container rounded-3xl p-6 shadow-sm border border-outline-variant/30 relative overflow-hidden">
+          <div class="card-filled relative overflow-hidden">
             <div class="absolute inset-0 bg-surface-tint/[0.03] pointer-events-none" />
             <div class="relative z-10">
               <div class="flex items-center justify-between mb-6">
-                <h2 class="text-lg font-medium text-primary flex items-center gap-3">
+                <h2 class="text-title-medium text-primary flex items-center gap-3">
                   <Play class="w-6 h-6" />
                   MPV Player
                 </h2>
                 <Show when={!mpvConnected.loading}>
                   <span
-                    class={`px-3 py-1 rounded-full text-xs font-medium border ${
+                    class={`px-3 py-1 rounded-full text-label-small border ${
                       mpvConnected()
                         ? 'bg-tertiary-container text-on-tertiary-container border-tertiary/20'
                         : 'bg-surface-container-highest text-on-surface-variant border-outline-variant'
@@ -350,11 +350,11 @@ export default function SettingsPage(props: SettingsPageProps) {
                     <div class="group">
                       <label
                         for={field().name}
-                        class="block text-xs font-medium text-on-surface-variant mb-1.5 ml-1 uppercase tracking-wider group-focus-within:text-primary transition-colors"
+                        class="block text-label-small text-on-surface-variant mb-1.5 ml-1 uppercase tracking-wider group-focus-within:text-primary transition-colors"
                       >
                         MPV Executable Path
                       </label>
-                      <div class="flex gap-2">
+                      <div class="flex gap-2 items-start">
                         <input
                           id={field().name}
                           name={field().name}
@@ -365,13 +365,13 @@ export default function SettingsPage(props: SettingsPageProps) {
                           }
                           onBlur={() => field().handleBlur()}
                           placeholder="Path to mpv.exe or mpv binary"
-                          class="flex-1 bg-surface-container-high border border-outline-variant/50 rounded-xl px-4 py-3 text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200"
+                          class="input-filled flex-1 min-w-0"
                         />
                         <button
                           type="button"
                           onClick={handleDetectMpv}
                           disabled={detectingMpv()}
-                          class="px-5 py-3 bg-secondary-container hover:bg-secondary-container/80 text-on-secondary-container font-medium rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-md active:scale-95"
+                          class="btn-tonal h-14"
                         >
                           {detectingMpv() ? '...' : 'Auto-detect'}
                         </button>
@@ -385,7 +385,7 @@ export default function SettingsPage(props: SettingsPageProps) {
                     <div class="group">
                       <label
                         for={field().name}
-                        class="block text-xs font-medium text-on-surface-variant mb-1.5 ml-1 uppercase tracking-wider group-focus-within:text-primary transition-colors"
+                        class="block text-label-small text-on-surface-variant mb-1.5 ml-1 uppercase tracking-wider group-focus-within:text-primary transition-colors"
                       >
                         Extra Arguments (one per line)
                       </label>
@@ -399,7 +399,7 @@ export default function SettingsPage(props: SettingsPageProps) {
                         onBlur={() => field().handleBlur()}
                         rows={4}
                         placeholder="--fullscreen&#10;--force-window"
-                        class="w-full bg-surface-container-high border border-outline-variant/50 rounded-xl px-4 py-3 text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200 font-mono text-sm leading-relaxed"
+                        class="w-full bg-surface-container-highest rounded-t-lg border-b border-on-surface-variant px-4 py-3 text-on-surface placeholder-on-surface-variant focus:border-b-2 focus:border-primary focus:outline-none transition-colors font-mono text-body-small leading-relaxed"
                       />
                     </div>
                   )}
@@ -409,15 +409,15 @@ export default function SettingsPage(props: SettingsPageProps) {
           </div>
 
           {/* Keybindings Card */}
-          <div class="bg-surface-container rounded-3xl p-6 shadow-sm border border-outline-variant/30 relative overflow-hidden">
+          <div class="card-filled relative overflow-hidden">
             <div class="absolute inset-0 bg-surface-tint/[0.03] pointer-events-none" />
             <div class="relative z-10">
-              <h2 class="text-lg font-medium text-primary mb-2 flex items-center gap-3">
+              <h2 class="text-title-medium text-primary mb-2 flex items-center gap-3">
                 <Keyboard class="w-6 h-6" />
                 Keybindings
               </h2>
 
-              <p class="text-on-surface-variant/80 text-sm mb-6 ml-9">
+              <p class="text-on-surface-variant/80 text-body-medium mb-6 ml-9">
                 Keyboard shortcuts for MPV episode navigation. Changes take
                 effect on next MPV restart.
               </p>
@@ -434,7 +434,7 @@ export default function SettingsPage(props: SettingsPageProps) {
                     <div class="group">
                       <label
                         for={field().name}
-                        class="block text-xs font-medium text-on-surface-variant mb-1.5 ml-1 uppercase tracking-wider group-focus-within:text-primary transition-colors"
+                        class="block text-label-small text-on-surface-variant mb-1.5 ml-1 uppercase tracking-wider group-focus-within:text-primary transition-colors"
                       >
                         Next Episode
                       </label>
@@ -447,11 +447,11 @@ export default function SettingsPage(props: SettingsPageProps) {
                           field().handleChange(e.currentTarget.value)
                         }
                         onBlur={() => field().handleBlur()}
-                        class="w-full bg-surface-container-high border border-outline-variant/50 rounded-xl px-4 py-3 text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200 font-mono text-center"
+                        class="input-filled font-mono text-center"
                         placeholder="Shift+n"
                       />
                       <Show when={field().state.meta.errors.length > 0}>
-                        <p class="text-error text-xs mt-1.5 ml-1">
+                        <p class="text-error text-body-small mt-1.5 ml-1">
                           {field().state.meta.errors[0]}
                         </p>
                       </Show>
@@ -470,7 +470,7 @@ export default function SettingsPage(props: SettingsPageProps) {
                     <div class="group">
                       <label
                         for={field().name}
-                        class="block text-xs font-medium text-on-surface-variant mb-1.5 ml-1 uppercase tracking-wider group-focus-within:text-primary transition-colors"
+                        class="block text-label-small text-on-surface-variant mb-1.5 ml-1 uppercase tracking-wider group-focus-within:text-primary transition-colors"
                       >
                         Previous Episode
                       </label>
@@ -483,11 +483,11 @@ export default function SettingsPage(props: SettingsPageProps) {
                           field().handleChange(e.currentTarget.value)
                         }
                         onBlur={() => field().handleBlur()}
-                        class="w-full bg-surface-container-high border border-outline-variant/50 rounded-xl px-4 py-3 text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200 font-mono text-center"
+                        class="input-filled font-mono text-center"
                         placeholder="Shift+p"
                       />
                       <Show when={field().state.meta.errors.length > 0}>
-                        <p class="text-error text-xs mt-1.5 ml-1">
+                        <p class="text-error text-body-small mt-1.5 ml-1">
                           {field().state.meta.errors[0]}
                         </p>
                       </Show>
@@ -496,7 +496,7 @@ export default function SettingsPage(props: SettingsPageProps) {
                 </form.Field>
               </div>
 
-              <p class="text-on-surface-variant/60 text-xs mt-6 text-center border-t border-outline-variant/20 pt-4">
+              <p class="text-on-surface-variant/60 text-body-small mt-6 text-center border-t border-outline-variant/20 pt-4">
                 Use MPV keybinding syntax (e.g., Shift+n, Ctrl+Left, Alt+q)
               </p>
             </div>
@@ -509,7 +509,7 @@ export default function SettingsPage(props: SettingsPageProps) {
                 <button
                   type="submit"
                   disabled={isSubmitting()}
-                  class="w-full py-4 px-6 bg-primary hover:bg-primary/90 text-on-primary hover:text-on-primary font-bold rounded-full shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:-translate-y-1 active:translate-y-0 active:scale-[0.99] backdrop-blur-md"
+                  class="btn-primary w-full h-14 text-title-medium shadow-lg hover:shadow-xl hover:-translate-y-1 active:translate-y-0 active:scale-[0.99] backdrop-blur-md"
                 >
                   {isSubmitting() ? 'Saving...' : 'Save Settings'}
                 </button>
@@ -518,7 +518,7 @@ export default function SettingsPage(props: SettingsPageProps) {
 
             <Show when={saveMessage()}>
               <div
-                class={`mt-4 p-4 rounded-xl text-sm font-medium text-center animate-in slide-in-from-bottom-2 fade-in duration-300 ${
+                class={`mt-4 p-4 rounded-xl text-body-medium font-medium text-center animate-in slide-in-from-bottom-2 fade-in duration-300 ${
                   saveMessage()?.type === 'success'
                     ? 'bg-tertiary-container text-on-tertiary-container'
                     : 'bg-error-container text-on-error-container'
@@ -531,19 +531,17 @@ export default function SettingsPage(props: SettingsPageProps) {
         </form>
 
         {/* Actions Card */}
-        <div class="bg-surface-container rounded-3xl p-6 shadow-sm border border-outline-variant/30 relative overflow-hidden">
+        <div class="card-filled relative overflow-hidden">
           <div class="absolute inset-0 bg-surface-tint/[0.03] pointer-events-none" />
           <div class="relative z-10">
-            <h2 class="text-lg font-medium text-on-surface mb-6">
-              Danger Zone
-            </h2>
+            <h2 class="text-title-medium text-on-surface mb-6">Danger Zone</h2>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <button
                 type="button"
                 onClick={handleDisconnect}
                 disabled={disconnecting() || !state()?.connected}
-                class="flex items-center justify-center gap-2 py-3 px-6 bg-surface-container-high hover:bg-error/20 text-error font-medium rounded-xl border border-outline-variant/50 hover:border-error/50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                class="btn-outlined border-error/50 text-error hover:bg-error/10 hover:border-error w-full"
               >
                 <LogOut class="w-5 h-5" />
                 {disconnecting() ? 'Disconnecting...' : 'Disconnect'}
@@ -553,13 +551,13 @@ export default function SettingsPage(props: SettingsPageProps) {
                 type="button"
                 onClick={handleClearSession}
                 disabled={clearingSession()}
-                class="flex items-center justify-center gap-2 py-3 px-6 bg-surface-container-high hover:bg-on-surface/10 text-on-surface-variant hover:text-on-surface font-medium rounded-xl border border-outline-variant/50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                class="btn-tonal w-full"
               >
                 <Trash2 class="w-5 h-5" />
                 {clearingSession() ? 'Clearing...' : 'Clear Session'}
               </button>
             </div>
-            <p class="text-on-surface-variant/60 text-xs mt-4 text-center">
+            <p class="text-on-surface-variant/60 text-body-small mt-4 text-center">
               Clear saved session will remove stored credentials and return to
               login
             </p>
@@ -571,7 +569,7 @@ export default function SettingsPage(props: SettingsPageProps) {
 
         {/* Version Footer */}
         <div class="py-8 text-center">
-          <p class="text-on-surface-variant/70 text-sm">
+          <p class="text-on-surface-variant/70 text-body-small">
             JMSR - Jellyfin MPV Shim Rust
           </p>
           <AppVersion />

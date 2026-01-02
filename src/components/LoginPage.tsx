@@ -103,21 +103,21 @@ export default function LoginPage(props: LoginPageProps) {
       <div class="w-full max-w-md">
         {/* Logo */}
         <div class="text-center mb-10">
-          <h1 class="text-5xl font-bold text-primary tracking-tighter drop-shadow-sm">
+          <h1 class="text-display-medium font-normal text-primary tracking-tight drop-shadow-sm">
             JMSR
           </h1>
-          <p class="text-on-surface-variant mt-3 text-base tracking-wide font-medium">
+          <p class="text-body-large text-on-surface-variant mt-2 tracking-wide font-normal">
             Jellyfin MPV Shim
           </p>
         </div>
 
         {/* Login Card */}
-        <div class="bg-surface-container rounded-3xl p-8 shadow-xl border border-outline-variant/30 relative overflow-hidden">
+        <div class="card-elevated relative overflow-hidden">
           {/* Surface Tint Overlay for Elevation 1 */}
           <div class="absolute inset-0 bg-surface-tint/[0.05] pointer-events-none" />
 
           <div class="relative z-10">
-            <h2 class="text-2xl font-normal text-on-surface mb-8 tracking-tight">
+            <h2 class="text-headline-small text-on-surface mb-8 tracking-tight">
               Connect to Server
             </h2>
 
@@ -150,7 +150,7 @@ export default function LoginPage(props: LoginPageProps) {
                     <div class="group">
                       <label
                         for={field().name}
-                        class="block text-xs font-medium text-on-surface-variant mb-1.5 ml-1 uppercase tracking-wider group-focus-within:text-primary transition-colors"
+                        class="text-label-medium block text-on-surface-variant mb-1 ml-1 uppercase tracking-wider group-focus-within:text-primary transition-colors"
                       >
                         Server URL
                       </label>
@@ -165,10 +165,10 @@ export default function LoginPage(props: LoginPageProps) {
                         onBlur={field().handleBlur}
                         placeholder="https://jellyfin.example.com"
                         disabled={isSubmitting()}
-                        class="w-full px-4 py-3.5 bg-surface-container-high border border-outline-variant/50 rounded-xl text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200 disabled:opacity-50"
+                        class="input-filled w-full"
                       />
                       <Show when={touched() && errors().length > 0}>
-                        <p class="text-error text-xs mt-1.5 ml-1 animate-in slide-in-from-top-1 fade-in duration-200">
+                        <p class="text-error text-body-small mt-1.5 ml-1 animate-in slide-in-from-top-1 fade-in duration-200">
                           {errors()[0]}
                         </p>
                       </Show>
@@ -193,7 +193,7 @@ export default function LoginPage(props: LoginPageProps) {
                     <div class="group">
                       <label
                         for={field().name}
-                        class="block text-xs font-medium text-on-surface-variant mb-1.5 ml-1 uppercase tracking-wider group-focus-within:text-primary transition-colors"
+                        class="text-label-medium block text-on-surface-variant mb-1 ml-1 uppercase tracking-wider group-focus-within:text-primary transition-colors"
                       >
                         Username
                       </label>
@@ -208,10 +208,10 @@ export default function LoginPage(props: LoginPageProps) {
                         onBlur={field().handleBlur}
                         placeholder="Enter your username"
                         disabled={isSubmitting()}
-                        class="w-full px-4 py-3.5 bg-surface-container-high border border-outline-variant/50 rounded-xl text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200 disabled:opacity-50"
+                        class="input-filled w-full"
                       />
                       <Show when={touched() && errors().length > 0}>
-                        <p class="text-error text-xs mt-1.5 ml-1 animate-in slide-in-from-top-1 fade-in duration-200">
+                        <p class="text-error text-body-small mt-1.5 ml-1 animate-in slide-in-from-top-1 fade-in duration-200">
                           {errors()[0]}
                         </p>
                       </Show>
@@ -227,7 +227,7 @@ export default function LoginPage(props: LoginPageProps) {
                   <div class="group">
                     <label
                       for={field().name}
-                      class="block text-xs font-medium text-on-surface-variant mb-1.5 ml-1 uppercase tracking-wider group-focus-within:text-primary transition-colors"
+                      class="text-label-medium block text-on-surface-variant mb-1 ml-1 uppercase tracking-wider group-focus-within:text-primary transition-colors"
                     >
                       Password
                     </label>
@@ -242,7 +242,7 @@ export default function LoginPage(props: LoginPageProps) {
                       onBlur={field().handleBlur}
                       placeholder="Enter your password"
                       disabled={isSubmitting()}
-                      class="w-full px-4 py-3.5 bg-surface-container-high border border-outline-variant/50 rounded-xl text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200 disabled:opacity-50"
+                      class="input-filled w-full"
                     />
                   </div>
                 )}
@@ -272,7 +272,7 @@ export default function LoginPage(props: LoginPageProps) {
                     </div>
                     <label
                       for={field().name}
-                      class="text-sm text-on-surface select-none cursor-pointer"
+                      class="text-body-medium text-on-surface select-none cursor-pointer"
                     >
                       Remember server and username
                     </label>
@@ -286,7 +286,7 @@ export default function LoginPage(props: LoginPageProps) {
                   <div class="mt-0.5">
                     <CircleAlert class="w-5 h-5" />
                   </div>
-                  <p class="text-sm font-medium">{error()}</p>
+                  <p class="text-body-medium font-medium">{error()}</p>
                 </div>
               </Show>
 
@@ -294,7 +294,7 @@ export default function LoginPage(props: LoginPageProps) {
               <button
                 type="submit"
                 disabled={isSubmitting()}
-                class="w-full py-3.5 px-6 bg-primary hover:bg-primary/90 active:bg-primary/80 text-on-primary font-semibold rounded-full shadow-sm hover:shadow-md active:shadow-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2 transform active:scale-[0.99]"
+                class="btn-primary w-full"
               >
                 <Show when={isSubmitting()} fallback="Connect">
                   <LoaderCircle class="animate-spin h-5 w-5" />
@@ -307,10 +307,10 @@ export default function LoginPage(props: LoginPageProps) {
 
         {/* Footer */}
         <div class="text-center mt-8">
-          <p class="text-on-surface-variant/70 text-sm">
+          <p class="text-on-surface-variant/70 text-body-small">
             Jellyfin MPV Shim Rust
           </p>
-          <AppVersion class="text-on-surface-variant/50 text-xs mt-1" />
+          <AppVersion />
         </div>
       </div>
     </div>

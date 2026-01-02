@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
-/* ==========================================================================
+/* ==========================================================================\
    Material Design 3 - Dark Theme
-   Generated from Jellyfin seed color #00A4DC
+   Generated from Jellyfin seed color #00A4DC (Purple/Blue variant)
    ========================================================================== */
 
 @theme {
@@ -33,83 +33,190 @@
   /* Surface colors */
   --color-surface: #0f1417;
   --color-on-surface: #dfe3e7;
-  --color-surface-variant: #41484d;
-  --color-on-surface-variant: #c0c7cd;
-  --color-surface-dim: #0f1417;
-  --color-surface-bright: #353a3d;
-  --color-surface-container-lowest: #0a0f12;
-  --color-surface-container-low: #181c1f;
-  --color-surface-container: #1c2023;
-  --color-surface-container-high: #262b2e;
-  --color-surface-container-highest: #313539;
+  --color-surface-variant: #40484c;
+  --color-on-surface-variant: #c0c8cc;
 
-  /* Background */
-  --color-background: #0f1417;
-  --color-on-background: #dfe3e7;
+  /* Surface Containers (M3 Elevation replacement) */
+  --color-surface-container-lowest: #0a0f11;
+  --color-surface-container-low: #171c1f;
+  --color-surface-container: #1b2023;
+  --color-surface-container-high: #252b2e;
+  --color-surface-container-highest: #303639;
 
   /* Outline */
-  --color-outline: #8b9297;
-  --color-outline-variant: #41484d;
+  --color-outline: #8a9296;
+  --color-outline-variant: #40484c;
 
-  /* Inverse colors */
-  --color-inverse-surface: #dfe3e7;
-  --color-inverse-on-surface: #2c3134;
-  --color-inverse-primary: #1c6585;
-
-  /* Surface tint */
-  --color-surface-tint: #8fcef3;
+  /* Background (matches surface in dark mode typically) */
+  --color-background: #0f1417;
+  --color-on-background: #dfe3e7;
 
   /* Shadow & Scrim */
   --color-shadow: #000000;
   --color-scrim: #000000;
 
-  /* Legacy aliases for backwards compatibility */
-  --color-jellyfin: #8fcef3;
-  --color-jellyfin-dark: #004c69;
-  --color-surface-light: #1c2023;
-  --color-surface-lighter: #262b2e;
+  /* Font Families (Optional overrides) */
+  --font-sans: "Roboto", ui-sans-serif, system-ui, sans-serif;
 }
 
-/* Base styles */
+/* ==========================================================================\
+   Base Styles
+   ========================================================================== */
 body {
-  @apply bg-background text-on-surface font-sans antialiased;
+  @apply bg-background text-on-surface font-sans antialiased selection:bg-primary-container selection:text-on-primary-container;
   margin: 0;
 }
 
-/* Form input styles */
-input[type="text"],
-input[type="password"],
-input[type="url"] {
-  @apply w-full px-4 py-3 bg-surface-container border border-outline-variant rounded-lg text-on-surface placeholder-on-surface-variant focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200;
+/* ==========================================================================\
+   M3 Typography Classes (Utility Helpers)
+   ========================================================================== */
+@layer components {
+  /* Display styles (Large, impressive headers) */
+  .text-display-large {
+    @apply text-[57px] leading-[64px] font-normal tracking-[-0.25px];
+  }
+  .text-display-medium {
+    @apply text-[45px] leading-[52px] font-normal tracking-[0px];
+  }
+  .text-display-small {
+    @apply text-[36px] leading-[44px] font-normal tracking-[0px];
+  }
+
+  /* Headline styles (Section headers) */
+  .text-headline-large {
+    @apply text-[32px] leading-[40px] font-normal tracking-[0px];
+  }
+  .text-headline-medium {
+    @apply text-[28px] leading-[36px] font-normal tracking-[0px];
+  }
+  .text-headline-small {
+    @apply text-[24px] leading-[32px] font-normal tracking-[0px];
+  }
+
+  /* Title styles (Card titles, Dialog titles) */
+  .text-title-large {
+    @apply text-[22px] leading-[28px] font-normal tracking-[0px];
+  }
+  .text-title-medium {
+    @apply text-[16px] leading-[24px] font-medium tracking-[0.15px];
+  }
+  .text-title-small {
+    @apply text-[14px] leading-[20px] font-medium tracking-[0.1px];
+  }
+
+  /* Body styles (Reading text) */
+  .text-body-large {
+    @apply text-[16px] leading-[24px] font-normal tracking-[0.5px];
+  }
+  .text-body-medium {
+    @apply text-[14px] leading-[20px] font-normal tracking-[0.25px];
+  }
+  .text-body-small {
+    @apply text-[12px] leading-[16px] font-normal tracking-[0.4px];
+  }
+
+  /* Label styles (Buttons, Captions) */
+  .text-label-large {
+    @apply text-[14px] leading-[20px] font-medium tracking-[0.1px];
+  }
+  .text-label-medium {
+    @apply text-[12px] leading-[16px] font-medium tracking-[0.5px];
+  }
+  .text-label-small {
+    @apply text-[11px] leading-[16px] font-medium tracking-[0.5px];
+  }
 }
 
-/* Button styles */
-.btn-primary {
-  @apply px-6 py-3 bg-primary hover:bg-primary-container text-on-primary hover:text-on-primary-container font-medium rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+/* ==========================================================================\
+   M3 Components
+   ========================================================================== */
+@layer components {
+  /* --- Inputs --- */
+
+  /* Basic Input style reset */
+  .input-base {
+    @apply w-full px-4 text-[16px] leading-[24px] font-normal tracking-[0.5px] text-on-surface bg-transparent focus:outline-none placeholder-on-surface-variant/70 transition-all duration-200;
+  }
+
+  /* M3 Filled Input (Standard) */
+  /* Usage: <div class="input-filled-container"><input class="input-base" .../><label>...</label></div> */
+  .input-filled {
+    @apply h-14 bg-surface-container-highest rounded-t-lg border-b border-on-surface-variant hover:bg-surface-container-highest/80 focus:border-b-2 focus:border-primary px-4 text-on-surface placeholder-on-surface-variant transition-colors;
+  }
+
+  /* M3 Outlined Input */
+  .input-outlined {
+    @apply h-14 bg-transparent rounded-lg border border-outline text-on-surface px-4 focus:border-2 focus:border-primary focus:text-primary transition-all;
+  }
+
+  /* Default Legacy Input Style (Kept for backward compatibility) */
+  input[type="text"]:not(.no-style),
+  input[type="password"]:not(.no-style),
+  input[type="url"]:not(.no-style) {
+    @apply h-12 w-full px-4 bg-surface-container border border-outline-variant rounded-lg text-on-surface placeholder-on-surface-variant focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-200;
+  }
+
+  /* --- Buttons --- */
+
+  /* 1. Filled Button (High Emphasis) */
+  .btn-primary {
+    @apply h-10 px-6 bg-primary text-on-primary text-[14px] leading-[20px] font-medium tracking-[0.1px] rounded-full hover:bg-primary/90 hover:shadow-md active:scale-[0.98] disabled:bg-on-surface/12 disabled:text-on-surface/38 disabled:shadow-none disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all duration-200 ease-out;
+  }
+
+  /* 2. Tonal Button (Medium Emphasis) */
+  .btn-tonal {
+    @apply h-10 px-6 bg-secondary-container text-on-secondary-container text-[14px] leading-[20px] font-medium tracking-[0.1px] rounded-full hover:bg-secondary-container/90 hover:shadow-sm active:scale-[0.98] disabled:bg-on-surface/12 disabled:text-on-surface/38 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all duration-200 ease-out;
+  }
+
+  /* Backward compatibility alias for existing code */
+  .btn-secondary {
+    @apply h-10 px-6 bg-secondary-container text-on-secondary-container text-[14px] leading-[20px] font-medium tracking-[0.1px] rounded-full hover:bg-secondary-container/90 hover:shadow-sm active:scale-[0.98] disabled:bg-on-surface/12 disabled:text-on-surface/38 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all duration-200 ease-out;
+  }
+
+  /* 3. Outlined Button (Low Emphasis) */
+  .btn-outlined {
+    @apply h-10 px-6 bg-transparent border border-outline text-primary text-[14px] leading-[20px] font-medium tracking-[0.1px] rounded-full hover:bg-primary/8 focus:ring-2 focus:ring-primary active:bg-primary/12 disabled:border-on-surface/12 disabled:text-on-surface/38 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all duration-200 ease-out;
+  }
+
+  /* 4. Text Button (Lowest Emphasis) */
+  .btn-text {
+    @apply h-10 px-4 bg-transparent text-primary text-[14px] leading-[20px] font-medium tracking-[0.1px] rounded-full min-w-[64px] hover:bg-primary/8 active:bg-primary/12 disabled:text-on-surface/38 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all duration-200 ease-out;
+  }
+
+  /* 5. Icon Button */
+  .btn-icon {
+    @apply w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-on-surface-variant/8 active:bg-on-surface-variant/12 transition-colors;
+  }
+
+  /* --- Cards --- */
+
+  /* Elevated Card */
+  .card-elevated {
+    @apply bg-surface-container-low rounded-xl p-4 shadow-md text-on-surface transition-shadow hover:shadow-lg;
+  }
+
+  /* Filled Card (Default) */
+  .card-filled {
+    @apply bg-surface-container-highest rounded-xl p-4 text-on-surface border border-transparent;
+  }
+
+  /* Outlined Card */
+  .card-outlined {
+    @apply bg-surface rounded-xl p-4 border border-outline-variant text-on-surface;
+  }
 }
 
-.btn-secondary {
-  @apply px-6 py-3 bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-medium rounded-lg border border-outline-variant transition-all duration-200;
+/* Scrollbar Styling (Optional but recommended for Desktop Apps) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
-
-/* Card styles */
-.card {
-  @apply bg-surface-container rounded-xl p-6 border border-outline-variant;
+::-webkit-scrollbar-track {
+  @apply bg-surface-container;
 }
-
-.card-elevated {
-  @apply bg-surface-container-low rounded-xl p-6 shadow-lg;
+::-webkit-scrollbar-thumb {
+  @apply bg-outline-variant rounded-full;
 }
-
-/* Text styles */
-.text-label {
-  @apply text-on-surface-variant text-sm;
-}
-
-.text-body {
-  @apply text-on-surface;
-}
-
-.text-headline {
-  @apply text-on-surface font-semibold;
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-outline;
 }
