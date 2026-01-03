@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Default capabilities for JMSR desktop app",
-  "windows": ["main"],
+  "windows": ["main", "player"],
   "permissions": [
     "core:default",
     "core:window:allow-close",

@@ -26,7 +26,7 @@ pub fn run() {
 
   // Create MPV client state
   let mpv_client = Arc::new(MpvClient::new(None));
-  let mpv_state = MpvState(mpv_client.clone());
+  let mpv_state = MpvState::new(mpv_client.clone());
   let mpv_for_setup = mpv_client.clone();
 
   // Create Jellyfin client state

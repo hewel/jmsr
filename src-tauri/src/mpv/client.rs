@@ -54,6 +54,33 @@ impl MpvClient {
     *self.extra_args.lock() = args;
   }
 
+  /// Set an externally spawned child process (used for embedded mode).
+  /// This allows the client to track and manage a process spawned outside the normal start() flow.
+  pub fn set_embedded_child(&self, child: Child) {
+    let mut process = self.process.lock();
+    *process = Some(child);
+  }
+
+  /// Connect to IPC after an externally spawned MPV process.
+  /// Used for embedded mode where spawn happens separately.
+  pub async fn connect_ipc(&self) -> Result<(), MpvError> {
+    // Cleanup any stale socket first
+    cleanup_ipc();
+
+    // Wait a bit for MPV to create the socket
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    // Connect to IPC with retries
+    let ipc_conn = MpvIpc::connect(&ipc_path(), 10).await?;
+    {
+      let mut ipc = self.ipc.lock();
+      *ipc = Some(Arc::new(ipc_conn));
+    }
+
+    log::info!("MPV IPC connected (embedded mode)");
+    Ok(())
+  }
+
   /// Start MPV and connect to IPC.
   pub async fn start(&self) -> Result<(), MpvError> {
     // Cleanup any existing socket

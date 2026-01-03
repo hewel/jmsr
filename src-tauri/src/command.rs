@@ -3,12 +3,12 @@ use serde::{Deserialize, Serialize};
 use specta::specta;
 use specta_typescript::Typescript;
 use std::sync::Arc;
-use tauri::State;
+use tauri::{Manager, State};
 use tauri_specta::{collect_commands, collect_events, Builder, Event};
 
 use crate::config::AppConfig;
 use crate::jellyfin::{ConnectionState, Credentials, JellyfinClient, SavedSession, SessionManager};
-use crate::mpv::{write_input_conf, MpvClient, PropertyValue};
+use crate::mpv::{spawn_embedded_mpv, write_input_conf, MpvClient, PropertyValue};
 
 // ============================================================================
 // Events
@@ -198,7 +198,20 @@ impl Default for PlayerState {
 }
 
 /// MPV client state managed by Tauri.
-pub struct MpvState(pub Arc<MpvClient>);
+pub struct MpvState {
+  pub client: Arc<MpvClient>,
+  /// The embedded player window label, if active
+  pub player_window: RwLock<Option<String>>,
+}
+
+impl MpvState {
+  pub fn new(client: Arc<MpvClient>) -> Self {
+    Self {
+      client,
+      player_window: RwLock::new(None),
+    }
+  }
+}
 
 /// Jellyfin client state managed by Tauri.
 pub struct JellyfinState {
@@ -225,14 +238,26 @@ impl JellyfinState {
 #[tauri::command]
 #[specta]
 pub async fn mpv_start(state: State<'_, MpvState>) -> Result<(), CommandError> {
-  state.0.start().await.map_err(internal_err)
+  state.client.start().await.map_err(internal_err)
 }
 
 /// Stop the MPV player.
 #[tauri::command]
 #[specta]
-pub async fn mpv_stop(state: State<'_, MpvState>) -> Result<(), CommandError> {
-  state.0.stop().await;
+pub async fn mpv_stop(
+  app: tauri::AppHandle,
+  state: State<'_, MpvState>,
+) -> Result<(), CommandError> {
+  state.client.stop().await;
+
+  // Close the player window if embedded mode was active
+  if let Some(label) = state.player_window.write().take() {
+    if let Some(window) = app.get_webview_window(&label) {
+      let _ = window.close();
+      log::info!("Closed embedded player window");
+    }
+  }
+
   Ok(())
 }
 
@@ -246,7 +271,7 @@ pub async fn mpv_loadfile(state: State<'_, MpvState>, url: String) -> Result<(),
       "Only http:// and https:// URLs are allowed",
     ));
   }
-  state.0.loadfile(&url).await.map_err(internal_err)
+  state.client.loadfile(&url).await.map_err(internal_err)
 }
 
 /// Seek to absolute position in seconds.
@@ -256,14 +281,14 @@ pub async fn mpv_seek(state: State<'_, MpvState>, time: f64) -> Result<(), Comma
   if time < 0.0 {
     return Err(CommandError::invalid_input("Seek time cannot be negative"));
   }
-  state.0.seek(time).await.map_err(internal_err)
+  state.client.seek(time).await.map_err(internal_err)
 }
 
 /// Set pause state.
 #[tauri::command]
 #[specta]
 pub async fn mpv_set_pause(state: State<'_, MpvState>, paused: bool) -> Result<(), CommandError> {
-  state.0.set_pause(paused).await.map_err(internal_err)
+  state.client.set_pause(paused).await.map_err(internal_err)
 }
 
 /// Set volume (0-100).
@@ -275,7 +300,7 @@ pub async fn mpv_set_volume(state: State<'_, MpvState>, volume: f64) -> Result<(
       "Volume must be between 0 and 100",
     ));
   }
-  state.0.set_volume(volume).await.map_err(internal_err)
+  state.client.set_volume(volume).await.map_err(internal_err)
 }
 
 /// Set audio track by ID.
@@ -283,7 +308,7 @@ pub async fn mpv_set_volume(state: State<'_, MpvState>, volume: f64) -> Result<(
 #[specta]
 pub async fn mpv_set_audio_track(state: State<'_, MpvState>, id: i32) -> Result<(), CommandError> {
   state
-    .0
+    .client
     .set_audio_track(id as i64)
     .await
     .map_err(internal_err)
@@ -294,7 +319,7 @@ pub async fn mpv_set_audio_track(state: State<'_, MpvState>, id: i32) -> Result<
 #[specta]
 pub async fn mpv_set_subtitle_track(state: State<'_, MpvState>, id: i32) -> Result<(), CommandError> {
   state
-    .0
+    .client
     .set_subtitle_track(id as i64)
     .await
     .map_err(internal_err)
@@ -307,23 +332,23 @@ pub async fn mpv_get_property(
   state: State<'_, MpvState>,
   name: String,
 ) -> Result<PropertyValue, CommandError> {
-  state.0.get_property(&name).await.map_err(internal_err)
+  state.client.get_property(&name).await.map_err(internal_err)
 }
 
 /// Get current player state.
 #[tauri::command]
 #[specta]
 pub async fn mpv_get_state(state: State<'_, MpvState>) -> Result<PlayerState, CommandError> {
-  if !state.0.is_connected() {
+  if !state.client.is_connected() {
     return Ok(PlayerState::default());
   }
 
   // Fetch all properties in parallel for better performance
   let (paused_res, time_pos_res, duration_res, volume_res) = tokio::join!(
-    state.0.get_property("pause"),
-    state.0.get_property("time-pos"),
-    state.0.get_property("duration"),
-    state.0.get_property("volume"),
+    state.client.get_property("pause"),
+    state.client.get_property("time-pos"),
+    state.client.get_property("duration"),
+    state.client.get_property("volume"),
   );
 
   let paused = match paused_res {
@@ -375,7 +400,109 @@ pub async fn mpv_get_state(state: State<'_, MpvState>) -> Result<PlayerState, Co
 #[tauri::command]
 #[specta]
 pub fn mpv_is_connected(state: State<'_, MpvState>) -> bool {
-  state.0.is_connected()
+  state.client.is_connected()
+}
+
+/// Spawn MPV embedded in a dedicated player window.
+///
+/// Creates a new borderless window and starts MPV with --wid pointing to it,
+/// causing MPV to render directly inside the window.
+///
+/// **Windows only** - Returns an error on other platforms.
+#[tauri::command]
+#[specta]
+pub async fn mpv_spawn_embedded(
+  app: tauri::AppHandle,
+  state: State<'_, MpvState>,
+  config_state: State<'_, ConfigState>,
+  video_url: String,
+) -> Result<(), CommandError> {
+  use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+  use tauri::{WebviewUrl, WebviewWindowBuilder};
+
+  // Validate URL scheme for security (same as mpv_loadfile)
+  if !video_url.starts_with("http://") && !video_url.starts_with("https://") {
+    return Err(CommandError::invalid_input(
+      "Only http:// and https:// URLs are allowed",
+    ));
+  }
+
+  // Create a dedicated player window with transparent HTML (so MPV can render behind it)
+  let player_window = WebviewWindowBuilder::new(&app, "player", WebviewUrl::App("player.html".into()))
+    .title("JMSR Player")
+    .inner_size(1280.0, 720.0)
+    .decorations(false)
+    .transparent(true)
+    .resizable(true)
+    .center()
+    .build()
+    .map_err(|e| CommandError::internal(format!("Failed to create player window: {}", e)))?;
+
+  log::info!("Created player window");
+
+  // Extract HWND synchronously (WindowHandle is not Send)
+  let hwnd: isize = {
+    let handle = player_window
+      .window_handle()
+      .map_err(|e| CommandError::internal(format!("Failed to get window handle: {}", e)))?;
+
+    match handle.as_raw() {
+      #[cfg(target_os = "windows")]
+      RawWindowHandle::Win32(win32_handle) => win32_handle.hwnd.get(),
+      #[allow(unreachable_patterns)]
+      _ => {
+        let _ = player_window.close();
+        return Err(CommandError::internal(
+          "Embedded MPV is only supported on Windows",
+        ));
+      }
+    }
+  };
+
+  // Extract config synchronously (RwLockReadGuard is not Send)
+  let (mpv_path, extra_args) = {
+    let config = config_state.0.read();
+    let mpv_path = config
+      .mpv_path
+      .as_ref()
+      .filter(|s| !s.is_empty())
+      .map(std::path::PathBuf::from);
+    let extra_args = config.mpv_args.clone();
+    (mpv_path, extra_args)
+  };
+
+  // Spawn embedded MPV in a blocking task
+  let child = tauri::async_runtime::spawn_blocking(move || {
+    spawn_embedded_mpv(mpv_path.as_ref(), &extra_args, hwnd, &video_url)
+  })
+  .await
+  .map_err(|e| CommandError::internal(format!("Task join error: {}", e)))?
+  .map_err(|e| {
+    let _ = player_window.close();
+    internal_err(e)
+  })?;
+
+  log::info!("Embedded MPV spawned with PID: {}", child.id());
+
+  // Store the child process in MpvState for lifecycle management
+  state.client.set_embedded_child(child);
+
+  // Connect to IPC so MPV can be controlled
+  if let Err(e) = state.client.connect_ipc().await {
+    log::error!("Failed to connect IPC after embedded spawn: {}", e);
+    // Clean up the spawned process and window since we can't control it
+    state.client.stop().await;
+    let _ = player_window.close();
+    return Err(CommandError::internal(format!(
+      "Embedded MPV spawned but IPC connection failed: {}",
+      e
+    )));
+  }
+
+  // Store the player window label for cleanup later
+  *state.player_window.write() = Some("player".to_string());
+
+  Ok(())
 }
 
 // ============================================================================
@@ -552,8 +679,8 @@ pub async fn config_set(
     .as_ref()
     .filter(|s| !s.is_empty())
     .map(PathBuf::from);
-  mpv_state.0.set_mpv_path(mpv_path);
-  mpv_state.0.set_extra_args(config.mpv_args.clone());
+  mpv_state.client.set_mpv_path(mpv_path);
+  mpv_state.client.set_extra_args(config.mpv_args.clone());
   log::info!("MPV config updated (applies on next spawn)");
 
   // Apply Jellyfin device name change if connected
@@ -653,6 +780,7 @@ pub fn specta_builder() -> Builder {
       mpv_get_property,
       mpv_get_state,
       mpv_is_connected,
+      mpv_spawn_embedded,
       // Jellyfin commands
       jellyfin_connect,
       jellyfin_disconnect,

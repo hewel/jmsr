@@ -90,6 +90,7 @@ dependencies = [
  "futures-util",
  "log",
  "parking_lot",
+ "raw-window-handle",
  "reqwest",
  "serde",
  "serde_json",

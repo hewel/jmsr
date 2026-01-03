@@ -8,7 +8,13 @@ import {
   RefreshCw,
   Trash2,
 } from 'lucide-solid';
-import { createEffect, createResource, createSignal, Show } from 'solid-js';
+import {
+  createEffect,
+  createResource,
+  createSignal,
+  onMount,
+  Show,
+} from 'solid-js';
 import { type AppConfig, type ConnectionState, commands } from '../bindings';
 import { clearSavedSession } from '../router';
 import LogPanel from './LogPanel';
@@ -48,6 +54,14 @@ export default function SettingsPage(props: SettingsPageProps) {
     createResource(fetchConnectionState);
   const [mpvConnected, { refetch: refetchMpv }] =
     createResource(fetchMpvStatus);
+  const [mpvEmbedded] = createResource(() =>
+    commands.mpvSpawnEmbedded(
+      'http://10.0.0.27:8096/Items/7ab9e3336a51d629ea49f4e0be0be7d7/Download?api_key=7a6e8f25c83e4bc38149cb47b6cbbb48',
+    ),
+  );
+  onMount(() => {
+    mpvEmbedded();
+  });
 
   // Load initial configuration
   const [initialConfig] = createResource(async () => {

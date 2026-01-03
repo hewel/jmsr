@@ -122,6 +122,22 @@ async mpvIsConnected() : Promise<boolean> {
     return await TAURI_INVOKE("mpv_is_connected");
 },
 /**
+ * Spawn MPV embedded in a dedicated player window.
+ * 
+ * Creates a new borderless window and starts MPV with --wid pointing to it,
+ * causing MPV to render directly inside the window.
+ * 
+ * **Windows only** - Returns an error on other platforms.
+ */
+async mpvSpawnEmbedded(videoUrl: string) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("mpv_spawn_embedded", { videoUrl }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Connect to a Jellyfin server.
  */
 async jellyfinConnect(credentials: Credentials) : Promise<Result<null, CommandError>> {

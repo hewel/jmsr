@@ -4,6 +4,9 @@ use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use thiserror::Error;
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
 #[derive(Error, Debug)]
 pub enum ProcessError {
   #[error("MPV executable not found")]
@@ -218,4 +221,82 @@ pub fn cleanup_ipc() {
     let _ = std::fs::remove_file(&path);
   }
   // Windows named pipes are cleaned up automatically
+}
+
+/// Spawn MPV embedded in a parent window using --wid.
+///
+/// # Arguments
+/// * `mpv_path` - Optional custom path to MPV executable
+/// * `extra_args` - Additional arguments to pass to MPV
+/// * `hwnd` - The native window handle (HWND on Windows) as an integer
+/// * `video_url` - URL or path to the video file to play
+///
+/// # Platform Support
+/// Currently only implemented for Windows. Returns an error on other platforms.
+#[cfg(windows)]
+pub fn spawn_embedded_mpv(
+  mpv_path: Option<&PathBuf>,
+  extra_args: &[String],
+  hwnd: isize,
+  video_url: &str,
+) -> Result<Child, ProcessError> {
+  const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+  let mpv_exe = mpv_path
+    .cloned()
+    .or_else(find_mpv)
+    .ok_or(ProcessError::NotFound)?;
+
+  let ipc = ipc_path();
+
+  log::info!(
+    "Spawning embedded MPV: {:?} with --wid={} IPC: {}",
+    mpv_exe,
+    hwnd,
+    ipc
+  );
+  if !extra_args.is_empty() {
+    log::info!("Extra MPV args: {:?}", extra_args);
+  }
+
+  let mut cmd = Command::new(&mpv_exe);
+  cmd
+    .arg(format!("--wid={}", hwnd))
+    .arg(format!("--input-ipc-server={}", ipc))
+    .arg("--keep-open=no")
+    .arg("--no-terminal")
+    .arg("--osc")
+    .arg("--no-border")
+    .arg("--no-keepaspect-window")
+    .arg(video_url);
+
+  // Add JMSR keybindings via input.conf
+  if let Some(input_conf) = ensure_input_conf() {
+    cmd.arg(format!("--input-conf={}", input_conf.display()));
+    log::info!("Using JMSR input.conf: {:?}", input_conf);
+  }
+
+  // Add user-specified extra arguments
+  for arg in extra_args {
+    cmd.arg(arg);
+  }
+
+  let child = cmd
+    .stdin(Stdio::null())
+    .stdout(Stdio::null())
+    .stderr(Stdio::null())
+    .creation_flags(CREATE_NO_WINDOW)
+    .spawn()?;
+
+  Ok(child)
+}
+
+#[cfg(not(windows))]
+pub fn spawn_embedded_mpv(
+  _mpv_path: Option<&PathBuf>,
+  _extra_args: &[String],
+  _hwnd: isize,
+  _video_url: &str,
+) -> Result<Child, ProcessError> {
+  Err(ProcessError::NotFound) // TODO: Implement for other platforms
 }

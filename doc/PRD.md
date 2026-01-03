@@ -6,8 +6,9 @@
 **Goal:** Develop a high-performance, memory-safe, and stable replacement for the existing Python-based `jellyfin-mpv-shim`.
 **Core Philosophy:**
 
-1. **External Player Only:** The application must **not** embed `libmpv`. It acts strictly as a "Bridge/Controller" that spawns and controls a standalone `mpv` executable via JSON IPC. This ensures maximum video quality and compatibility with user custom configs (`mpv.conf`) and shaders.
-2. **Type Safety:** Utilize `tauri-specta` to ensure 100% type-safe communication between the Rust backend and the TypeScript frontend.
+1. **External Player First:** The primary mode spawns and controls a standalone `mpv` executable via JSON IPC. This ensures maximum video quality and compatibility with user custom configs (`mpv.conf`) and shaders.
+2. **Optional Embedded Mode:** For users who prefer an integrated experience, an optional embedded mode renders MPV directly within the Tauri window using `--wid` (Windows only for now). This sacrifices some MPV window management features for a unified UI.
+3. **Type Safety:** Utilize `tauri-specta` to ensure 100% type-safe communication between the Rust backend and the TypeScript frontend.
 
 ## 2. Technology Stack
 
@@ -65,6 +66,21 @@ The system is composed of three distinct actors:
 * **Lifecycle Management:**
 * **Aggressive Cleanup:** Configurable option to terminate the MPV process completely when playback stops (to clear VRAM/Memory leaks) and respawn on the next play command.
 * **Crash Recovery:** Detect unexpected process termination and auto-respawn or alert the user.
+
+### 4.1.1. Embedded Mode (Optional)
+
+An alternative playback mode where MPV renders directly inside the Tauri application window.
+
+* **Implementation:** Uses `--wid={hwnd}` to parent MPV's video output to the native window handle.
+* **Platform Support:** Windows only (uses `raw-window-handle` to get HWND).
+* **Window Configuration:** Tauri window must have `transparent: true` for proper video rendering.
+* **Trade-offs:**
+  * ✅ Unified UI experience - video plays inside the app
+  * ✅ Simpler window management for users
+  * ❌ Cannot use MPV independently while embedded
+  * ❌ Some MPV OSD/keybinding features may behave differently
+  * ❌ Fullscreen/multi-monitor handling is more complex
+* **Command:** `mpv_spawn_embedded(video_url)` - spawns MPV with `--wid` pointing to main window
 
 
 

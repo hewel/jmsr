@@ -70,7 +70,7 @@ pub fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
       match event.id.as_ref() {
         MENU_PLAY_PAUSE => {
           let mpv_state = app.state::<MpvState>();
-          let mpv = mpv_state.0.clone();
+          let mpv = mpv_state.client.clone();
           tauri::async_runtime::spawn(async move {
             // Toggle pause state
             match mpv.get_pause().await {
@@ -109,7 +109,7 @@ pub fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         }
         MENU_MUTE => {
           let mpv_state = app.state::<MpvState>();
-          let mpv = mpv_state.0.clone();
+          let mpv = mpv_state.client.clone();
           tauri::async_runtime::spawn(async move {
             if let Err(e) = mpv.toggle_mute().await {
               log::error!("Failed to toggle mute: {}", e);
