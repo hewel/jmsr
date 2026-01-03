@@ -28,6 +28,8 @@ pub enum MpvAction {
     audio_index: Option<i32>,
     subtitle_index: Option<i32>,
   },
+  /// Add an external subtitle file.
+  AddExternalSubtitle(String),
   /// Pause playback.
   Pause,
   /// Resume playback.
@@ -367,6 +369,12 @@ impl SessionManager {
                 }
               }
             }
+            MpvAction::AddExternalSubtitle(url) => {
+              log::info!("MpvAction::AddExternalSubtitle: {}", redact_url(&url));
+              if let Err(e) = mpv.sub_add(&url, true).await {
+                log::error!("Failed to add external subtitle: {}", e);
+              }
+            }
           }
         }
       });
@@ -390,7 +398,7 @@ impl SessionManager {
         Self::handle_playstate(client, state, action_tx, mpv, request).await?;
       }
       JellyfinCommand::GeneralCommand(request) => {
-        Self::handle_general_command(state, action_tx, app_handle, request).await?;
+        Self::handle_general_command(client, state, action_tx, app_handle, request).await?;
       }
     }
     Ok(())
@@ -561,13 +569,32 @@ impl SessionManager {
         jellyfin_to_mpv_track_index(&media_source.media_streams, "Audio", idx)
       }
     });
-    let mpv_subtitle_index = subtitle_index.map(|idx| {
+
+    // Check if the selected subtitle is external
+    // External subtitles need to be loaded via sub-add command, not via loadfile options
+    let external_subtitle_stream = subtitle_index.and_then(|idx| {
       if idx < 0 {
-        idx // -1 means disable
+        None // Disabled subtitles
       } else {
-        jellyfin_to_mpv_track_index(&media_source.media_streams, "Subtitle", idx)
+        media_source.media_streams.iter().find(|s| {
+          s.stream_type == "Subtitle" && s.index == idx && s.is_external
+        })
       }
     });
+
+    // For external subtitles, we don't pass sid to loadfile - we'll use sub-add instead
+    let mpv_subtitle_index = if external_subtitle_stream.is_some() {
+      log::info!("Selected subtitle is external, will use sub-add command");
+      None // Don't set sid in loadfile for external subs
+    } else {
+      subtitle_index.map(|idx| {
+        if idx < 0 {
+          idx // -1 means disable
+        } else {
+          jellyfin_to_mpv_track_index(&media_source.media_streams, "Subtitle", idx)
+        }
+      })
+    };
 
     // Send action to MPV with converted indices
     log::info!(
@@ -584,6 +611,20 @@ impl SessionManager {
       })
       .await;
     log::info!("MpvAction::Play sent successfully");
+
+    // Load external subtitle if the selected subtitle is external
+    if let Some(ext_sub_stream) = external_subtitle_stream {
+      if let Some(sub_url) = client.build_subtitle_url(item_id, &media_source.id, ext_sub_stream) {
+        log::info!(
+          "Loading external subtitle: codec={:?}, url={}",
+          ext_sub_stream.codec,
+          redact_url(&sub_url)
+        );
+        let _ = action_tx.send(MpvAction::AddExternalSubtitle(sub_url)).await;
+      } else {
+        log::warn!("Failed to build external subtitle URL");
+      }
+    }
 
     Ok(())
   }
@@ -844,6 +885,7 @@ impl SessionManager {
 
   /// Handle GeneralCommand.
   async fn handle_general_command(
+    client: &JellyfinClient,
     state: &RwLock<SessionState>,
     action_tx: &mpsc::Sender<MpvAction>,
     app_handle: &AppHandle,
@@ -923,17 +965,20 @@ impl SessionManager {
           });
           if let Some(index) = index {
             log::info!("SetSubtitleStreamIndex: {} (Jellyfin index)", index);
-            // Update playback state and save series preference
-            let mpv_index = {
+            
+            // Collect data we need while holding the lock
+            let (mpv_action, item_id, media_source_id) = {
               let mut s = state.write();
+              
+              // Update playback state
               if let Some(ref mut playback) = s.playback {
                 playback.subtitle_stream_index = Some(index as i32);
               }
-              // Save preference for series (clone to avoid borrow issues)
+              
+              // Save preference for series
               let series_id = s.current_series_id.clone();
               if let Some(series_id) = series_id {
                 if index == -1 {
-                  // User disabled subtitles
                   log::info!("Saving subtitle disabled preference for series {}", series_id);
                   let pref = s.series_preferences.entry(series_id).or_default();
                   pref.is_subtitle_enabled = false;
@@ -941,7 +986,6 @@ impl SessionManager {
                   pref.subtitle_title = None;
                   should_save_prefs = true;
                 } else {
-                  // Find the language and title of the selected subtitle track
                   let track_info = s.current_media_streams
                     .iter()
                     .find(|stream| stream.stream_type == "Subtitle" && stream.index == index as i32)
@@ -957,22 +1001,56 @@ impl SessionManager {
                     pref.subtitle_language = lang;
                     pref.subtitle_title = title;
                   } else {
-                    // Track selected but no language - just enable subtitles
                     pref.is_subtitle_enabled = true;
                   }
                   should_save_prefs = true;
                 }
               }
-              // Convert Jellyfin stream index to MPV track index (or -1 to disable)
+              
+              // Determine action: external subtitle via sub-add or internal via sid
               if index == -1 {
-                -1
+                // Disable subtitles
+                (MpvAction::SetSubtitleTrack(-1), None, None)
               } else {
-                jellyfin_to_mpv_track_index(&s.current_media_streams, "Subtitle", index as i32)
+                // Find the subtitle stream
+                let external_stream = s.current_media_streams
+                  .iter()
+                  .find(|stream| {
+                    stream.stream_type == "Subtitle" && stream.index == index as i32 && stream.is_external
+                  })
+                  .cloned();
+                
+                if let Some(ext_stream) = external_stream {
+                  // External subtitle - need to use sub-add
+                  let item_id = s.playback.as_ref().map(|p| p.item_id.clone());
+                  let media_source_id = s.playback.as_ref().and_then(|p| p.media_source_id.clone());
+                  // Return placeholder action - we'll build the URL outside the lock
+                  (MpvAction::SetSubtitleTrack(-1), item_id, media_source_id.map(|id| (id, ext_stream)))
+                } else {
+                  // Internal subtitle - convert index and use sid
+                  let mpv_idx = jellyfin_to_mpv_track_index(&s.current_media_streams, "Subtitle", index as i32);
+                  (MpvAction::SetSubtitleTrack(mpv_idx), None, None)
+                }
               }
             };
-            // Send to MPV with converted index
-            log::info!("SetSubtitleStreamIndex: {} (MPV index)", mpv_index);
-            let _ = action_tx.send(MpvAction::SetSubtitleTrack(mpv_index)).await;
+            
+            // Handle the action
+            match (item_id, media_source_id) {
+              (Some(item_id), Some((ms_id, ext_stream))) => {
+                // External subtitle - build URL and use sub-add
+                if let Some(sub_url) = client.build_subtitle_url(&item_id, &ms_id, &ext_stream) {
+                  log::info!("SetSubtitleStreamIndex: loading external subtitle via sub-add");
+                  let _ = action_tx.send(MpvAction::AddExternalSubtitle(sub_url)).await;
+                } else {
+                  log::warn!("Failed to build external subtitle URL");
+                }
+              }
+              _ => {
+                // Internal subtitle or disable
+                log::info!("SetSubtitleStreamIndex: sending {:?}", mpv_action);
+                let _ = action_tx.send(mpv_action).await;
+              }
+            }
           }
         }
       }

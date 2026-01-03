@@ -113,6 +113,18 @@ impl MpvCommand {
   pub fn unobserve_property(observer_id: i64) -> Self {
     Self::new(vec!["unobserve_property".into(), observer_id.into()])
   }
+
+  /// Add an external subtitle file.
+  ///
+  /// MPV sub-add format: `sub-add <url> [<flags> [<title> [<lang>]]]`
+  /// Flags: "select" (select immediately), "auto" (don't select), "cached" (cache only)
+  pub fn sub_add(url: &str, flags: Option<&str>) -> Self {
+    let mut args: Vec<serde_json::Value> = vec!["sub-add".into(), url.into()];
+    if let Some(f) = flags {
+      args.push(f.into());
+    }
+    Self::new(args)
+  }
 }
 
 /// Response from MPV for a command.

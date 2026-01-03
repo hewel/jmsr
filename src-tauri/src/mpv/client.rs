@@ -317,6 +317,16 @@ impl MpvClient {
     Ok(())
   }
 
+  /// Add an external subtitle file and optionally select it.
+  ///
+  /// When `select` is true, the subtitle is immediately selected after loading.
+  pub async fn sub_add(&self, url: &str, select: bool) -> Result<(), MpvError> {
+    log::info!("Adding external subtitle (select={}): {}", select, url);
+    let flags = if select { Some("select") } else { None };
+    self.send(MpvCommand::sub_add(url, flags)).await?;
+    Ok(())
+  }
+
   /// Quit MPV gracefully.
   pub async fn quit(&self) -> Result<(), MpvError> {
     let _ = self.send(MpvCommand::quit()).await;

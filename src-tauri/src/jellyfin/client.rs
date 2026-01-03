@@ -398,6 +398,51 @@ impl JellyfinClient {
     ))
   }
 
+  /// Build external subtitle URL with correct format extension.
+  ///
+  /// Uses the subtitle's codec to determine the file extension (ass, ssa, srt, vtt).
+  /// This prevents Jellyfin from attempting to transcode the subtitle, which can fail
+  /// for formats like ASS/SSA when requesting as SRT.
+  ///
+  /// MPV natively supports all these formats, so we should always request the original.
+  pub fn build_subtitle_url(
+    &self,
+    item_id: &str,
+    media_source_id: &str,
+    stream: &MediaStream,
+  ) -> Option<String> {
+    let state = self.state.read();
+    let server_url = state.server_url.as_ref()?;
+    let token = state.access_token.as_ref()?;
+
+    // Normalize codec to lowercase for case-insensitive matching.
+    // Jellyfin can report codecs in various cases (e.g., "PGSSUB", "ass", "subrip").
+    let codec = stream.codec.as_deref().unwrap_or("").to_ascii_lowercase();
+
+    // Map codec to file extension (prevents transcoding)
+    let ext = match codec.as_str() {
+      "ass" => "ass",
+      "ssa" => "ssa",
+      "subrip" | "srt" => "srt",
+      "webvtt" | "vtt" => "vtt",
+      // Bitmap subtitle formats
+      "pgs" | "pgssub" | "hdmv_pgs_subtitle" => "sup",
+      "dvdsub" | "dvd_subtitle" | "vobsub" => "sub",
+      "dvbsub" | "dvb_subtitle" => "sub",
+      // Other text formats
+      "mov_text" => "srt", // MP4 timed text - request as SRT
+      "ttml" => "ttml",
+      _ => "srt", // fallback for unknown codecs
+    };
+
+    // Jellyfin subtitle endpoint format:
+    // /Videos/{itemId}/{mediaSourceId}/Subtitles/{streamIndex}/Stream.{format}
+    Some(format!(
+      "{}/Videos/{}/{}/Subtitles/{}/Stream.{}?api_key={}",
+      server_url, item_id, media_source_id, stream.index, ext, token
+    ))
+  }
+
   /// Get WebSocket URL for session.
   pub fn websocket_url(&self) -> Result<String, JellyfinError> {
     let state = self.state.read();
