@@ -1,3 +1,5 @@
+import { css, cx } from '../../../styled-system/css';
+
 type StatusBadgeVariant = 'success' | 'warning' | 'error' | 'neutral';
 
 interface StatusBadgeProps {
@@ -11,22 +13,48 @@ interface StatusBadgeProps {
 export default function StatusBadge(props: StatusBadgeProps) {
   const variant = () => props.variant ?? 'neutral';
 
-  const variantClasses = () => {
+  const variantStyles = () => {
     switch (variant()) {
       case 'success':
-        return 'bg-tertiary-container text-on-tertiary-container border-tertiary/20';
+        return css({
+          backgroundColor: 'tertiaryContainer',
+          color: 'onTertiaryContainer',
+          borderColor: 'tertiary/20',
+        });
       case 'warning':
-        return 'bg-secondary-container text-on-secondary-container border-secondary/20';
+        return css({
+          backgroundColor: 'secondaryContainer',
+          color: 'onSecondaryContainer',
+          borderColor: 'secondary/20',
+        });
       case 'error':
-        return 'bg-error-container text-on-error-container border-error/20';
+        return css({
+          backgroundColor: 'errorContainer',
+          color: 'onErrorContainer',
+          borderColor: 'error/20',
+        });
       default:
-        return 'bg-surface-container-highest text-on-surface-variant border-outline-variant';
+        return css({
+          backgroundColor: 'surfaceContainerHighest',
+          color: 'onSurfaceVariant',
+          borderColor: 'outlineVariant',
+        });
     }
   };
 
   return (
     <span
-      class={`px-3 py-1 rounded-full text-label-small border ${variantClasses()}`}
+      class={cx(
+        css({
+          paddingX: '12px',
+          paddingY: '4px',
+          borderRadius: '9999px',
+          textStyle: 'labelSmall',
+          borderWidth: '1px',
+          borderStyle: 'solid',
+        }),
+        variantStyles(),
+      )}
     >
       {props.children}
     </span>

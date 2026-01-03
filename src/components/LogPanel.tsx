@@ -7,6 +7,8 @@ import {
   onMount,
   Show,
 } from 'solid-js';
+import { css, cx } from '../../styled-system/css';
+import { button, card } from '../../styled-system/recipes';
 
 interface LogEntry {
   level: number;
@@ -16,11 +18,11 @@ interface LogEntry {
 const MAX_LOGS = 200;
 
 const LogLevel: Record<number, { name: string; color: string }> = {
-  1: { name: 'ERROR', color: 'text-error' },
-  2: { name: 'WARN', color: 'text-secondary' },
-  3: { name: 'INFO', color: 'text-primary' },
-  4: { name: 'DEBUG', color: 'text-on-surface-variant' },
-  5: { name: 'TRACE', color: 'text-outline' },
+  1: { name: 'ERROR', color: 'error' },
+  2: { name: 'WARN', color: 'secondary' },
+  3: { name: 'INFO', color: 'primary' },
+  4: { name: 'DEBUG', color: 'onSurfaceVariant' },
+  5: { name: 'TRACE', color: 'outline' },
 };
 
 export default function LogPanel() {
@@ -66,24 +68,55 @@ export default function LogPanel() {
   };
 
   const getLevelColor = (level: number) => {
-    return LogLevel[level]?.color ?? 'text-gray-400';
+    return LogLevel[level]?.color ?? 'outline';
   };
   const getLevelName = (level: number) => {
     return LogLevel[level]?.name ?? 'UNKNOWN';
   };
 
   return (
-    <div class="card-outlined overflow-hidden p-0">
+    <div
+      class={cx(
+        card({ variant: 'outlined' }),
+        css({ overflow: 'hidden', padding: 0 }),
+      )}
+    >
       {/* Header */}
       <button
         type="button"
-        class="w-full flex items-center justify-between p-4 hover:bg-surface-container-high/50 transition-colors group"
+        class={css({
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '16px',
+          cursor: 'pointer',
+          backgroundColor: 'transparent',
+          border: 'none',
+          color: 'inherit',
+          _hover: {
+            backgroundColor: 'surfaceContainerHigh/50',
+          },
+          transition: 'colors',
+        })}
         onClick={toggleExpand}
       >
-        <div class="flex items-center gap-3">
-          <div class="p-2 bg-primary/10 rounded-full group-hover:bg-primary/20 transition-colors">
+        <div
+          class={css({ display: 'flex', alignItems: 'center', gap: '12px' })}
+        >
+          <div
+            class={css({
+              padding: '8px',
+              backgroundColor: 'primary/10',
+              borderRadius: '9999px',
+              _groupHover: {
+                backgroundColor: 'primary/20',
+              },
+              transition: 'colors',
+            })}
+          >
             <svg
-              class="w-5 h-5 text-primary"
+              class={css({ width: '20px', height: '20px', color: 'primary' })}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -98,17 +131,47 @@ export default function LogPanel() {
             </svg>
           </div>
           <div>
-            <h2 class="text-title-medium text-on-surface text-left">Logs</h2>
-            <div class="text-on-surface-variant text-label-small mt-0.5 flex gap-2">
+            <h2
+              class={css({
+                textStyle: 'titleMedium',
+                color: 'onSurface',
+                textAlign: 'left',
+              })}
+            >
+              Logs
+            </h2>
+            <div
+              class={css({
+                color: 'onSurfaceVariant',
+                textStyle: 'labelSmall',
+                marginTop: '2px',
+                display: 'flex',
+                gap: '8px',
+              })}
+            >
               <span>System events & debugging</span>
-              <span class="px-1.5 py-0.5 bg-surface-container-highest rounded-md font-mono">
+              <span
+                class={css({
+                  paddingX: '6px',
+                  paddingY: '2px',
+                  backgroundColor: 'surfaceContainerHighest',
+                  borderRadius: '6px',
+                  fontFamily: 'mono',
+                })}
+              >
                 {logs().length} entries
               </span>
             </div>
           </div>
         </div>
         <svg
-          class={`w-5 h-5 text-on-surface-variant transition-transform duration-300 ${expanded() ? 'rotate-180' : ''}`}
+          class={css({
+            width: '20px',
+            height: '20px',
+            color: 'onSurfaceVariant',
+            transition: 'transform 0.3s',
+            transform: expanded() ? 'rotate(180deg)' : 'rotate(0deg)',
+          })}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -125,16 +188,48 @@ export default function LogPanel() {
 
       {/* Log content */}
       <Show when={expanded()}>
-        <div class="border-t border-outline-variant/30 animate-in slide-in-from-top-2 fade-in duration-200">
+        <div
+          class={css({
+            borderTopWidth: '1px',
+            borderTopStyle: 'solid',
+            borderTopColor: 'outlineVariant/30',
+            animation: 'slideInFromTop 0.2s ease-out, fadeIn 0.2s ease-out',
+          })}
+        >
           {/* Toolbar */}
-          <div class="flex items-center justify-between px-4 py-2 bg-surface-container-low">
-            <div class="flex items-center gap-2">
-              <label class="flex items-center gap-1.5 text-label-small text-on-surface-variant cursor-pointer">
+          <div
+            class={css({
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingX: '16px',
+              paddingY: '8px',
+              backgroundColor: 'surfaceContainerLow',
+            })}
+          >
+            <div
+              class={css({ display: 'flex', alignItems: 'center', gap: '8px' })}
+            >
+              <label
+                class={css({
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  textStyle: 'labelSmall',
+                  color: 'onSurfaceVariant',
+                  cursor: 'pointer',
+                })}
+              >
                 <input
                   type="checkbox"
                   checked={autoScroll()}
                   onChange={(e) => setAutoScroll(e.target.checked)}
-                  class="rounded bg-surface-container-high border-outline-variant text-primary focus:ring-primary/50"
+                  class={css({
+                    borderRadius: '4px',
+                    backgroundColor: 'surfaceContainerHigh',
+                    borderColor: 'outlineVariant',
+                    color: 'primary',
+                  })}
                 />
                 Auto-scroll
               </label>
@@ -142,7 +237,15 @@ export default function LogPanel() {
             <button
               type="button"
               onClick={clearLogs}
-              class="btn-text h-8 min-w-0 px-3 text-label-small"
+              class={cx(
+                button({ variant: 'text' }),
+                css({
+                  height: '32px',
+                  minWidth: 0,
+                  paddingX: '12px',
+                  textStyle: 'labelSmall',
+                }),
+              )}
             >
               Clear
             </button>
@@ -152,23 +255,59 @@ export default function LogPanel() {
           <div
             ref={containerRef}
             onScroll={handleScroll}
-            class="h-64 overflow-y-auto bg-surface-container-lowest/50 font-mono text-body-small p-2 space-y-0.5"
+            class={css({
+              height: '256px',
+              overflowY: 'auto',
+              backgroundColor: 'surfaceContainerLowest/50',
+              fontFamily: 'mono',
+              textStyle: 'bodySmall',
+              padding: '8px',
+            })}
           >
             <Show
               when={logs().length > 0}
               fallback={
-                <p class="text-outline text-center py-8">
+                <p
+                  class={css({
+                    color: 'outline',
+                    textAlign: 'center',
+                    paddingY: '32px',
+                  })}
+                >
                   No logs yet. Logs from the Rust backend will appear here.
                 </p>
               }
             >
               <For each={logs()}>
                 {(log) => (
-                  <div class="flex gap-2 hover:bg-on-surface/5 px-1 rounded">
-                    <span class={`shrink-0 w-12 ${getLevelColor(log.level)}`}>
+                  <div
+                    class={css({
+                      display: 'flex',
+                      gap: '8px',
+                      paddingX: '4px',
+                      borderRadius: '4px',
+                      _hover: {
+                        backgroundColor: 'onSurface/5',
+                      },
+                    })}
+                  >
+                    <span
+                      class={css({
+                        flexShrink: 0,
+                        width: '48px',
+                      })}
+                      style={{
+                        color: `var(--colors-${getLevelColor(log.level)})`,
+                      }}
+                    >
                       {getLevelName(log.level)}
                     </span>
-                    <span class="text-on-surface-variant break-all">
+                    <span
+                      class={css({
+                        color: 'onSurfaceVariant',
+                        wordBreak: 'break-all',
+                      })}
+                    >
                       {log.message}
                     </span>
                   </div>

@@ -1,4 +1,5 @@
 import type { JSX } from 'solid-js';
+import { css } from '../../../styled-system/css';
 
 interface InfoCardProps {
   label: string;
@@ -10,8 +11,26 @@ interface InfoCardProps {
  */
 export default function InfoCard(props: InfoCardProps) {
   return (
-    <div class="bg-surface-container-high/50 p-4 rounded-xl border border-outline-variant/30">
-      <span class="text-label-small text-on-surface-variant uppercase tracking-wider block mb-1">
+    <div
+      class={css({
+        backgroundColor: 'surfaceContainerHigh/50',
+        padding: '16px',
+        borderRadius: '12px',
+        borderWidth: '1px',
+        borderStyle: 'solid',
+        borderColor: 'outlineVariant/30',
+      })}
+    >
+      <span
+        class={css({
+          textStyle: 'labelSmall',
+          color: 'onSurfaceVariant',
+          textTransform: 'uppercase',
+          letterSpacing: 'wider',
+          display: 'block',
+          marginBottom: '4px',
+        })}
+      >
         {props.label}
       </span>
       {props.children}

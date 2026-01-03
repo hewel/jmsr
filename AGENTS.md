@@ -4,7 +4,7 @@ Tauri v2 desktop app: Jellyfin MPV Shim rewrite. External MPV player controller 
 
 ## Stack
 
-- **Frontend**: Solid.js + TypeScript + Rsbuild + TanStack Query + TanStack Form
+- **Frontend**: Solid.js + TypeScript + Rsbuild + TanStack Query + TanStack Form + Panda CSS
 - **Backend**: Rust (Tauri v2) with tauri-specta for type-safe bindings
 - **Tools**: Bun, Biome (lint/format), Rstest (jsdom)
 
@@ -77,4 +77,4 @@ bun tauri build     # Production desktop build
 - Test setup extends expect with jest-dom matchers (rstest.setup.ts)
 - See `doc/todos.md` for current tasks and priorities
 - When edit finished, use @oracle to review changes
-- Design system at `doc/m3.md` with predefined CSS classes based on Tailwind + M3
+- Design system at `doc/m3.md` with Panda CSS recipes and M3 tokens

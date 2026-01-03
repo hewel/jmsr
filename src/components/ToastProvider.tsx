@@ -8,6 +8,7 @@ import {
   type ParentProps,
   useContext,
 } from 'solid-js';
+import { css } from '../../styled-system/css';
 import Toast, { type NotificationLevel } from './Toast';
 
 export interface ToastMessage {
@@ -63,8 +64,19 @@ export function ToastProvider(props: ParentProps) {
   return (
     <ToastContext.Provider value={{ showToast, removeToast }}>
       {props.children}
-      <div class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
-        <div class="pointer-events-auto">
+      <div
+        class={css({
+          position: 'fixed',
+          bottom: '16px',
+          right: '16px',
+          zIndex: 50,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
+          pointerEvents: 'none',
+        })}
+      >
+        <div class={css({ pointerEvents: 'auto' })}>
           <For each={toasts()}>
             {(toast) => (
               <Toast

@@ -1,4 +1,6 @@
 import type { JSX } from 'solid-js';
+import { css, cx } from '../../../styled-system/css';
+import { card } from '../../../styled-system/recipes';
 
 type CardVariant = 'filled' | 'elevated' | 'outlined';
 
@@ -15,24 +17,26 @@ interface CardProps {
 export default function Card(props: CardProps) {
   const variant = () => props.variant ?? 'filled';
 
-  const variantClasses = () => {
-    switch (variant()) {
-      case 'elevated':
-        return 'card-elevated';
-      case 'outlined':
-        return 'card-outlined';
-      default:
-        return 'card-filled';
-    }
-  };
-
   return (
     <div
-      class={`${variantClasses()} relative overflow-hidden ${props.class ?? ''}`}
+      class={cx(
+        card({ variant: variant() }),
+        css({ position: 'relative', overflow: 'hidden' }),
+        props.class,
+      )}
     >
       {/* Surface Tint Overlay for M3 elevation effect */}
-      <div class="absolute inset-0 bg-surface-tint/[0.03] pointer-events-none" />
-      <div class="relative z-10">{props.children}</div>
+      <div
+        class={css({
+          position: 'absolute',
+          inset: 0,
+          backgroundColor: 'primary/3',
+          pointerEvents: 'none',
+        })}
+      />
+      <div class={css({ position: 'relative', zIndex: 10 })}>
+        {props.children}
+      </div>
     </div>
   );
 }

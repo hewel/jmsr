@@ -1,5 +1,6 @@
 import { Check, Info, TriangleAlert, X } from 'lucide-solid';
 import { onCleanup, onMount } from 'solid-js';
+import { css, cx } from '../../styled-system/css';
 import type { NotificationLevel } from '../bindings';
 
 export type { NotificationLevel };
@@ -27,48 +28,117 @@ export default function Toast(props: ToastProps) {
   const getStyles = () => {
     switch (props.level) {
       case 'success':
-        return 'bg-surface-container-high text-on-surface border-outline-variant/30 shadow-lg shadow-black/20';
+        return css({
+          backgroundColor: 'surfaceContainerHigh',
+          color: 'onSurface',
+          borderColor: 'outlineVariant/30',
+          boxShadow: 'lg',
+        });
       case 'error':
-        return 'bg-error-container text-on-error-container border-transparent shadow-lg shadow-error-container/20';
+        return css({
+          backgroundColor: 'errorContainer',
+          color: 'onErrorContainer',
+          borderColor: 'transparent',
+          boxShadow: 'lg',
+        });
       case 'warning':
-        return 'bg-secondary-container text-on-secondary-container border-transparent shadow-lg shadow-secondary-container/20';
+        return css({
+          backgroundColor: 'secondaryContainer',
+          color: 'onSecondaryContainer',
+          borderColor: 'transparent',
+          boxShadow: 'lg',
+        });
       default:
-        return 'bg-surface-container-high text-on-surface border-outline-variant/30 shadow-lg shadow-black/20';
+        return css({
+          backgroundColor: 'surfaceContainerHigh',
+          color: 'onSurface',
+          borderColor: 'outlineVariant/30',
+          boxShadow: 'lg',
+        });
     }
   };
 
   const getIcon = () => {
+    const iconClass = css({ width: '20px', height: '20px' });
     switch (props.level) {
       case 'success':
-        return <Check class="w-5 h-5 text-tertiary" />;
+        return <Check class={cx(iconClass, css({ color: 'tertiary' }))} />;
       case 'error':
-        return <X class="w-5 h-5" />;
+        return <X class={iconClass} />;
       case 'warning':
-        return <TriangleAlert class="w-5 h-5" />;
+        return <TriangleAlert class={iconClass} />;
       default:
-        return <Info class="w-5 h-5 text-primary" />;
+        return <Info class={cx(iconClass, css({ color: 'primary' }))} />;
     }
   };
 
   return (
     <div
-      class={`flex items-center w-full max-w-sm p-4 mb-4 rounded-xl border animate-in slide-in-from-right duration-300 shadow-md ${getStyles()}`}
+      class={cx(
+        css({
+          display: 'flex',
+          alignItems: 'center',
+          width: '100%',
+          maxWidth: '384px',
+          padding: '16px',
+          marginBottom: '16px',
+          borderRadius: '12px',
+          borderWidth: '1px',
+          borderStyle: 'solid',
+          animation: 'slideInFromRight 0.3s ease-out',
+        }),
+        getStyles(),
+      )}
       role="alert"
     >
-      <div class="inline-flex items-center justify-center flex-shrink-0">
+      <div
+        class={css({
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+        })}
+      >
         {getIcon()}
       </div>
-      <div class="ml-3 text-body-medium font-normal break-words flex-1">
+      <div
+        class={css({
+          marginLeft: '12px',
+          textStyle: 'bodyMedium',
+          fontWeight: 'normal',
+          wordBreak: 'break-word',
+          flex: 1,
+        })}
+      >
         {props.message}
       </div>
       <button
         type="button"
-        class="ml-auto -mx-1.5 -my-1.5 rounded-full p-1.5 inline-flex h-8 w-8 hover:bg-on-surface/10 transition-colors items-center justify-center"
+        class={css({
+          marginLeft: 'auto',
+          marginX: '-6px',
+          marginY: '-6px',
+          borderRadius: '9999px',
+          padding: '6px',
+          display: 'inline-flex',
+          height: '32px',
+          width: '32px',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          backgroundColor: 'transparent',
+          border: 'none',
+          color: 'inherit',
+          _hover: {
+            backgroundColor: 'onSurface/10',
+          },
+          transition: 'colors',
+        })}
         onClick={() => props.onDismiss(props.id)}
         aria-label="Close"
       >
-        <span class="sr-only">Close</span>
-        <X class="w-4 h-4" />
+        <span class={css({ srOnly: true })}>Close</span>
+        <X class={css({ width: '16px', height: '16px' })} />
       </button>
     </div>
   );

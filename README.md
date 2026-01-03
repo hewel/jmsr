@@ -176,7 +176,7 @@ jmsr/
 | **Frontend** | [Solid.js](https://www.solidjs.com) + TypeScript |
 | **Backend** | Rust |
 | **Bundler** | Rsbuild |
-| **Styling** | TailwindCSS |
+| **Styling** | [Panda CSS](https://panda-css.com) |
 | **IPC** | tauri-specta |
 | **Linting** | Biome |
 | **Testing** | Rstest |

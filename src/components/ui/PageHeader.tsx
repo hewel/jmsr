@@ -1,4 +1,5 @@
 import type { JSX } from 'solid-js';
+import { css } from '../../../styled-system/css';
 
 interface PageHeaderProps {
   title: string;
@@ -11,13 +12,32 @@ interface PageHeaderProps {
  */
 export default function PageHeader(props: PageHeaderProps) {
   return (
-    <div class="flex items-center justify-between pb-4">
+    <div
+      class={css({
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingBottom: '16px',
+      })}
+    >
       <div>
-        <h1 class="text-headline-large text-on-surface tracking-tight">
+        <h1
+          class={css({
+            textStyle: 'headlineLarge',
+            color: 'onSurface',
+            letterSpacing: 'tight',
+          })}
+        >
           {props.title}
         </h1>
         {props.description && (
-          <p class="text-body-large text-on-surface-variant mt-1">
+          <p
+            class={css({
+              textStyle: 'bodyLarge',
+              color: 'onSurfaceVariant',
+              marginTop: '4px',
+            })}
+          >
             {props.description}
           </p>
         )}

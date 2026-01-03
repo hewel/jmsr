@@ -20,7 +20,13 @@
     /* type checking */
     "strict": true,
     "noUnusedLocals": true,
-    "noUnusedParameters": true
+    "noUnusedParameters": true,
+
+    /* paths */
+    "baseUrl": ".",
+    "paths": {
+      "styled-system/*": ["./src/styled-system/*"]
+    }
   },
   "include": ["src"]
 }

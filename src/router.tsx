@@ -7,8 +7,8 @@ import {
   useNavigate,
 } from '@tanstack/solid-router';
 import { commands, type SavedSession } from './bindings';
-import LoginPage from './components/LoginPage';
-import SettingsPage from './components/SettingsPage';
+import LoginPage from './pages/Login';
+import SettingsPage from './pages/Settings';
 
 const SESSION_STORAGE_KEY = 'jmsr_auth_session';
 

@@ -1,4 +1,6 @@
 import type { JSX } from 'solid-js';
+import { css, cx } from '../../../styled-system/css';
+import { card } from '../../../styled-system/recipes';
 
 interface SectionCardProps {
   icon: JSX.Element;
@@ -12,11 +14,38 @@ interface SectionCardProps {
  */
 export default function SectionCard(props: SectionCardProps) {
   return (
-    <div class="card-filled relative overflow-hidden">
-      <div class="absolute inset-0 bg-surface-tint/[0.03] pointer-events-none" />
-      <div class="relative z-10">
-        <div class="flex items-center justify-between mb-6">
-          <h2 class="text-title-medium text-primary flex items-center gap-3">
+    <div
+      class={cx(
+        card({ variant: 'filled' }),
+        css({ position: 'relative', overflow: 'hidden' }),
+      )}
+    >
+      <div
+        class={css({
+          position: 'absolute',
+          inset: 0,
+          backgroundColor: 'primary/3',
+          pointerEvents: 'none',
+        })}
+      />
+      <div class={css({ position: 'relative', zIndex: 10 })}>
+        <div
+          class={css({
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '24px',
+          })}
+        >
+          <h2
+            class={css({
+              textStyle: 'titleMedium',
+              color: 'primary',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+            })}
+          >
             {props.icon}
             {props.title}
           </h2>

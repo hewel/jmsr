@@ -15,10 +15,11 @@ import {
   onMount,
   Show,
 } from 'solid-js';
+import { css, cx } from '../../styled-system/css';
+import { button, card, input } from '../../styled-system/recipes';
 import { type AppConfig, type ConnectionState, commands } from '../bindings';
-import { clearSavedSession } from '../router';
-import LogPanel from './LogPanel';
-import { useToast } from './ToastProvider';
+import LogPanel from '../components/LogPanel';
+import { useToast } from '../components/ToastProvider';
 import {
   InfoCard,
   PageFooter,
@@ -26,7 +27,8 @@ import {
   SectionCard,
   StatusBadge,
   StatusIndicator,
-} from './ui';
+} from '../components/ui';
+import { clearSavedSession } from '../router';
 
 interface SettingsPageProps {
   onDisconnected: () => void;
@@ -183,8 +185,23 @@ export default function SettingsPage(props: SettingsPageProps) {
   const state = () => connectionState();
 
   return (
-    <div class="min-h-screen bg-background p-6 md:p-10">
-      <div class="max-w-3xl mx-auto space-y-6">
+    <div
+      class={css({
+        minHeight: '100vh',
+        backgroundColor: 'background',
+        padding: '24px',
+        md: { padding: '40px' },
+      })}
+    >
+      <div
+        class={css({
+          maxWidth: '768px',
+          marginX: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '24px',
+        })}
+      >
         {/* Header */}
         <PageHeader
           title="Settings"
@@ -193,26 +210,48 @@ export default function SettingsPage(props: SettingsPageProps) {
             <button
               type="button"
               onClick={handleRefresh}
-              class="btn-icon hover:rotate-180 transition-transform"
+              class={cx(
+                button({ variant: 'icon' }),
+                css({
+                  _hover: { transform: 'rotate(180deg)' },
+                  transition: 'transform 0.3s',
+                }),
+              )}
               title="Refresh status"
             >
-              <RefreshCw class="w-6 h-6" />
+              <RefreshCw class={css({ width: '24px', height: '24px' })} />
             </button>
           }
         />
 
         {/* Jellyfin Connection Card */}
         <SectionCard
-          icon={<CircleCheckBig class="w-6 h-6" />}
+          icon={
+            <CircleCheckBig class={css({ width: '24px', height: '24px' })} />
+          }
           title="Jellyfin Connection"
         >
           <Show
             when={!connectionState.loading}
             fallback={
-              <div class="animate-pulse h-24 bg-surface-container-high rounded-xl" />
+              <div
+                class={css({
+                  animation: 'pulse 2s infinite',
+                  height: '96px',
+                  backgroundColor: 'surfaceContainerHigh',
+                  borderRadius: '12px',
+                })}
+              />
             }
           >
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div
+              class={css({
+                display: 'grid',
+                gridTemplateColumns: '1fr',
+                md: { gridTemplateColumns: 'repeat(2, 1fr)' },
+                gap: '16px',
+              })}
+            >
               <InfoCard label="Status">
                 <StatusIndicator connected={state()?.connected ?? false} />
               </InfoCard>
@@ -220,7 +259,14 @@ export default function SettingsPage(props: SettingsPageProps) {
               <Show when={state()?.serverName}>
                 <InfoCard label="Server">
                   <span
-                    class="text-on-surface font-medium truncate block"
+                    class={css({
+                      color: 'onSurface',
+                      fontWeight: 'medium',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      display: 'block',
+                    })}
                     title={state()?.serverName ?? ''}
                   >
                     {state()?.serverName}
@@ -231,7 +277,14 @@ export default function SettingsPage(props: SettingsPageProps) {
               <Show when={state()?.serverUrl}>
                 <InfoCard label="URL">
                   <span
-                    class="text-on-surface font-medium truncate block"
+                    class={css({
+                      color: 'onSurface',
+                      fontWeight: 'medium',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      display: 'block',
+                    })}
                     title={state()?.serverUrl ?? ''}
                   >
                     {state()?.serverUrl}
@@ -242,7 +295,14 @@ export default function SettingsPage(props: SettingsPageProps) {
               <Show when={state()?.userName}>
                 <InfoCard label="User">
                   <span
-                    class="text-on-surface font-medium truncate block"
+                    class={css({
+                      color: 'onSurface',
+                      fontWeight: 'medium',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      display: 'block',
+                    })}
                     title={state()?.userName ?? ''}
                   >
                     {state()?.userName}
@@ -260,11 +320,20 @@ export default function SettingsPage(props: SettingsPageProps) {
             e.stopPropagation();
             void form.handleSubmit();
           }}
-          class="space-y-6"
+          class={css({ display: 'flex', flexDirection: 'column', gap: '24px' })}
         >
           {/* Device Settings Card */}
-          <SectionCard icon={<Cast class="w-6 h-6" />} title="Device Settings">
-            <div class="space-y-4">
+          <SectionCard
+            icon={<Cast class={css({ width: '24px', height: '24px' })} />}
+            title="Device Settings"
+          >
+            <div
+              class={css({
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px',
+              })}
+            >
               <form.Field
                 name="deviceName"
                 validators={{
@@ -273,10 +342,23 @@ export default function SettingsPage(props: SettingsPageProps) {
                 }}
               >
                 {(field) => (
-                  <div class="group">
+                  <div
+                    class={css({
+                      _focusWithin: { '& label': { color: 'primary' } },
+                    })}
+                  >
                     <label
                       for={field().name}
-                      class="block text-label-small text-on-surface-variant mb-1.5 ml-1 uppercase tracking-wider group-focus-within:text-primary transition-colors"
+                      class={css({
+                        display: 'block',
+                        textStyle: 'labelSmall',
+                        color: 'onSurfaceVariant',
+                        marginBottom: '6px',
+                        marginLeft: '4px',
+                        textTransform: 'uppercase',
+                        letterSpacing: 'wider',
+                        transition: 'colors',
+                      })}
                     >
                       Device Name
                     </label>
@@ -289,15 +371,29 @@ export default function SettingsPage(props: SettingsPageProps) {
                         field().handleChange(e.currentTarget.value)
                       }
                       onBlur={() => field().handleBlur()}
-                      class="input-filled"
+                      class={input({ variant: 'filled' })}
                       placeholder="JMSR"
                     />
                     <Show when={field().state.meta.errors.length > 0}>
-                      <p class="text-error text-body-small mt-1.5 ml-1">
+                      <p
+                        class={css({
+                          color: 'error',
+                          textStyle: 'bodySmall',
+                          marginTop: '6px',
+                          marginLeft: '4px',
+                        })}
+                      >
                         {field().state.meta.errors[0]}
                       </p>
                     </Show>
-                    <p class="text-on-surface-variant/70 text-body-small mt-1.5 ml-1">
+                    <p
+                      class={css({
+                        color: 'onSurfaceVariant/70',
+                        textStyle: 'bodySmall',
+                        marginTop: '6px',
+                        marginLeft: '4px',
+                      })}
+                    >
                       Name displayed in Jellyfin cast menu
                     </p>
                   </div>
@@ -308,7 +404,7 @@ export default function SettingsPage(props: SettingsPageProps) {
 
           {/* MPV Player Card */}
           <SectionCard
-            icon={<Play class="w-6 h-6" />}
+            icon={<Play class={css({ width: '24px', height: '24px' })} />}
             title="MPV Player"
             trailing={
               <Show when={!mpvConnected.loading}>
@@ -318,17 +414,42 @@ export default function SettingsPage(props: SettingsPageProps) {
               </Show>
             }
           >
-            <div class="space-y-6">
+            <div
+              class={css({
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '24px',
+              })}
+            >
               <form.Field name="mpvPath">
                 {(field) => (
-                  <div class="group">
+                  <div
+                    class={css({
+                      _focusWithin: { '& label': { color: 'primary' } },
+                    })}
+                  >
                     <label
                       for={field().name}
-                      class="block text-label-small text-on-surface-variant mb-1.5 ml-1 uppercase tracking-wider group-focus-within:text-primary transition-colors"
+                      class={css({
+                        display: 'block',
+                        textStyle: 'labelSmall',
+                        color: 'onSurfaceVariant',
+                        marginBottom: '6px',
+                        marginLeft: '4px',
+                        textTransform: 'uppercase',
+                        letterSpacing: 'wider',
+                        transition: 'colors',
+                      })}
                     >
                       MPV Executable Path
                     </label>
-                    <div class="flex gap-2 items-start">
+                    <div
+                      class={css({
+                        display: 'flex',
+                        gap: '8px',
+                        alignItems: 'flex-start',
+                      })}
+                    >
                       <input
                         id={field().name}
                         name={field().name}
@@ -339,13 +460,19 @@ export default function SettingsPage(props: SettingsPageProps) {
                         }
                         onBlur={() => field().handleBlur()}
                         placeholder="Path to mpv.exe or mpv binary"
-                        class="input-filled flex-1 min-w-0"
+                        class={cx(
+                          input({ variant: 'filled' }),
+                          css({ flex: 1, minWidth: 0 }),
+                        )}
                       />
                       <button
                         type="button"
                         onClick={handleDetectMpv}
                         disabled={detectingMpv()}
-                        class="btn-tonal h-14"
+                        class={cx(
+                          button({ variant: 'tonal' }),
+                          css({ height: '56px' }),
+                        )}
                       >
                         {detectingMpv() ? '...' : 'Auto-detect'}
                       </button>
@@ -356,10 +483,23 @@ export default function SettingsPage(props: SettingsPageProps) {
 
               <form.Field name="mpvArgs">
                 {(field) => (
-                  <div class="group">
+                  <div
+                    class={css({
+                      _focusWithin: { '& label': { color: 'primary' } },
+                    })}
+                  >
                     <label
                       for={field().name}
-                      class="block text-label-small text-on-surface-variant mb-1.5 ml-1 uppercase tracking-wider group-focus-within:text-primary transition-colors"
+                      class={css({
+                        display: 'block',
+                        textStyle: 'labelSmall',
+                        color: 'onSurfaceVariant',
+                        marginBottom: '6px',
+                        marginLeft: '4px',
+                        textTransform: 'uppercase',
+                        letterSpacing: 'wider',
+                        transition: 'colors',
+                      })}
                     >
                       Extra Arguments (one per line)
                     </label>
@@ -373,7 +513,28 @@ export default function SettingsPage(props: SettingsPageProps) {
                       onBlur={() => field().handleBlur()}
                       rows={4}
                       placeholder="--fullscreen&#10;--force-window"
-                      class="w-full bg-surface-container-highest rounded-t-lg border-b border-on-surface-variant px-4 py-3 text-on-surface placeholder-on-surface-variant focus:border-b-2 focus:border-primary focus:outline-none transition-colors font-mono text-body-small leading-relaxed"
+                      class={css({
+                        width: '100%',
+                        backgroundColor: 'surfaceContainerHighest',
+                        borderTopLeftRadius: '8px',
+                        borderTopRightRadius: '8px',
+                        borderBottomWidth: '1px',
+                        borderBottomStyle: 'solid',
+                        borderBottomColor: 'onSurfaceVariant',
+                        paddingX: '16px',
+                        paddingY: '12px',
+                        color: 'onSurface',
+                        fontFamily: 'mono',
+                        textStyle: 'bodySmall',
+                        lineHeight: 'relaxed',
+                        outline: 'none',
+                        transition: 'colors',
+                        _placeholder: { color: 'onSurfaceVariant' },
+                        _focus: {
+                          borderBottomWidth: '2px',
+                          borderBottomColor: 'primary',
+                        },
+                      })}
                     />
                   </div>
                 )}
@@ -382,13 +543,31 @@ export default function SettingsPage(props: SettingsPageProps) {
           </SectionCard>
 
           {/* Keybindings Card */}
-          <SectionCard icon={<Keyboard class="w-6 h-6" />} title="Keybindings">
-            <p class="text-on-surface-variant/80 text-body-medium mb-6 -mt-4 ml-9">
+          <SectionCard
+            icon={<Keyboard class={css({ width: '24px', height: '24px' })} />}
+            title="Keybindings"
+          >
+            <p
+              class={css({
+                color: 'onSurfaceVariant/80',
+                textStyle: 'bodyMedium',
+                marginBottom: '24px',
+                marginTop: '-16px',
+                marginLeft: '36px',
+              })}
+            >
               Keyboard shortcuts for MPV episode navigation. Changes take effect
               on next MPV restart.
             </p>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div
+              class={css({
+                display: 'grid',
+                gridTemplateColumns: '1fr',
+                md: { gridTemplateColumns: 'repeat(2, 1fr)' },
+                gap: '24px',
+              })}
+            >
               <form.Field
                 name="keybindNext"
                 validators={{
@@ -397,10 +576,23 @@ export default function SettingsPage(props: SettingsPageProps) {
                 }}
               >
                 {(field) => (
-                  <div class="group">
+                  <div
+                    class={css({
+                      _focusWithin: { '& label': { color: 'primary' } },
+                    })}
+                  >
                     <label
                       for={field().name}
-                      class="block text-label-small text-on-surface-variant mb-1.5 ml-1 uppercase tracking-wider group-focus-within:text-primary transition-colors"
+                      class={css({
+                        display: 'block',
+                        textStyle: 'labelSmall',
+                        color: 'onSurfaceVariant',
+                        marginBottom: '6px',
+                        marginLeft: '4px',
+                        textTransform: 'uppercase',
+                        letterSpacing: 'wider',
+                        transition: 'colors',
+                      })}
                     >
                       Next Episode
                     </label>
@@ -413,11 +605,21 @@ export default function SettingsPage(props: SettingsPageProps) {
                         field().handleChange(e.currentTarget.value)
                       }
                       onBlur={() => field().handleBlur()}
-                      class="input-filled font-mono text-center"
+                      class={cx(
+                        input({ variant: 'filled' }),
+                        css({ fontFamily: 'mono', textAlign: 'center' }),
+                      )}
                       placeholder="Shift+n"
                     />
                     <Show when={field().state.meta.errors.length > 0}>
-                      <p class="text-error text-body-small mt-1.5 ml-1">
+                      <p
+                        class={css({
+                          color: 'error',
+                          textStyle: 'bodySmall',
+                          marginTop: '6px',
+                          marginLeft: '4px',
+                        })}
+                      >
                         {field().state.meta.errors[0]}
                       </p>
                     </Show>
@@ -433,10 +635,23 @@ export default function SettingsPage(props: SettingsPageProps) {
                 }}
               >
                 {(field) => (
-                  <div class="group">
+                  <div
+                    class={css({
+                      _focusWithin: { '& label': { color: 'primary' } },
+                    })}
+                  >
                     <label
                       for={field().name}
-                      class="block text-label-small text-on-surface-variant mb-1.5 ml-1 uppercase tracking-wider group-focus-within:text-primary transition-colors"
+                      class={css({
+                        display: 'block',
+                        textStyle: 'labelSmall',
+                        color: 'onSurfaceVariant',
+                        marginBottom: '6px',
+                        marginLeft: '4px',
+                        textTransform: 'uppercase',
+                        letterSpacing: 'wider',
+                        transition: 'colors',
+                      })}
                     >
                       Previous Episode
                     </label>
@@ -449,11 +664,21 @@ export default function SettingsPage(props: SettingsPageProps) {
                         field().handleChange(e.currentTarget.value)
                       }
                       onBlur={() => field().handleBlur()}
-                      class="input-filled font-mono text-center"
+                      class={cx(
+                        input({ variant: 'filled' }),
+                        css({ fontFamily: 'mono', textAlign: 'center' }),
+                      )}
                       placeholder="Shift+p"
                     />
                     <Show when={field().state.meta.errors.length > 0}>
-                      <p class="text-error text-body-small mt-1.5 ml-1">
+                      <p
+                        class={css({
+                          color: 'error',
+                          textStyle: 'bodySmall',
+                          marginTop: '6px',
+                          marginLeft: '4px',
+                        })}
+                      >
                         {field().state.meta.errors[0]}
                       </p>
                     </Show>
@@ -462,19 +687,46 @@ export default function SettingsPage(props: SettingsPageProps) {
               </form.Field>
             </div>
 
-            <p class="text-on-surface-variant/60 text-body-small mt-6 text-center border-t border-outline-variant/20 pt-4">
+            <p
+              class={css({
+                color: 'onSurfaceVariant/60',
+                textStyle: 'bodySmall',
+                marginTop: '24px',
+                textAlign: 'center',
+                borderTopWidth: '1px',
+                borderTopStyle: 'solid',
+                borderTopColor: 'outlineVariant/20',
+                paddingTop: '16px',
+              })}
+            >
               Use MPV keybinding syntax (e.g., Shift+n, Ctrl+Left, Alt+q)
             </p>
           </SectionCard>
 
           {/* Save Settings Button */}
-          <div class="sticky bottom-6 z-20">
+          <div class={css({ position: 'sticky', bottom: '24px', zIndex: 20 })}>
             <form.Subscribe selector={(state) => state.isSubmitting}>
               {(isSubmitting) => (
                 <button
                   type="submit"
                   disabled={isSubmitting()}
-                  class="btn-primary w-full h-14 text-title-medium shadow-lg hover:shadow-xl hover:-translate-y-1 active:translate-y-0 active:scale-[0.99] backdrop-blur-md"
+                  class={cx(
+                    button({ variant: 'primary' }),
+                    css({
+                      width: '100%',
+                      height: '56px',
+                      textStyle: 'titleMedium',
+                      boxShadow: 'lg',
+                      _hover: {
+                        boxShadow: 'xl',
+                        transform: 'translateY(-4px)',
+                      },
+                      _active: {
+                        transform: 'translateY(0) scale(0.99)',
+                      },
+                      backdropFilter: 'blur(12px)',
+                    }),
+                  )}
                 >
                   {isSubmitting() ? 'Saving...' : 'Save Settings'}
                 </button>
@@ -483,11 +735,27 @@ export default function SettingsPage(props: SettingsPageProps) {
 
             <Show when={saveMessage()}>
               <div
-                class={`mt-4 p-4 rounded-xl text-body-medium font-medium text-center animate-in slide-in-from-bottom-2 fade-in duration-300 ${
+                class={cx(
+                  css({
+                    marginTop: '16px',
+                    padding: '16px',
+                    borderRadius: '12px',
+                    textStyle: 'bodyMedium',
+                    fontWeight: 'medium',
+                    textAlign: 'center',
+                    animation:
+                      'slideInFromBottom 0.3s ease-out, fadeIn 0.3s ease-out',
+                  }),
                   saveMessage()?.type === 'success'
-                    ? 'bg-tertiary-container text-on-tertiary-container'
-                    : 'bg-error-container text-on-error-container'
-                }`}
+                    ? css({
+                        backgroundColor: 'tertiaryContainer',
+                        color: 'onTertiaryContainer',
+                      })
+                    : css({
+                        backgroundColor: 'errorContainer',
+                        color: 'onErrorContainer',
+                      }),
+                )}
               >
                 {saveMessage()?.text}
               </div>
@@ -496,19 +764,57 @@ export default function SettingsPage(props: SettingsPageProps) {
         </form>
 
         {/* Actions Card */}
-        <div class="card-filled relative overflow-hidden">
-          <div class="absolute inset-0 bg-surface-tint/[0.03] pointer-events-none" />
-          <div class="relative z-10">
-            <h2 class="text-title-medium text-on-surface mb-6">Danger Zone</h2>
+        <div
+          class={cx(
+            card({ variant: 'filled' }),
+            css({ position: 'relative', overflow: 'hidden' }),
+          )}
+        >
+          <div
+            class={css({
+              position: 'absolute',
+              inset: 0,
+              backgroundColor: 'primary/3',
+              pointerEvents: 'none',
+            })}
+          />
+          <div class={css({ position: 'relative', zIndex: 10 })}>
+            <h2
+              class={css({
+                textStyle: 'titleMedium',
+                color: 'onSurface',
+                marginBottom: '24px',
+              })}
+            >
+              Danger Zone
+            </h2>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div
+              class={css({
+                display: 'grid',
+                gridTemplateColumns: '1fr',
+                md: { gridTemplateColumns: 'repeat(2, 1fr)' },
+                gap: '16px',
+              })}
+            >
               <button
                 type="button"
                 onClick={handleDisconnect}
                 disabled={disconnecting() || !state()?.connected}
-                class="btn-outlined border-error/50 text-error hover:bg-error/10 hover:border-error w-full"
+                class={cx(
+                  button({ variant: 'outlined' }),
+                  css({
+                    borderColor: 'error/50',
+                    color: 'error',
+                    width: '100%',
+                    _hover: {
+                      backgroundColor: 'error/10',
+                      borderColor: 'error',
+                    },
+                  }),
+                )}
               >
-                <LogOut class="w-5 h-5" />
+                <LogOut class={css({ width: '20px', height: '20px' })} />
                 {disconnecting() ? 'Disconnecting...' : 'Disconnect'}
               </button>
 
@@ -516,13 +822,20 @@ export default function SettingsPage(props: SettingsPageProps) {
                 type="button"
                 onClick={handleClearSession}
                 disabled={clearingSession()}
-                class="btn-tonal w-full"
+                class={cx(button({ variant: 'tonal' }), css({ width: '100%' }))}
               >
-                <Trash2 class="w-5 h-5" />
+                <Trash2 class={css({ width: '20px', height: '20px' })} />
                 {clearingSession() ? 'Clearing...' : 'Clear Session'}
               </button>
             </div>
-            <p class="text-on-surface-variant/60 text-body-small mt-4 text-center">
+            <p
+              class={css({
+                color: 'onSurfaceVariant/60',
+                textStyle: 'bodySmall',
+                marginTop: '16px',
+                textAlign: 'center',
+              })}
+            >
               Clear saved session will remove stored credentials and return to
               login
             </p>

@@ -1,4 +1,6 @@
 import { Show, splitProps } from 'solid-js';
+import { css, cx } from '../../../styled-system/css';
+import { input } from '../../../styled-system/recipes';
 
 type TextFieldVariant = 'filled' | 'outlined';
 
@@ -39,14 +41,26 @@ export default function TextField(props: TextFieldProps) {
   ]);
 
   const variant = () => local.variant ?? 'filled';
-  const inputVariantClass = () =>
-    variant() === 'outlined' ? 'input-outlined' : 'input-filled';
 
   return (
-    <div class={`group ${local.class ?? ''}`}>
+    <div
+      class={cx(
+        css({ _focusWithin: { '& label': { color: 'primary' } } }),
+        local.class,
+      )}
+    >
       <label
         for={local.name}
-        class="text-label-medium block text-on-surface-variant mb-1 ml-1 uppercase tracking-wider group-focus-within:text-primary transition-colors"
+        class={css({
+          textStyle: 'labelMedium',
+          display: 'block',
+          color: 'onSurfaceVariant',
+          marginBottom: '4px',
+          marginLeft: '4px',
+          textTransform: 'uppercase',
+          letterSpacing: 'wider',
+          transition: 'colors',
+        })}
       >
         {local.label}
       </label>
@@ -59,16 +73,35 @@ export default function TextField(props: TextFieldProps) {
         onBlur={() => local.onBlur?.()}
         placeholder={local.placeholder}
         disabled={local.disabled}
-        class={`${inputVariantClass()} w-full ${local.inputClass ?? ''}`}
+        class={cx(
+          input({ variant: variant() }),
+          css({ width: '100%' }),
+          local.inputClass,
+        )}
         {...rest}
       />
       <Show when={local.error}>
-        <p class="text-error text-body-small mt-1.5 ml-1 animate-in slide-in-from-top-1 fade-in duration-200">
+        <p
+          class={css({
+            color: 'error',
+            textStyle: 'bodySmall',
+            marginTop: '6px',
+            marginLeft: '4px',
+            animation: 'slideInFromTop 0.2s ease-out, fadeIn 0.2s ease-out',
+          })}
+        >
           {local.error}
         </p>
       </Show>
       <Show when={local.hint && !local.error}>
-        <p class="text-on-surface-variant/70 text-body-small mt-1.5 ml-1">
+        <p
+          class={css({
+            color: 'onSurfaceVariant/70',
+            textStyle: 'bodySmall',
+            marginTop: '6px',
+            marginLeft: '4px',
+          })}
+        >
           {local.hint}
         </p>
       </Show>
