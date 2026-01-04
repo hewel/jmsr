@@ -14,6 +14,9 @@ pub enum ProcessError {
 
 /// Get the IPC socket/pipe path for MPV.
 /// Uses PID suffix to prevent collisions when multiple JMSR instances run.
+///
+/// On Linux, respects `XDG_RUNTIME_DIR` for AppImage/Flatpak compatibility
+/// where `/tmp` may be inaccessible inside sandboxes.
 pub fn ipc_path() -> String {
   let pid = std::process::id();
   #[cfg(windows)]
@@ -22,7 +25,8 @@ pub fn ipc_path() -> String {
   }
   #[cfg(not(windows))]
   {
-    format!("/tmp/jmsr-mpv-{}.sock", pid)
+    let base_dir = std::env::var("XDG_RUNTIME_DIR").unwrap_or_else(|_| "/tmp".to_string());
+    format!("{}/jmsr-mpv-{}.sock", base_dir, pid)
   }
 }
 
