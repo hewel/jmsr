@@ -11,7 +11,7 @@
 **A high-performance Jellyfin cast receiver that controls an external MPV player.**  
 Built with Tauri v2, Solid.js, and Rust.
 
-[Features](#-features) • [Quick Start](#-quick-start) • [Architecture](#-architecture) • [Troubleshooting](#-troubleshooting)
+[Features](#-features) • [Roadmap](#️-roadmap) • [Quick Start](#-quick-start) • [Architecture](#-architecture) • [Troubleshooting](#-troubleshooting)
 
 </div>
 
@@ -39,6 +39,14 @@ JMSR allows you to cast media from any Jellyfin client (web, mobile, TV) to your
 | 🖥️ **System Tray** | Runs quietly in the background with quick access controls |
 | 🛡️ **Type-Safe** | 100% type-safe Rust-to-TypeScript communication via `tauri-specta` |
 | 🍏 **Cross-Platform** | Native support for Windows, macOS, and Linux |
+
+## 🗺️ Roadmap
+
+- [ ] **[Quick Connect](https://jellyfin.org/docs/general/server/quick-connect/)** - Login via code from another device
+- [ ] **[Intro Skipper](https://github.com/intro-skipper/intro-skipper) Integration** - Auto-skip intros/credits
+- [ ] **Full-Featured Client UI** - Browse libraries, manage media, and control playback like other Jellyfin clients
+- [ ] **Embedded Player** - Optional built-in video player without external MPV dependency
+- [ ] **MPRIS Support** - Linux media player integration for desktop controls
 
 ## 🏗️ Architecture
 
