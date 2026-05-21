@@ -136,7 +136,7 @@
 
 ### Future Features
 - [x] System tray controls (play/pause, next, previous, mute)
-- [ ] [Quick Connect](https://jellyfin.org/docs/general/server/quick-connect/) - Login via code from another device
+- [x] [Quick Connect](https://jellyfin.org/docs/general/server/quick-connect/) - Login via code from another device
 - [ ] [Intro Skipper](https://github.com/intro-skipper/intro-skipper) integration - Auto-skip intros/credits
 - [ ] Full-featured client UI - Browse libraries, manage media like other Jellyfin clients
 - [ ] Embedded player - Optional built-in video player without external MPV dependency
