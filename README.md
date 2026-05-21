@@ -32,8 +32,10 @@ JMSR allows you to cast media from any Jellyfin client (web, mobile, TV) to your
 | 📺 **Cast Target** | Appears as a controllable device in Jellyfin's cast menu |
 | 🚀 **External MPV** | Full compatibility with your system MPV configuration and shaders |
 | 🔒 **Persistent Auth** | Login once, stay connected with secure token storage |
+| 🔑 **Quick Connect** | Authenticate with Jellyfin by approving a one-time code on another device |
 | 🔄 **Auto-Reconnect** | Resilient WebSocket connection with exponential backoff strategy |
 | ⏭️ **Smart Playback** | Automatically plays the next episode when the current one finishes |
+| ✂️ **Intro Skipper** | Automatically skips Intro Skipper plugin introduction and credit ranges |
 | 🧠 **Series Memory** | Remembers audio/subtitle language preferences per TV series |
 | ⌨️ **Shortcuts** | Use `Shift+N` / `Shift+P` directly in MPV to skip episodes |
 | 🖥️ **System Tray** | Runs quietly in the background with quick access controls |
@@ -42,8 +44,8 @@ JMSR allows you to cast media from any Jellyfin client (web, mobile, TV) to your
 
 ## 🗺️ Roadmap
 
-- [ ] **[Quick Connect](https://jellyfin.org/docs/general/server/quick-connect/)** - Login via code from another device
-- [ ] **[Intro Skipper](https://github.com/intro-skipper/intro-skipper) Integration** - Auto-skip intros/credits
+- [x] **[Quick Connect](https://jellyfin.org/docs/general/server/quick-connect/)** - Login via code from another device
+- [x] **[Intro Skipper](https://github.com/intro-skipper/intro-skipper) Integration** - Auto-skip intros/credits
 - [ ] **Full-Featured Client UI** - Browse libraries, manage media, and control playback like other Jellyfin clients
 - [ ] **Embedded Player** - Optional built-in video player without external MPV dependency
 - [ ] **MPRIS Support** - Linux media player integration for desktop controls
@@ -57,6 +59,15 @@ JMSR allows you to cast media from any Jellyfin client (web, mobile, TV) to your
 - [ ] **Picture-in-Picture (PiP)** - Floating mini-player mode
 - [ ] **Global Hotkeys** - Customizable shortcuts that work in the background
 - [ ] **Offline Mode** - Download media for offline playback
+
+## 📦 Release Notes
+
+### v1.3.0
+
+- Added Intro Skipper plugin support for automatic introduction and credit skips.
+- Added a global Settings toggle to enable or disable Intro Skipper behavior.
+- Added once-per-session skip semantics so manual seeks back into skipped ranges are respected.
+- Added verification coverage for plugin failures, malformed ranges, disabled behavior, progress reporting, and existing track controls.
 
 ## 🏗️ Architecture
 
@@ -114,7 +125,7 @@ Download the latest release for your platform from the [Releases page](https://g
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/jmsr.git
+git clone https://github.com/hewel/jmsr.git
 cd jmsr
 
 # Install dependencies
@@ -129,9 +140,10 @@ Binaries will be in `src-tauri/target/release/bundle/`.
 ### Usage Steps
 
 1.  **Launch JMSR** from your application menu or terminal.
-2.  **Authenticate** by entering your Jellyfin server URL and credentials.
+2.  **Authenticate** with Quick Connect or by entering your Jellyfin server URL and credentials.
 3.  **Cast Media**: JMSR will appear as "JMSR" in your Jellyfin client's cast menu.
-4.  **Enjoy**: Media plays in MPV on your desktop with full control syncing.
+4.  **Optional Intro Skipper**: Install the Jellyfin Intro Skipper plugin and keep Settings > Playback > Intro Skipper enabled to skip detected intros and credits.
+5.  **Enjoy**: Media plays in MPV on your desktop with full control syncing.
 
 ## 🛠️ How It Works
 
