@@ -27,6 +27,10 @@ pub struct AppConfig {
   #[serde(default)]
   pub start_minimized: bool,
 
+  /// Enable automatic Intro Skipper plugin skips.
+  #[serde(default = "default_intro_skipper_enabled")]
+  pub intro_skipper_enabled: bool,
+
   /// Keybinding for next episode in MPV.
   #[serde(default = "default_keybind_next")]
   pub keybind_next: String,
@@ -52,6 +56,10 @@ fn default_keybind_prev() -> String {
   "Shift+p".to_string()
 }
 
+fn default_intro_skipper_enabled() -> bool {
+  true
+}
+
 impl Default for AppConfig {
   fn default() -> Self {
     Self {
@@ -60,6 +68,7 @@ impl Default for AppConfig {
       device_name: default_device_name(),
       progress_interval: default_progress_interval(),
       start_minimized: false,
+      intro_skipper_enabled: default_intro_skipper_enabled(),
       keybind_next: default_keybind_next(),
       keybind_prev: default_keybind_prev(),
     }
@@ -82,5 +91,26 @@ impl AppConfig {
       return Err("Previous episode keybinding cannot be empty".to_string());
     }
     Ok(())
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn older_saved_config_deserializes_with_intro_skipper_enabled() {
+    let config: AppConfig = serde_json::from_str(
+      r#"{
+        "deviceName": "JMSR",
+        "progressInterval": 5,
+        "startMinimized": false,
+        "keybindNext": "Shift+n",
+        "keybindPrev": "Shift+p"
+      }"#,
+    )
+    .expect("older config should deserialize");
+
+    assert!(config.intro_skipper_enabled);
   }
 }

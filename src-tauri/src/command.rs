@@ -409,6 +409,7 @@ pub fn mpv_is_connected(state: State<'_, MpvState>) -> bool {
 pub async fn jellyfin_connect(
   app: tauri::AppHandle,
   state: State<'_, JellyfinState>,
+  config_state: State<'_, ConfigState>,
   credentials: Credentials,
 ) -> Result<(), CommandError> {
   // Authenticate with server
@@ -422,6 +423,7 @@ pub async fn jellyfin_connect(
   let new_session = Arc::new(SessionManager::new(
     state.client.clone(),
     state.mpv.clone(),
+    config_state.0.clone(),
     app,
   ));
   new_session.start().await.map_err(internal_err)?;
@@ -472,6 +474,7 @@ pub async fn jellyfin_quick_connect_check(
 pub async fn jellyfin_quick_connect_authenticate(
   app: tauri::AppHandle,
   state: State<'_, JellyfinState>,
+  config_state: State<'_, ConfigState>,
   server_url: String,
   secret: String,
 ) -> Result<(), CommandError> {
@@ -485,6 +488,7 @@ pub async fn jellyfin_quick_connect_authenticate(
   let new_session = Arc::new(SessionManager::new(
     state.client.clone(),
     state.mpv.clone(),
+    config_state.0.clone(),
     app,
   ));
   new_session.start().await.map_err(internal_err)?;
@@ -545,6 +549,7 @@ pub fn jellyfin_get_session(state: State<'_, JellyfinState>) -> Option<SavedSess
 pub async fn jellyfin_restore_session(
   app: tauri::AppHandle,
   state: State<'_, JellyfinState>,
+  config_state: State<'_, ConfigState>,
   session: SavedSession,
 ) -> Result<(), CommandError> {
   // Restore connection from saved session
@@ -558,6 +563,7 @@ pub async fn jellyfin_restore_session(
   let new_session = Arc::new(SessionManager::new(
     state.client.clone(),
     state.mpv.clone(),
+    config_state.0.clone(),
     app,
   ));
   new_session.start().await.map_err(internal_err)?;

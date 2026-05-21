@@ -6,6 +6,7 @@ import {
   LogOut,
   Play,
   RefreshCw,
+  SkipForward,
   Trash2,
 } from 'lucide-solid';
 import { createEffect, createResource, createSignal, Show } from 'solid-js';
@@ -36,6 +37,9 @@ async function fetchMpvStatus(): Promise<boolean> {
 
 export default function SettingsPage(props: SettingsPageProps) {
   const { showToast } = useToast();
+  let introSkipperEnabledValue = true;
+  let configHydrated = false;
+  let introSkipperInput: HTMLInputElement | undefined;
   const [disconnecting, setDisconnecting] = createSignal(false);
   const [clearingSession, setClearingSession] = createSignal(false);
   const [detectingMpv, setDetectingMpv] = createSignal(false);
@@ -67,6 +71,7 @@ export default function SettingsPage(props: SettingsPageProps) {
       mpvArgs: '',
       keybindNext: 'Shift+n',
       keybindPrev: 'Shift+p',
+      introSkipperEnabled: true,
     },
     onSubmit: async ({ value }) => {
       setSaveMessage(null);
@@ -84,6 +89,8 @@ export default function SettingsPage(props: SettingsPageProps) {
           mpvArgs: argsList,
           progressInterval: cfg?.progressInterval ?? 5,
           startMinimized: cfg?.startMinimized ?? false,
+          introSkipperEnabled:
+            introSkipperInput?.checked ?? introSkipperEnabledValue,
           keybindNext: value.keybindNext,
           keybindPrev: value.keybindPrev,
         };
@@ -107,12 +114,21 @@ export default function SettingsPage(props: SettingsPageProps) {
   // Update form values when config is loaded
   createEffect(() => {
     const cfg = initialConfig();
-    if (cfg) {
+    if (cfg && !configHydrated) {
       form.setFieldValue('deviceName', cfg.deviceName ?? 'JMSR');
       form.setFieldValue('mpvPath', cfg.mpvPath ?? '');
       form.setFieldValue('mpvArgs', (cfg.mpvArgs ?? []).join('\n'));
       form.setFieldValue('keybindNext', cfg.keybindNext ?? 'Shift+n');
       form.setFieldValue('keybindPrev', cfg.keybindPrev ?? 'Shift+p');
+      form.setFieldValue(
+        'introSkipperEnabled',
+        cfg.introSkipperEnabled ?? true,
+      );
+      introSkipperEnabledValue = cfg.introSkipperEnabled ?? true;
+      if (introSkipperInput) {
+        introSkipperInput.checked = cfg.introSkipperEnabled ?? true;
+      }
+      configHydrated = true;
     }
   });
 
@@ -164,6 +180,11 @@ export default function SettingsPage(props: SettingsPageProps) {
     } finally {
       setDetectingMpv(false);
     }
+  };
+
+  const handleIntroSkipperToggle = (enabled: boolean) => {
+    introSkipperEnabledValue = enabled;
+    form.setFieldValue('introSkipperEnabled', enabled);
   };
 
   const state = () => connectionState();
@@ -365,6 +386,37 @@ export default function SettingsPage(props: SettingsPageProps) {
                 )}
               </form.Field>
             </div>
+          </SectionCard>
+
+          {/* Playback Settings Card */}
+          <SectionCard
+            icon={<SkipForward class="w-6 h-6" />}
+            title="Playback"
+          >
+            <label
+              for="intro-skipper-enabled"
+              class="flex items-center justify-between gap-4 rounded-xl bg-surface-container-highest px-4 py-3 cursor-pointer"
+            >
+              <span class="text-body-large text-on-surface">
+                Intro Skipper
+              </span>
+              <input
+                id="intro-skipper-enabled"
+                name="introSkipperEnabled"
+                type="checkbox"
+                ref={(el) => {
+                  introSkipperInput = el;
+                }}
+                checked={introSkipperEnabledValue}
+                onInput={(e) =>
+                  handleIntroSkipperToggle(e.currentTarget.checked)
+                }
+                onChange={(e) =>
+                  handleIntroSkipperToggle(e.currentTarget.checked)
+                }
+                class="h-6 w-6 rounded border-outline text-primary focus:ring-primary"
+              />
+            </label>
           </SectionCard>
 
           {/* Keybindings Card */}

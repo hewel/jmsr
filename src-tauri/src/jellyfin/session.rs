@@ -13,6 +13,7 @@ use super::intro_skipper::evaluate_skip;
 use super::types::*;
 use super::websocket::{JellyfinCommand, JellyfinWebSocket};
 use crate::command::AppNotification;
+use crate::config::AppConfig;
 use crate::mpv::MpvClient;
 
 const PREFERENCES_STORE_FILE: &str = "preferences.json";
@@ -70,6 +71,7 @@ pub struct SessionManager {
   client: Arc<JellyfinClient>,
   websocket: Arc<JellyfinWebSocket>,
   mpv: Arc<MpvClient>,
+  config: Arc<RwLock<AppConfig>>,
   app_handle: AppHandle,
   state: Arc<RwLock<SessionState>>,
   action_tx: mpsc::Sender<MpvAction>,
@@ -78,7 +80,12 @@ pub struct SessionManager {
 
 impl SessionManager {
   /// Create a new session manager.
-  pub fn new(client: Arc<JellyfinClient>, mpv: Arc<MpvClient>, app_handle: AppHandle) -> Self {
+  pub fn new(
+    client: Arc<JellyfinClient>,
+    mpv: Arc<MpvClient>,
+    config: Arc<RwLock<AppConfig>>,
+    app_handle: AppHandle,
+  ) -> Self {
     let (action_tx, action_rx) = mpsc::channel(32);
 
     // Load series preferences from disk
@@ -88,6 +95,7 @@ impl SessionManager {
       client,
       websocket: Arc::new(JellyfinWebSocket::new()),
       mpv,
+      config,
       app_handle,
       state: Arc::new(RwLock::new(SessionState {
         playback: None,
@@ -173,6 +181,7 @@ impl SessionManager {
     let action_tx = self.action_tx.clone();
     let app_handle = self.app_handle.clone();
     let mpv = self.mpv.clone();
+    let config = self.config.clone();
 
     tokio::spawn(async move {
       const RECONNECT_DELAYS: &[u64] = &[1, 2, 5, 10, 30, 60]; // seconds
@@ -199,8 +208,16 @@ impl SessionManager {
         // Process commands until channel closes
         let mut command_rx = command_rx;
         while let Some(cmd) = command_rx.recv().await {
-          if let Err(e) =
-            Self::handle_command(&client, &state, &action_tx, &app_handle, &mpv, cmd).await
+          if let Err(e) = Self::handle_command(
+            &client,
+            &state,
+            &action_tx,
+            &app_handle,
+            &mpv,
+            &config,
+            cmd,
+          )
+          .await
           {
             log::error!("Failed to handle Jellyfin command: {}", e);
             AppNotification::error(&app_handle, format!("Command failed: {}", e));
@@ -405,14 +422,15 @@ impl SessionManager {
     action_tx: &mpsc::Sender<MpvAction>,
     app_handle: &AppHandle,
     mpv: &MpvClient,
+    config: &RwLock<AppConfig>,
     cmd: JellyfinCommand,
   ) -> Result<(), JellyfinError> {
     match cmd {
       JellyfinCommand::Play(request) => {
-        Self::handle_play(client, state, action_tx, request).await?;
+        Self::handle_play(client, state, action_tx, config, request).await?;
       }
       JellyfinCommand::Playstate(request) => {
-        Self::handle_playstate(client, state, action_tx, mpv, request).await?;
+        Self::handle_playstate(client, state, action_tx, mpv, config, request).await?;
       }
       JellyfinCommand::GeneralCommand(request) => {
         Self::handle_general_command(client, state, action_tx, app_handle, request).await?;
@@ -426,6 +444,7 @@ impl SessionManager {
     client: &JellyfinClient,
     state: &RwLock<SessionState>,
     action_tx: &mpsc::Sender<MpvAction>,
+    config: &RwLock<AppConfig>,
     request: PlayRequest,
   ) -> Result<(), JellyfinError> {
     log::info!("handle_play called with request: {:?}", request);
@@ -544,15 +563,20 @@ impl SessionManager {
       .map(ticks_to_seconds)
       .unwrap_or(0.0);
 
-    let intro_skipper_ranges = match client.get_intro_skipper_ranges(item_id).await {
-      Ok(ranges) => {
-        log::info!("Loaded {} Intro Skipper ranges", ranges.len());
-        ranges
+    let intro_skipper_ranges = if config.read().intro_skipper_enabled {
+      match client.get_intro_skipper_ranges(item_id).await {
+        Ok(ranges) => {
+          log::info!("Loaded {} Intro Skipper ranges", ranges.len());
+          ranges
+        }
+        Err(e) => {
+          log::warn!("Intro Skipper ranges unavailable for {}: {}", item_id, e);
+          Vec::new()
+        }
       }
-      Err(e) => {
-        log::warn!("Intro Skipper ranges unavailable for {}: {}", item_id, e);
-        Vec::new()
-      }
+    } else {
+      log::debug!("Intro Skipper disabled; skipping range fetch");
+      Vec::new()
     };
 
     // Store playback session and current series
@@ -688,6 +712,7 @@ impl SessionManager {
     state: &RwLock<SessionState>,
     action_tx: &mpsc::Sender<MpvAction>,
     mpv: &MpvClient,
+    config: &RwLock<AppConfig>,
     request: PlaystateRequest,
   ) -> Result<(), JellyfinError> {
     log::info!("handle_playstate: command={}", request.command);
@@ -828,7 +853,9 @@ impl SessionManager {
               };
 
               // Handle the play request
-              if let Err(e) = Self::handle_play(client, state, action_tx, play_request).await {
+              if let Err(e) =
+                Self::handle_play(client, state, action_tx, config, play_request).await
+              {
                 log::error!("Failed to play next episode: {}", e);
               }
             }
@@ -897,7 +924,9 @@ impl SessionManager {
               };
 
               // Handle the play request
-              if let Err(e) = Self::handle_play(client, state, action_tx, play_request).await {
+              if let Err(e) =
+                Self::handle_play(client, state, action_tx, config, play_request).await
+              {
                 log::error!("Failed to play previous episode: {}", e);
               }
             }
@@ -1166,6 +1195,7 @@ impl SessionManager {
     let client = self.client.clone();
     let state = self.state.clone();
     let action_tx = self.action_tx.clone();
+    let config = self.config.clone();
 
     tokio::spawn(async move {
       log::info!("MPV event listener started");
@@ -1226,7 +1256,7 @@ impl SessionManager {
                 "time-pos" => {
                   // Update state but throttle reporting
                   Self::update_state_from_property(&state, &event);
-                  Self::apply_intro_skipper(&state, &action_tx, &event).await;
+                  Self::apply_intro_skipper(&state, &action_tx, &config, &event).await;
                   let now = std::time::Instant::now();
                   if now.duration_since(last_progress_report) >= progress_report_interval {
                     last_progress_report = now;
@@ -1243,10 +1273,11 @@ impl SessionManager {
               }
             }
             "end-file" => {
-              Self::handle_end_file_event(&event, &client, &state, &action_tx).await;
+              Self::handle_end_file_event(&event, &client, &state, &action_tx, &config).await;
             }
             "client-message" => {
-              Self::handle_client_message_event(&event, &client, &state, &action_tx).await;
+              Self::handle_client_message_event(&event, &client, &state, &action_tx, &config)
+                .await;
             }
             _ => {
               // Ignore other events
@@ -1310,8 +1341,13 @@ impl SessionManager {
   async fn apply_intro_skipper(
     state: &RwLock<SessionState>,
     action_tx: &mpsc::Sender<MpvAction>,
+    config: &RwLock<AppConfig>,
     event: &crate::mpv::MpvEvent,
   ) {
+    if !config.read().intro_skipper_enabled {
+      return;
+    }
+
     if event.name.as_deref() != Some("time-pos") {
       return;
     }
@@ -1375,6 +1411,7 @@ impl SessionManager {
     client: &JellyfinClient,
     state: &RwLock<SessionState>,
     action_tx: &mpsc::Sender<MpvAction>,
+    config: &RwLock<AppConfig>,
   ) {
     let reason = event.reason.as_deref().unwrap_or("");
     log::info!("MPV end-file event, reason: {}", reason);
@@ -1400,7 +1437,7 @@ impl SessionManager {
     Self::report_playback_stopped(client, state).await;
 
     // Try to get next episode
-    Self::play_adjacent_episode(client, state, action_tx, &item, true).await;
+    Self::play_adjacent_episode(client, state, action_tx, config, &item, true).await;
   }
 
   /// Handle MPV client-message event for keyboard shortcuts.
@@ -1413,6 +1450,7 @@ impl SessionManager {
     client: &JellyfinClient,
     state: &RwLock<SessionState>,
     action_tx: &mpsc::Sender<MpvAction>,
+    config: &RwLock<AppConfig>,
   ) {
     let args = match &event.args {
       Some(args) if !args.is_empty() => args,
@@ -1432,7 +1470,7 @@ impl SessionManager {
         if let Some(item) = current_item {
           log::info!("Keyboard shortcut: playing next episode");
           Self::report_playback_stopped(client, state).await;
-          Self::play_adjacent_episode(client, state, action_tx, &item, true).await;
+          Self::play_adjacent_episode(client, state, action_tx, config, &item, true).await;
         } else {
           log::warn!("jmsr-next: No current item");
         }
@@ -1446,7 +1484,7 @@ impl SessionManager {
         if let Some(item) = current_item {
           log::info!("Keyboard shortcut: playing previous episode");
           Self::report_playback_stopped(client, state).await;
-          Self::play_adjacent_episode(client, state, action_tx, &item, false).await;
+          Self::play_adjacent_episode(client, state, action_tx, config, &item, false).await;
         } else {
           log::warn!("jmsr-prev: No current item");
         }
@@ -1496,6 +1534,7 @@ impl SessionManager {
     client: &JellyfinClient,
     state: &RwLock<SessionState>,
     action_tx: &mpsc::Sender<MpvAction>,
+    config: &RwLock<AppConfig>,
     current_item: &MediaItem,
     next: bool,
   ) {
@@ -1524,7 +1563,7 @@ impl SessionManager {
           subtitle_stream_index: None,
         };
 
-        if let Err(e) = Self::handle_play(client, state, action_tx, play_request).await {
+        if let Err(e) = Self::handle_play(client, state, action_tx, config, play_request).await {
           log::error!(
             "Failed to play {} episode: {}",
             if next { "next" } else { "previous" },
@@ -1561,7 +1600,15 @@ impl SessionManager {
     if let Some(item) = current_item {
       log::info!("Tray: playing next episode");
       Self::report_playback_stopped(&self.client, &self.state).await;
-      Self::play_adjacent_episode(&self.client, &self.state, &self.action_tx, &item, true).await;
+      Self::play_adjacent_episode(
+        &self.client,
+        &self.state,
+        &self.action_tx,
+        &self.config,
+        &item,
+        true,
+      )
+      .await;
     } else {
       log::warn!("play_next_episode: No current item");
     }
@@ -1577,7 +1624,15 @@ impl SessionManager {
     if let Some(item) = current_item {
       log::info!("Tray: playing previous episode");
       Self::report_playback_stopped(&self.client, &self.state).await;
-      Self::play_adjacent_episode(&self.client, &self.state, &self.action_tx, &item, false).await;
+      Self::play_adjacent_episode(
+        &self.client,
+        &self.state,
+        &self.action_tx,
+        &self.config,
+        &item,
+        false,
+      )
+      .await;
     } else {
       log::warn!("play_previous_episode: No current item");
     }
@@ -1679,6 +1734,7 @@ mod tests {
   async fn time_pos_update_inside_intro_range_emits_seek_action() {
     let state = test_state_with_intro_range();
     let (action_tx, mut action_rx) = mpsc::channel(1);
+    let config = RwLock::new(AppConfig::default());
     let event = crate::mpv::MpvEvent {
       event: "property-change".to_string(),
       id: Some(4),
@@ -1688,7 +1744,7 @@ mod tests {
       args: None,
     };
 
-    SessionManager::apply_intro_skipper(&state, &action_tx, &event).await;
+    SessionManager::apply_intro_skipper(&state, &action_tx, &config, &event).await;
 
     assert!(matches!(
       action_rx.recv().await,
@@ -1707,6 +1763,7 @@ mod tests {
       series_preferences: HashMap::new(),
     });
     let (action_tx, mut action_rx) = mpsc::channel(1);
+    let config = RwLock::new(AppConfig::default());
     let event = crate::mpv::MpvEvent {
       event: "property-change".to_string(),
       id: Some(4),
@@ -1716,7 +1773,28 @@ mod tests {
       args: None,
     };
 
-    SessionManager::apply_intro_skipper(&state, &action_tx, &event).await;
+    SessionManager::apply_intro_skipper(&state, &action_tx, &config, &event).await;
+
+    assert!(action_rx.try_recv().is_err());
+  }
+
+  #[tokio::test]
+  async fn disabled_intro_skipper_setting_emits_no_seek_action() {
+    let state = test_state_with_intro_range();
+    let (action_tx, mut action_rx) = mpsc::channel(1);
+    let mut config = AppConfig::default();
+    config.intro_skipper_enabled = false;
+    let config = RwLock::new(config);
+    let event = crate::mpv::MpvEvent {
+      event: "property-change".to_string(),
+      id: Some(4),
+      name: Some("time-pos".to_string()),
+      data: Some(serde_json::json!(10.0)),
+      reason: None,
+      args: None,
+    };
+
+    SessionManager::apply_intro_skipper(&state, &action_tx, &config, &event).await;
 
     assert!(action_rx.try_recv().is_err());
   }

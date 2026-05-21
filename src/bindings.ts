@@ -290,6 +290,10 @@ progressInterval?: number;
  */
 startMinimized?: boolean; 
 /**
+ * Enable automatic Intro Skipper plugin skips.
+ */
+introSkipperEnabled?: boolean;
+/**
  * Keybinding for next episode in MPV.
  */
 keybindNext?: string; 
