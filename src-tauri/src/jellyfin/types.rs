@@ -5,6 +5,8 @@
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
+use super::intro_skipper::IntroSkipRange;
+
 /// Authentication response from Jellyfin.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -283,6 +285,7 @@ pub struct PlaybackSession {
   pub item_id: String,
   pub media_source_id: Option<String>,
   pub play_session_id: Option<String>,
+  pub intro_skipper_ranges: Vec<IntroSkipRange>,
   pub position_ticks: i64,
   pub is_paused: bool,
   pub is_muted: bool,

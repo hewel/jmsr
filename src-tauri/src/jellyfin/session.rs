@@ -9,6 +9,7 @@ use tokio::sync::mpsc;
 
 use super::client::JellyfinClient;
 use super::error::JellyfinError;
+use super::intro_skipper::evaluate_skip;
 use super::types::*;
 use super::websocket::{JellyfinCommand, JellyfinWebSocket};
 use crate::command::AppNotification;
@@ -106,7 +107,10 @@ impl SessionManager {
     log::info!("Attempting to load series preferences from store...");
     match app_handle.store(PREFERENCES_STORE_FILE) {
       Ok(store) => {
-        log::info!("Store opened successfully, checking for key: {}", SERIES_PREFERENCES_KEY);
+        log::info!(
+          "Store opened successfully, checking for key: {}",
+          SERIES_PREFERENCES_KEY
+        );
         if let Some(value) = store.get(SERIES_PREFERENCES_KEY) {
           log::info!("Found stored value: {:?}", value);
           match serde_json::from_value::<HashMap<String, TrackPreference>>(value.clone()) {
@@ -195,7 +199,9 @@ impl SessionManager {
         // Process commands until channel closes
         let mut command_rx = command_rx;
         while let Some(cmd) = command_rx.recv().await {
-          if let Err(e) = Self::handle_command(&client, &state, &action_tx, &app_handle, &mpv, cmd).await {
+          if let Err(e) =
+            Self::handle_command(&client, &state, &action_tx, &app_handle, &mpv, cmd).await
+          {
             log::error!("Failed to handle Jellyfin command: {}", e);
             AppNotification::error(&app_handle, format!("Command failed: {}", e));
           }
@@ -203,7 +209,7 @@ impl SessionManager {
 
         // Channel closed - WebSocket disconnected
         log::warn!("Jellyfin WebSocket connection lost");
-        
+
         // Clear playback context since we lost connection
         Self::clear_playback_context(&client, &state).await;
 
@@ -214,11 +220,12 @@ impl SessionManager {
 
         log::info!(
           "Attempting WebSocket reconnection in {} seconds (attempt {})",
-          delay, reconnect_attempt
+          delay,
+          reconnect_attempt
         );
         AppNotification::warning(
           &app_handle,
-          format!("Connection lost. Reconnecting in {} seconds...", delay)
+          format!("Connection lost. Reconnecting in {} seconds...", delay),
         );
 
         tokio::time::sleep(std::time::Duration::from_secs(delay)).await;
@@ -270,7 +277,11 @@ impl SessionManager {
               audio_index,
               subtitle_index,
             } => {
-              log::info!("MpvAction::Play received, url={}, title={}", redact_url(&url), title);
+              log::info!(
+                "MpvAction::Play received, url={}, title={}",
+                redact_url(&url),
+                title
+              );
               // Start MPV if not already running
               if !mpv.is_connected() {
                 log::info!("MPV not connected, starting...");
@@ -286,14 +297,20 @@ impl SessionManager {
               // This ensures tracks are set atomically with the file load, avoiding race conditions
               log::info!(
                 "Loading file into MPV: {} (start={}, aid={:?}, sid={:?})",
-                redact_url(&url), start_position, audio_index, subtitle_index
+                redact_url(&url),
+                start_position,
+                audio_index,
+                subtitle_index
               );
-              if let Err(e) = mpv.loadfile_with_options(
-                &url,
-                Some(start_position),
-                audio_index.map(|i| i as i64),
-                subtitle_index.map(|i| i as i64),
-              ).await {
+              if let Err(e) = mpv
+                .loadfile_with_options(
+                  &url,
+                  Some(start_position),
+                  audio_index.map(|i| i as i64),
+                  subtitle_index.map(|i| i as i64),
+                )
+                .await
+              {
                 log::error!("Failed to load file: {}", e);
                 AppNotification::error(&app_handle, format!("Failed to load media: {}", e));
                 continue;
@@ -461,7 +478,11 @@ impl SessionManager {
         s.series_preferences.keys().collect::<Vec<_>>()
       );
       if let Some(pref) = s.series_preferences.get(series_id) {
-        log::info!("Found track preference for series {}: {:?}", series_id, pref);
+        log::info!(
+          "Found track preference for series {}: {:?}",
+          series_id,
+          pref
+        );
 
         // Apply audio preference if not explicitly set in request
         if audio_index.is_none() {
@@ -474,7 +495,9 @@ impl SessionManager {
             ) {
               log::info!(
                 "Applying preferred audio lang='{}' title={:?} -> index {}",
-                lang, pref.audio_title, idx
+                lang,
+                pref.audio_title,
+                idx
               );
               audio_index = Some(idx);
             }
@@ -493,7 +516,9 @@ impl SessionManager {
               ) {
                 log::info!(
                   "Applying preferred subtitle lang='{}' title={:?} -> index {}",
-                  lang, pref.subtitle_title, idx
+                  lang,
+                  pref.subtitle_title,
+                  idx
                 );
                 subtitle_index = Some(idx);
               }
@@ -519,6 +544,17 @@ impl SessionManager {
       .map(ticks_to_seconds)
       .unwrap_or(0.0);
 
+    let intro_skipper_ranges = match client.get_intro_skipper_ranges(item_id).await {
+      Ok(ranges) => {
+        log::info!("Loaded {} Intro Skipper ranges", ranges.len());
+        ranges
+      }
+      Err(e) => {
+        log::warn!("Intro Skipper ranges unavailable for {}: {}", item_id, e);
+        Vec::new()
+      }
+    };
+
     // Store playback session and current series
     {
       let mut s = state.write();
@@ -529,6 +565,7 @@ impl SessionManager {
         item_id: item_id.clone(),
         media_source_id: Some(media_source.id.clone()),
         play_session_id: playback_info.play_session_id.clone(),
+        intro_skipper_ranges,
         position_ticks: request.start_position_ticks.unwrap_or(0),
         is_paused: false,
         is_muted: false,
@@ -576,9 +613,10 @@ impl SessionManager {
       if idx < 0 {
         None // Disabled subtitles
       } else {
-        media_source.media_streams.iter().find(|s| {
-          s.stream_type == "Subtitle" && s.index == idx && s.is_external
-        })
+        media_source
+          .media_streams
+          .iter()
+          .find(|s| s.stream_type == "Subtitle" && s.index == idx && s.is_external)
       }
     });
 
@@ -620,7 +658,9 @@ impl SessionManager {
           ext_sub_stream.codec,
           redact_url(&sub_url)
         );
-        let _ = action_tx.send(MpvAction::AddExternalSubtitle(sub_url)).await;
+        let _ = action_tx
+          .send(MpvAction::AddExternalSubtitle(sub_url))
+          .await;
       } else {
         log::warn!("Failed to build external subtitle URL");
       }
@@ -677,15 +717,15 @@ impl SessionManager {
         let is_paused = match mpv.get_pause().await {
           Ok(paused) => paused,
           Err(e) => {
-            log::warn!("Failed to get pause state from MPV: {}, using internal state", e);
+            log::warn!(
+              "Failed to get pause state from MPV: {}, using internal state",
+              e
+            );
             let s = state.read();
             s.playback.as_ref().map(|p| p.is_paused).unwrap_or(false)
           }
         };
-        log::info!(
-          "Processing PlayPause command, MPV paused={}",
-          is_paused
-        );
+        log::info!("Processing PlayPause command, MPV paused={}", is_paused);
         if is_paused {
           {
             let mut s = state.write();
@@ -892,7 +932,7 @@ impl SessionManager {
     request: GeneralCommand,
   ) -> Result<(), JellyfinError> {
     let mut should_save_prefs = false;
-    
+
     match request.name.as_str() {
       "SetVolume" => {
         if let Some(args) = request.arguments {
@@ -918,7 +958,8 @@ impl SessionManager {
         if let Some(args) = &request.arguments {
           // Index can be a string or number depending on Jellyfin client
           let index = args.get("Index").and_then(|v| {
-            v.as_i64().or_else(|| v.as_str().and_then(|s| s.parse::<i64>().ok()))
+            v.as_i64()
+              .or_else(|| v.as_str().and_then(|s| s.parse::<i64>().ok()))
           });
           if let Some(index) = index {
             log::info!("SetAudioStreamIndex: {} (Jellyfin index)", index);
@@ -932,15 +973,18 @@ impl SessionManager {
               let series_id = s.current_series_id.clone();
               if let Some(series_id) = series_id {
                 // Find the language and title of the selected track
-                let track_info = s.current_media_streams
+                let track_info = s
+                  .current_media_streams
                   .iter()
                   .find(|stream| stream.stream_type == "Audio" && stream.index == index as i32)
                   .map(|stream| (stream.language.clone(), stream.display_title.clone()));
-                
+
                 if let Some((lang, title)) = track_info {
                   log::info!(
                     "Saving audio preference for series {}: lang={:?}, title={:?}",
-                    series_id, lang, title
+                    series_id,
+                    lang,
+                    title
                   );
                   let pref = s.series_preferences.entry(series_id).or_default();
                   pref.audio_language = lang;
@@ -961,41 +1005,48 @@ impl SessionManager {
         if let Some(args) = &request.arguments {
           // Index can be -1 to disable subtitles, and can be string or number
           let index = args.get("Index").and_then(|v| {
-            v.as_i64().or_else(|| v.as_str().and_then(|s| s.parse::<i64>().ok()))
+            v.as_i64()
+              .or_else(|| v.as_str().and_then(|s| s.parse::<i64>().ok()))
           });
           if let Some(index) = index {
             log::info!("SetSubtitleStreamIndex: {} (Jellyfin index)", index);
-            
+
             // Collect data we need while holding the lock
             let (mpv_action, item_id, media_source_id) = {
               let mut s = state.write();
-              
+
               // Update playback state
               if let Some(ref mut playback) = s.playback {
                 playback.subtitle_stream_index = Some(index as i32);
               }
-              
+
               // Save preference for series
               let series_id = s.current_series_id.clone();
               if let Some(series_id) = series_id {
                 if index == -1 {
-                  log::info!("Saving subtitle disabled preference for series {}", series_id);
+                  log::info!(
+                    "Saving subtitle disabled preference for series {}",
+                    series_id
+                  );
                   let pref = s.series_preferences.entry(series_id).or_default();
                   pref.is_subtitle_enabled = false;
                   pref.subtitle_language = None;
                   pref.subtitle_title = None;
                   should_save_prefs = true;
                 } else {
-                  let track_info = s.current_media_streams
+                  let track_info = s
+                    .current_media_streams
                     .iter()
                     .find(|stream| stream.stream_type == "Subtitle" && stream.index == index as i32)
                     .map(|stream| (stream.language.clone(), stream.display_title.clone()));
-                  
+
                   let pref = s.series_preferences.entry(series_id.clone()).or_default();
                   if let Some((lang, title)) = track_info {
                     log::info!(
                       "Saving subtitle preference for series {}: lang={:?}, title={:?}",
-                      series_id, lang, title
+                      series_id,
+                      lang,
+                      title
                     );
                     pref.is_subtitle_enabled = true;
                     pref.subtitle_language = lang;
@@ -1006,41 +1057,51 @@ impl SessionManager {
                   should_save_prefs = true;
                 }
               }
-              
+
               // Determine action: external subtitle via sub-add or internal via sid
               if index == -1 {
                 // Disable subtitles
                 (MpvAction::SetSubtitleTrack(-1), None, None)
               } else {
                 // Find the subtitle stream
-                let external_stream = s.current_media_streams
+                let external_stream = s
+                  .current_media_streams
                   .iter()
                   .find(|stream| {
-                    stream.stream_type == "Subtitle" && stream.index == index as i32 && stream.is_external
+                    stream.stream_type == "Subtitle"
+                      && stream.index == index as i32
+                      && stream.is_external
                   })
                   .cloned();
-                
+
                 if let Some(ext_stream) = external_stream {
                   // External subtitle - need to use sub-add
                   let item_id = s.playback.as_ref().map(|p| p.item_id.clone());
                   let media_source_id = s.playback.as_ref().and_then(|p| p.media_source_id.clone());
                   // Return placeholder action - we'll build the URL outside the lock
-                  (MpvAction::SetSubtitleTrack(-1), item_id, media_source_id.map(|id| (id, ext_stream)))
+                  (
+                    MpvAction::SetSubtitleTrack(-1),
+                    item_id,
+                    media_source_id.map(|id| (id, ext_stream)),
+                  )
                 } else {
                   // Internal subtitle - convert index and use sid
-                  let mpv_idx = jellyfin_to_mpv_track_index(&s.current_media_streams, "Subtitle", index as i32);
+                  let mpv_idx =
+                    jellyfin_to_mpv_track_index(&s.current_media_streams, "Subtitle", index as i32);
                   (MpvAction::SetSubtitleTrack(mpv_idx), None, None)
                 }
               }
             };
-            
+
             // Handle the action
             match (item_id, media_source_id) {
               (Some(item_id), Some((ms_id, ext_stream))) => {
                 // External subtitle - build URL and use sub-add
                 if let Some(sub_url) = client.build_subtitle_url(&item_id, &ms_id, &ext_stream) {
                   log::info!("SetSubtitleStreamIndex: loading external subtitle via sub-add");
-                  let _ = action_tx.send(MpvAction::AddExternalSubtitle(sub_url)).await;
+                  let _ = action_tx
+                    .send(MpvAction::AddExternalSubtitle(sub_url))
+                    .await;
                 } else {
                   log::warn!("Failed to build external subtitle URL");
                 }
@@ -1058,12 +1119,12 @@ impl SessionManager {
         log::debug!("Unhandled general command: {}", request.name);
       }
     }
-    
+
     // Persist preferences to disk if changed
     if should_save_prefs {
       Self::save_preferences_static(state, app_handle);
     }
-    
+
     Ok(())
   }
 
@@ -1075,21 +1136,19 @@ impl SessionManager {
     };
 
     match app_handle.store(PREFERENCES_STORE_FILE) {
-      Ok(store) => {
-        match serde_json::to_value(&prefs) {
-          Ok(value) => {
-            store.set(SERIES_PREFERENCES_KEY.to_string(), value);
-            if let Err(e) = store.save() {
-              log::error!("Failed to save preferences to disk: {}", e);
-            } else {
-              log::debug!("Saved {} series track preferences to disk", prefs.len());
-            }
-          }
-          Err(e) => {
-            log::error!("Failed to serialize preferences: {}", e);
+      Ok(store) => match serde_json::to_value(&prefs) {
+        Ok(value) => {
+          store.set(SERIES_PREFERENCES_KEY.to_string(), value);
+          if let Err(e) = store.save() {
+            log::error!("Failed to save preferences to disk: {}", e);
+          } else {
+            log::debug!("Saved {} series track preferences to disk", prefs.len());
           }
         }
-      }
+        Err(e) => {
+          log::error!("Failed to serialize preferences: {}", e);
+        }
+      },
       Err(e) => {
         log::error!("Failed to open preferences store for writing: {}", e);
       }
@@ -1167,6 +1226,7 @@ impl SessionManager {
                 "time-pos" => {
                   // Update state but throttle reporting
                   Self::update_state_from_property(&state, &event);
+                  Self::apply_intro_skipper(&state, &action_tx, &event).await;
                   let now = std::time::Instant::now();
                   if now.duration_since(last_progress_report) >= progress_report_interval {
                     last_progress_report = now;
@@ -1246,6 +1306,37 @@ impl SessionManager {
     }
   }
 
+  /// Apply Intro Skipper seek decisions for a time-position update.
+  async fn apply_intro_skipper(
+    state: &RwLock<SessionState>,
+    action_tx: &mpsc::Sender<MpvAction>,
+    event: &crate::mpv::MpvEvent,
+  ) {
+    if event.name.as_deref() != Some("time-pos") {
+      return;
+    }
+
+    let Some(position_seconds) = event.data.as_ref().and_then(|data| data.as_f64()) else {
+      return;
+    };
+
+    let seek_target = {
+      let s = state.read();
+      s.playback
+        .as_ref()
+        .and_then(|playback| evaluate_skip(position_seconds, &playback.intro_skipper_ranges))
+    };
+
+    if let Some(seek_target) = seek_target {
+      log::info!(
+        "Intro Skipper seeking from {:.3}s to {:.3}s",
+        position_seconds,
+        seek_target
+      );
+      let _ = action_tx.send(MpvAction::Seek(seek_target)).await;
+    }
+  }
+
   /// Report current playback progress to Jellyfin.
   async fn report_progress(client: &JellyfinClient, state: &RwLock<SessionState>) {
     let session = {
@@ -1313,7 +1404,7 @@ impl SessionManager {
   }
 
   /// Handle MPV client-message event for keyboard shortcuts.
-  /// 
+  ///
   /// Users can add to their input.conf:
   ///   Shift+n script-message jmsr-next
   ///   Shift+p script-message jmsr-prev
@@ -1434,17 +1525,28 @@ impl SessionManager {
         };
 
         if let Err(e) = Self::handle_play(client, state, action_tx, play_request).await {
-          log::error!("Failed to play {} episode: {}", if next { "next" } else { "previous" }, e);
+          log::error!(
+            "Failed to play {} episode: {}",
+            if next { "next" } else { "previous" },
+            e
+          );
         }
       }
       Ok(None) => {
-        log::info!("No {} episode available", if next { "next" } else { "previous" });
+        log::info!(
+          "No {} episode available",
+          if next { "next" } else { "previous" }
+        );
         let mut s = state.write();
         s.current_item = None;
         s.current_series_id = None;
       }
       Err(e) => {
-        log::error!("Failed to get {} episode: {}", if next { "next" } else { "previous" }, e);
+        log::error!(
+          "Failed to get {} episode: {}",
+          if next { "next" } else { "previous" },
+          e
+        );
       }
     }
   }
@@ -1507,7 +1609,11 @@ impl SessionManager {
 /// Convert Jellyfin stream index to MPV track index.
 /// Jellyfin uses absolute indices across all streams (video, audio, subtitle combined).
 /// MPV uses 1-based indices within each track type (audio, subtitle).
-fn jellyfin_to_mpv_track_index(streams: &[MediaStream], stream_type: &str, jellyfin_index: i32) -> i32 {
+fn jellyfin_to_mpv_track_index(
+  streams: &[MediaStream],
+  stream_type: &str,
+  jellyfin_index: i32,
+) -> i32 {
   // Count how many tracks of this type come before and including the target index
   let mut mpv_index = 0;
   for stream in streams {
@@ -1528,9 +1634,90 @@ fn redact_url(url: &str) -> String {
   // Use regex-like replacement for api_key parameter
   if let Some(idx) = url.find("api_key=") {
     let start = idx + 8; // length of "api_key="
-    let end = url[start..].find('&').map(|i| start + i).unwrap_or(url.len());
+    let end = url[start..]
+      .find('&')
+      .map(|i| start + i)
+      .unwrap_or(url.len());
     format!("{}[REDACTED]{}", &url[..start], &url[end..])
   } else {
     url.to_string()
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::super::intro_skipper::{IntroSkipKind, IntroSkipRange};
+  use super::*;
+
+  fn test_state_with_intro_range() -> RwLock<SessionState> {
+    RwLock::new(SessionState {
+      playback: Some(PlaybackSession {
+        item_id: "item-1".to_string(),
+        media_source_id: Some("source-1".to_string()),
+        play_session_id: Some("play-1".to_string()),
+        intro_skipper_ranges: vec![IntroSkipRange {
+          kind: IntroSkipKind::Introduction,
+          start_seconds: 10.0,
+          end_seconds: 80.0,
+        }],
+        position_ticks: 0,
+        is_paused: false,
+        is_muted: false,
+        volume: 100,
+        audio_stream_index: None,
+        subtitle_stream_index: None,
+      }),
+      last_report_time: std::time::Instant::now(),
+      current_series_id: None,
+      current_item: None,
+      current_media_streams: Vec::new(),
+      series_preferences: HashMap::new(),
+    })
+  }
+
+  #[tokio::test]
+  async fn time_pos_update_inside_intro_range_emits_seek_action() {
+    let state = test_state_with_intro_range();
+    let (action_tx, mut action_rx) = mpsc::channel(1);
+    let event = crate::mpv::MpvEvent {
+      event: "property-change".to_string(),
+      id: Some(4),
+      name: Some("time-pos".to_string()),
+      data: Some(serde_json::json!(10.0)),
+      reason: None,
+      args: None,
+    };
+
+    SessionManager::apply_intro_skipper(&state, &action_tx, &event).await;
+
+    assert!(matches!(
+      action_rx.recv().await,
+      Some(MpvAction::Seek(80.0))
+    ));
+  }
+
+  #[tokio::test]
+  async fn time_pos_update_without_active_ranges_emits_no_seek_action() {
+    let state = RwLock::new(SessionState {
+      playback: None,
+      last_report_time: std::time::Instant::now(),
+      current_series_id: None,
+      current_item: None,
+      current_media_streams: Vec::new(),
+      series_preferences: HashMap::new(),
+    });
+    let (action_tx, mut action_rx) = mpsc::channel(1);
+    let event = crate::mpv::MpvEvent {
+      event: "property-change".to_string(),
+      id: Some(4),
+      name: Some("time-pos".to_string()),
+      data: Some(serde_json::json!(10.0)),
+      reason: None,
+      args: None,
+    };
+
+    SessionManager::apply_intro_skipper(&state, &action_tx, &event).await;
+
+    assert!(action_rx.try_recv().is_err());
   }
 }

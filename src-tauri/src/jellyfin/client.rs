@@ -6,6 +6,9 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use super::error::JellyfinError;
+use super::intro_skipper::{
+  parse_intro_skipper_ranges, IntroSkipRange, IntroSkipperPluginResponse,
+};
 use super::types::*;
 
 /// Device info for Jellyfin client identification.
@@ -495,6 +498,20 @@ impl JellyfinClient {
     self.post(&path, &request).await
   }
 
+  /// Fetch active Intro Skipper plugin ranges for a media item.
+  ///
+  /// Missing, disabled, invalid, or failing plugin endpoints are treated as no
+  /// ranges so playback can continue normally.
+  pub async fn get_intro_skipper_ranges(
+    &self,
+    item_id: &str,
+  ) -> Result<Vec<IntroSkipRange>, JellyfinError> {
+    let path = format!("/Episode/{}/IntroSkipperSegments", item_id);
+    let response = self.get::<IntroSkipperPluginResponse>(&path).await?;
+
+    Ok(parse_intro_skipper_ranges(response))
+  }
+
   /// Build the direct play URL for a media source.
   /// Always uses HTTP streaming URL - even for "File" protocol sources,
   /// since the file path is on the server, not accessible locally.
@@ -960,5 +977,67 @@ mod tests {
       .expect("quick connect should create saved session");
 
     assert_eq!(session.access_token, "token-1");
+  }
+
+  fn connect_test_client(client: &JellyfinClient, server_url: String) {
+    let mut state = client.state.write();
+    state.server_url = Some(server_url);
+    state.access_token = Some("token-1".to_string());
+    state.user_id = Some("user-1".to_string());
+  }
+
+  #[tokio::test]
+  async fn intro_skipper_ranges_parse_valid_introduction_response() {
+    let server_url = serve_once(
+      "200 OK",
+      r#"{"Introduction":{"EpisodeId":"00000000-0000-0000-0000-000000000001","Start":8.5,"End":68.25}}"#,
+    )
+    .await;
+    let client = JellyfinClient::new();
+    connect_test_client(&client, server_url);
+
+    let ranges = client
+      .get_intro_skipper_ranges("item-1")
+      .await
+      .expect("intro skipper response should parse");
+
+    assert_eq!(ranges.len(), 1);
+    assert_eq!(ranges[0].start_seconds, 8.5);
+    assert_eq!(ranges[0].end_seconds, 68.25);
+  }
+
+  #[tokio::test]
+  async fn intro_skipper_ranges_return_empty_for_unsupported_or_invalid_segments() {
+    let server_url = serve_once(
+      "200 OK",
+      r#"{"Credits":{"Start":1200.0,"End":1260.0},"Preview":{"Start":1.0,"End":20.0},"Introduction":{"Start":90.0,"End":80.0}}"#,
+    )
+    .await;
+    let client = JellyfinClient::new();
+    connect_test_client(&client, server_url);
+
+    let ranges = client
+      .get_intro_skipper_ranges("item-1")
+      .await
+      .expect("unsupported segments should be ignored");
+
+    assert!(ranges.is_empty());
+  }
+
+  #[tokio::test]
+  async fn intro_skipper_ranges_report_endpoint_failure_to_caller() {
+    let server_url = serve_once("404 Not Found", r#"{"Message":"missing plugin"}"#).await;
+    let client = JellyfinClient::new();
+    connect_test_client(&client, server_url);
+
+    let err = client
+      .get_intro_skipper_ranges("item-1")
+      .await
+      .expect_err("missing plugin endpoint should be an HTTP error");
+
+    assert!(
+      matches!(err, JellyfinError::HttpError(_)),
+      "expected HTTP error for missing endpoint, got {err:?}"
+    );
   }
 }

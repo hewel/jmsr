@@ -4,6 +4,7 @@
 
 mod client;
 mod error;
+mod intro_skipper;
 mod session;
 mod types;
 mod websocket;
