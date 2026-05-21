@@ -62,6 +62,10 @@ JMSR allows you to cast media from any Jellyfin client (web, mobile, TV) to your
 
 ## 📦 Release Notes
 
+### v1.3.1
+
+- Added Arch Linux `.pkg.tar.zst` release packaging.
+
 ### v1.3.0
 
 - Added Intro Skipper plugin support for automatic introduction and credit skips.
