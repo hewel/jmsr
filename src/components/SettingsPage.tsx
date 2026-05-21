@@ -389,17 +389,12 @@ export default function SettingsPage(props: SettingsPageProps) {
           </SectionCard>
 
           {/* Playback Settings Card */}
-          <SectionCard
-            icon={<SkipForward class="w-6 h-6" />}
-            title="Playback"
-          >
+          <SectionCard icon={<SkipForward class="w-6 h-6" />} title="Playback">
             <label
               for="intro-skipper-enabled"
               class="flex items-center justify-between gap-4 rounded-xl bg-surface-container-highest px-4 py-3 cursor-pointer"
             >
-              <span class="text-body-large text-on-surface">
-                Intro Skipper
-              </span>
+              <span class="text-body-large text-on-surface">Intro Skipper</span>
               <input
                 id="intro-skipper-enabled"
                 name="introSkipperEnabled"

@@ -11,7 +11,9 @@ test('release workflow builds a source-based Arch package with desktop integrati
   expect(pkgbuild).toContain('pkgname=jmsr');
   expect(pkgbuild).toContain('pkgver=1.3.1');
   expect(pkgbuild).toContain("options=('!lto')");
-  expect(pkgbuild).toContain('"git+https://github.com/hewel/jmsr.git#tag=v$pkgver"');
+  expect(pkgbuild).toContain(
+    '"git+https://github.com/hewel/jmsr.git#tag=v$pkgver"',
+  );
   expect(pkgbuild).toContain("'top.pigfun.jmsr.desktop'");
   expect(pkgbuild).toContain("'SKIP'");
   expect(pkgbuild).toContain(

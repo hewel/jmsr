@@ -7,8 +7,8 @@ mod jellyfin;
 mod mpv;
 mod tray;
 
-pub use config::AppConfig;
 use command::{ConfigState, JellyfinState, MpvState};
+pub use config::AppConfig;
 use jellyfin::JellyfinClient;
 use mpv::MpvClient;
 use parking_lot::RwLock;

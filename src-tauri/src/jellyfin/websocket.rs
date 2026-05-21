@@ -62,10 +62,7 @@ impl JellyfinWebSocket {
 
   /// Connect to Jellyfin WebSocket.
   /// Accepts optional capabilities JSON to send via WebSocket (Double Report Strategy).
-  pub async fn connect(
-    &self,
-    url: &str,
-  ) -> Result<(), JellyfinError> {
+  pub async fn connect(&self, url: &str) -> Result<(), JellyfinError> {
     // Cancel any existing connection
     self.disconnect().await;
 

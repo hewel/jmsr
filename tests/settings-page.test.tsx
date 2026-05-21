@@ -73,7 +73,9 @@ test('settings page saves changed intro skipper setting', async () => {
   });
   const cleanup = renderSettingsPage();
 
-  await waitFor(() => expect(screen.getByDisplayValue('JMSR Test')).toBeVisible());
+  await waitFor(() =>
+    expect(screen.getByDisplayValue('JMSR Test')).toBeVisible(),
+  );
   await waitFor(() =>
     expect(screen.getByLabelText('Intro Skipper')).toBeChecked(),
   );

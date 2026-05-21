@@ -729,7 +729,7 @@ pub fn load_config_from_store(app: &tauri::AppHandle) -> AppConfig {
   AppConfig::default()
 }
 
-pub fn specta_builder() -> Builder {
+pub fn specta_builder() -> Builder<tauri::Wry> {
   let builder = Builder::<tauri::Wry>::new()
     .commands(collect_commands![
       // MPV commands

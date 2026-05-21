@@ -144,7 +144,11 @@ impl MpvClient {
   pub fn is_connected(&self) -> bool {
     let connected = self.ipc.lock().is_some();
     let has_process = self.process.lock().is_some();
-    log::debug!("is_connected check: ipc={}, process={}", connected, has_process);
+    log::debug!(
+      "is_connected check: ipc={}, process={}",
+      connected,
+      has_process
+    );
     connected
   }
 
@@ -211,7 +215,9 @@ impl MpvClient {
     } else {
       let options_str = options.join(",");
       log::info!("Loading file: {} with options: {}", url, options_str);
-      self.send(MpvCommand::loadfile_with_options(url, &options_str)).await?;
+      self
+        .send(MpvCommand::loadfile_with_options(url, &options_str))
+        .await?;
     }
 
     Ok(())
@@ -307,7 +313,9 @@ impl MpvClient {
 
   /// Set a string property (e.g., force-media-title).
   pub async fn set_property_string(&self, name: &str, value: &str) -> Result<(), MpvError> {
-    self.send(MpvCommand::set_property_string(name, value)).await?;
+    self
+      .send(MpvCommand::set_property_string(name, value))
+      .await?;
     Ok(())
   }
 
@@ -337,7 +345,9 @@ impl MpvClient {
   /// Observe a property for changes.
   /// Returns events via the events() receiver with event="property-change".
   pub async fn observe_property(&self, observer_id: i64, property: &str) -> Result<(), MpvError> {
-    self.send(MpvCommand::observe_property(observer_id, property)).await?;
+    self
+      .send(MpvCommand::observe_property(observer_id, property))
+      .await?;
     Ok(())
   }
 
