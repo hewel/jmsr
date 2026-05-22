@@ -13,7 +13,7 @@ use crate::jellyfin::{
   QuickConnectStatus, SavedSession, SessionManager,
 };
 use crate::mpv::{write_input_conf, MpvClient, PropertyValue};
-use crate::now_playing::{build_now_playing_state, collect_player_state, PlaybackContext};
+use crate::playback_control;
 
 // ============================================================================
 // Events
@@ -291,29 +291,6 @@ impl JellyfinState {
   }
 }
 
-async fn collect_now_playing_state(state: &JellyfinState) -> NowPlayingState {
-  let player = collect_player_state(&state.mpv).await;
-  let session = state.session.read().clone();
-  let current_item = session.as_ref().and_then(|session| session.current_item());
-
-  build_now_playing_state(
-    player,
-    PlaybackContext {
-      has_active_session: session.is_some(),
-      current_item: current_item.as_ref(),
-    },
-  )
-}
-
-async fn emit_now_playing_changed(app: &tauri::AppHandle, state: &JellyfinState) {
-  let event = NowPlayingChanged {
-    state: collect_now_playing_state(state).await,
-  };
-  if let Err(e) = event.emit(app) {
-    log::error!("Failed to emit now playing state: {}", e);
-  }
-}
-
 // ============================================================================
 // MPV Commands
 // ============================================================================
@@ -327,7 +304,7 @@ pub async fn mpv_start(
   jellyfin_state: State<'_, JellyfinState>,
 ) -> Result<(), CommandError> {
   state.0.start().await.map_err(internal_err)?;
-  emit_now_playing_changed(&app, &jellyfin_state).await;
+  playback_control::emit_now_playing_changed(&app, &jellyfin_state).await;
   Ok(())
 }
 
@@ -340,7 +317,7 @@ pub async fn mpv_stop(
   jellyfin_state: State<'_, JellyfinState>,
 ) -> Result<(), CommandError> {
   state.0.stop().await;
-  emit_now_playing_changed(&app, &jellyfin_state).await;
+  playback_control::emit_now_playing_changed(&app, &jellyfin_state).await;
   Ok(())
 }
 
@@ -370,7 +347,7 @@ pub async fn mpv_seek(
     return Err(CommandError::invalid_input("Seek time cannot be negative"));
   }
   state.0.seek(time).await.map_err(internal_err)?;
-  emit_now_playing_changed(&app, &jellyfin_state).await;
+  playback_control::emit_now_playing_changed(&app, &jellyfin_state).await;
   Ok(())
 }
 
@@ -383,9 +360,7 @@ pub async fn mpv_set_pause(
   jellyfin_state: State<'_, JellyfinState>,
   paused: bool,
 ) -> Result<(), CommandError> {
-  state.0.set_pause(paused).await.map_err(internal_err)?;
-  emit_now_playing_changed(&app, &jellyfin_state).await;
-  Ok(())
+  playback_control::set_pause(&app, &state.0, &jellyfin_state, paused).await
 }
 
 /// Set volume (0-100).
@@ -403,7 +378,7 @@ pub async fn mpv_set_volume(
     ));
   }
   state.0.set_volume(volume).await.map_err(internal_err)?;
-  emit_now_playing_changed(&app, &jellyfin_state).await;
+  playback_control::emit_now_playing_changed(&app, &jellyfin_state).await;
   Ok(())
 }
 
@@ -450,16 +425,14 @@ pub async fn mpv_toggle_mute(
   state: State<'_, MpvState>,
   jellyfin_state: State<'_, JellyfinState>,
 ) -> Result<(), CommandError> {
-  state.0.toggle_mute().await.map_err(internal_err)?;
-  emit_now_playing_changed(&app, &jellyfin_state).await;
-  Ok(())
+  playback_control::toggle_mute(&app, &state.0, &jellyfin_state).await
 }
 
 /// Get current player state.
 #[tauri::command]
 #[specta]
 pub async fn mpv_get_state(state: State<'_, MpvState>) -> Result<PlayerState, CommandError> {
-  Ok(collect_player_state(&state.0).await)
+  Ok(crate::now_playing::collect_player_state(&state.0).await)
 }
 
 /// Get current user-facing Now Playing state.
@@ -468,7 +441,7 @@ pub async fn mpv_get_state(state: State<'_, MpvState>) -> Result<PlayerState, Co
 pub async fn now_playing_get_state(
   state: State<'_, JellyfinState>,
 ) -> Result<NowPlayingState, CommandError> {
-  Ok(collect_now_playing_state(&state).await)
+  Ok(playback_control::collect_now_playing_state(&state).await)
 }
 
 /// Check if MPV is connected.
@@ -515,7 +488,7 @@ pub async fn jellyfin_connect(
       log::warn!("Failed to stop old session: {}", e);
     }
   }
-  emit_now_playing_changed(&app, &state).await;
+  playback_control::emit_now_playing_changed(&app, &state).await;
 
   Ok(())
 }
@@ -584,7 +557,7 @@ pub async fn jellyfin_quick_connect_authenticate(
       log::warn!("Failed to stop old session: {}", e);
     }
   }
-  emit_now_playing_changed(&app, &state).await;
+  playback_control::emit_now_playing_changed(&app, &state).await;
 
   Ok(())
 }
@@ -606,7 +579,7 @@ pub async fn jellyfin_disconnect(
 
   // Disconnect client
   state.client.login().disconnect();
-  emit_now_playing_changed(&app, &state).await;
+  playback_control::emit_now_playing_changed(&app, &state).await;
 
   Ok(())
 }
@@ -665,7 +638,7 @@ pub async fn jellyfin_restore_session(
       log::warn!("Failed to stop old session: {}", e);
     }
   }
-  emit_now_playing_changed(&app, &state).await;
+  playback_control::emit_now_playing_changed(&app, &state).await;
 
   Ok(())
 }
@@ -692,7 +665,7 @@ pub async fn jellyfin_clear_session(
   state.client.login().disconnect();
 
   log::info!("Session cleared");
-  emit_now_playing_changed(&app, &state).await;
+  playback_control::emit_now_playing_changed(&app, &state).await;
   Ok(())
 }
 
@@ -703,15 +676,8 @@ pub async fn jellyfin_play_next_episode(
   app: tauri::AppHandle,
   state: State<'_, JellyfinState>,
 ) -> Result<(), CommandError> {
-  let session = state.session.read().clone().ok_or_else(|| {
-    CommandError::invalid_input("Next episode is available during episode playback")
-  })?;
-  session
-    .play_next_episode()
+  playback_control::play_adjacent_episode(&app, &state, playback_control::AdjacentDirection::Next)
     .await
-    .map_err(CommandError::invalid_input)?;
-  emit_now_playing_changed(&app, &state).await;
-  Ok(())
 }
 
 /// Play the previous episode from the active Jellyfin session.
@@ -721,15 +687,12 @@ pub async fn jellyfin_play_previous_episode(
   app: tauri::AppHandle,
   state: State<'_, JellyfinState>,
 ) -> Result<(), CommandError> {
-  let session = state.session.read().clone().ok_or_else(|| {
-    CommandError::invalid_input("Previous episode is available during episode playback")
-  })?;
-  session
-    .play_previous_episode()
-    .await
-    .map_err(CommandError::invalid_input)?;
-  emit_now_playing_changed(&app, &state).await;
-  Ok(())
+  playback_control::play_adjacent_episode(
+    &app,
+    &state,
+    playback_control::AdjacentDirection::Previous,
+  )
+  .await
 }
 
 // ============================================================================

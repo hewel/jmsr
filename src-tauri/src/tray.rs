@@ -15,6 +15,7 @@ use tauri::{
 };
 
 use crate::command::{JellyfinState, MpvState};
+use crate::playback_control::{self, AdjacentDirection};
 
 /// Menu item IDs
 const MENU_PLAY_PAUSE: &str = "play_pause";
@@ -72,71 +73,67 @@ pub fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     .menu(&menu)
     .tooltip("JMSR - Jellyfin MPV Shim")
     .show_menu_on_left_click(false) // Left-click shows window, right-click shows menu
-    .on_menu_event(|app, event| {
-      match event.id.as_ref() {
-        MENU_PLAY_PAUSE => {
-          let mpv_state = app.state::<MpvState>();
-          let mpv = mpv_state.0.clone();
-          tauri::async_runtime::spawn(async move {
-            // Toggle pause state
-            match mpv.get_pause().await {
-              Ok(is_paused) => {
-                if let Err(e) = mpv.set_pause(!is_paused).await {
-                  log::error!("Failed to toggle pause: {}", e);
-                }
-              }
-              Err(e) => {
-                log::warn!("MPV not connected or error getting pause state: {}", e);
-              }
-            }
-          });
-        }
-        MENU_NEXT => {
-          let jellyfin_state = app.state::<JellyfinState>();
-          let session = jellyfin_state.session.read().clone();
-          if let Some(session) = session {
-            tauri::async_runtime::spawn(async move {
-              if let Err(e) = session.play_next_episode().await {
-                log::warn!("Failed to play next episode: {}", e);
-              }
-            });
-          } else {
-            log::warn!("No active Jellyfin session for next episode");
+    .on_menu_event(|app, event| match event.id.as_ref() {
+      MENU_PLAY_PAUSE => {
+        let app_handle = (*app).clone();
+        let mpv = app.state::<MpvState>().0.clone();
+        tauri::async_runtime::spawn(async move {
+          let jellyfin_state = app_handle.state::<JellyfinState>();
+          if let Err(e) = playback_control::toggle_pause(&app_handle, &mpv, &jellyfin_state).await {
+            log::warn!("Failed to toggle pause: {}", e);
           }
-        }
-        MENU_PREVIOUS => {
-          let jellyfin_state = app.state::<JellyfinState>();
-          let session = jellyfin_state.session.read().clone();
-          if let Some(session) = session {
-            tauri::async_runtime::spawn(async move {
-              if let Err(e) = session.play_previous_episode().await {
-                log::warn!("Failed to play previous episode: {}", e);
-              }
-            });
-          } else {
-            log::warn!("No active Jellyfin session for previous episode");
-          }
-        }
-        MENU_MUTE => {
-          let mpv_state = app.state::<MpvState>();
-          let mpv = mpv_state.0.clone();
-          tauri::async_runtime::spawn(async move {
-            if let Err(e) = mpv.toggle_mute().await {
-              log::error!("Failed to toggle mute: {}", e);
-            }
-          });
-        }
-        MENU_SHOW => {
-          if let Some(window) = app.get_webview_window("main") {
-            let _ = window.show();
-            let _ = window.set_focus();
-          }
-        }
-        MENU_QUIT => {
-          app.exit(0);
-        }
-        _ => {}
+        });
       }
+      MENU_NEXT => {
+        let app_handle = (*app).clone();
+        tauri::async_runtime::spawn(async move {
+          let jellyfin_state = app_handle.state::<JellyfinState>();
+          if let Err(e) = playback_control::play_adjacent_episode(
+            &app_handle,
+            &jellyfin_state,
+            AdjacentDirection::Next,
+          )
+          .await
+          {
+            log::warn!("Failed to play next episode: {}", e);
+          }
+        });
+      }
+      MENU_PREVIOUS => {
+        let app_handle = (*app).clone();
+        tauri::async_runtime::spawn(async move {
+          let jellyfin_state = app_handle.state::<JellyfinState>();
+          if let Err(e) = playback_control::play_adjacent_episode(
+            &app_handle,
+            &jellyfin_state,
+            AdjacentDirection::Previous,
+          )
+          .await
+          {
+            log::warn!("Failed to play previous episode: {}", e);
+          }
+        });
+      }
+      MENU_MUTE => {
+        let app_handle = (*app).clone();
+        let mpv = app.state::<MpvState>().0.clone();
+        tauri::async_runtime::spawn(async move {
+          let jellyfin_state = app_handle.state::<JellyfinState>();
+          if let Err(e) = playback_control::toggle_mute(&app_handle, &mpv, &jellyfin_state).await {
+            log::error!("Failed to toggle mute: {}", e);
+          }
+        });
+      }
+      MENU_SHOW => {
+        if let Some(window) = app.get_webview_window("main") {
+          let _ = window.show();
+          let _ = window.set_focus();
+        }
+      }
+      MENU_QUIT => {
+        app.exit(0);
+      }
+      _ => {}
     })
     .on_tray_icon_event(|tray, event| {
       // Left-click on tray icon shows/focuses the window

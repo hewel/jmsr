@@ -6,6 +6,7 @@ mod config;
 mod jellyfin;
 mod mpv;
 mod now_playing;
+mod playback_control;
 mod tray;
 
 use command::{ConfigState, JellyfinState, MpvState};
