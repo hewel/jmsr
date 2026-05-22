@@ -44,6 +44,30 @@ const playingState: NowPlayingState = {
   previousUnavailableReason: null,
 };
 
+const idleState: NowPlayingState = {
+  ...offlineState,
+  status: 'idle',
+  player: {
+    ...offlineState.player,
+    connected: true,
+  },
+};
+
+const unknownState: NowPlayingState = {
+  ...offlineState,
+  status: 'unknown',
+};
+
+const pausedWithoutMetadataState: NowPlayingState = {
+  ...playingState,
+  status: 'paused',
+  player: {
+    ...playingState.player,
+    paused: true,
+  },
+  media: null,
+};
+
 function renderCard(
   state: NowPlayingState = offlineState,
   jellyfinConnected = true,
@@ -132,5 +156,41 @@ test('next and previous are disabled when unavailable', async () => {
   );
   expect(screen.getByLabelText('Previous episode')).toBeDisabled();
 
+  cleanup();
+});
+
+test('idle and unknown states disable transport controls without exposing startup', async () => {
+  const cleanup = renderCard(idleState);
+
+  await waitFor(() => expect(screen.getByText('MPV idle')).toBeVisible());
+  expect(screen.getByRole('button', { name: 'Play' })).toBeDisabled();
+  expect(screen.getByLabelText('Stop playback')).toBeDisabled();
+  expect(screen.queryByRole('button', { name: 'Start MPV' })).toBeNull();
+  cleanup();
+
+  const cleanupUnknown = renderCard(unknownState);
+  await waitFor(() =>
+    expect(screen.getByText('Playback state unknown')).toBeVisible(),
+  );
+  expect(screen.getByRole('button', { name: 'Play' })).toBeDisabled();
+  expect(screen.getByLabelText('Stop playback')).toBeDisabled();
+  expect(screen.queryByRole('button', { name: 'Start MPV' })).toBeNull();
+
+  cleanupUnknown();
+});
+
+test('paused playback remains controllable without metadata', async () => {
+  const setPause = rstest
+    .spyOn(commands, 'mpvSetPause')
+    .mockResolvedValue({ status: 'ok', data: null });
+  const cleanup = renderCard(pausedWithoutMetadataState);
+
+  await waitFor(() => expect(screen.getByText('Paused')).toBeVisible());
+
+  expect(screen.getByRole('button', { name: 'Play' })).not.toBeDisabled();
+  expect(screen.getByLabelText('Stop playback')).not.toBeDisabled();
+  fireEvent.click(screen.getByRole('button', { name: 'Play' }));
+
+  await waitFor(() => expect(setPause).toHaveBeenCalledWith(false));
   cleanup();
 });

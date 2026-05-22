@@ -125,6 +125,10 @@ export default function NowPlayingCard(props: {
     const duration = player()?.duration ?? 0;
     return connected() && Number.isFinite(duration) && duration > 0;
   };
+  const canControlPlayback = () => {
+    const status = current()?.status;
+    return status === 'playing' || status === 'paused';
+  };
   const mediaTitle = () =>
     current()?.media?.name ?? 'No active playback metadata';
   const mediaSubtitle = () => {
@@ -223,7 +227,7 @@ export default function NowPlayingCard(props: {
         <button
           type="button"
           class="btn-primary min-w-32"
-          disabled={!connected() || busy() !== null}
+          disabled={!canControlPlayback() || busy() !== null}
           onClick={() =>
             void runCommand(
               'pause',
@@ -244,7 +248,7 @@ export default function NowPlayingCard(props: {
           type="button"
           class="btn-icon"
           aria-label="Stop playback"
-          disabled={!connected() || busy() !== null}
+          disabled={!canControlPlayback() || busy() !== null}
           onClick={() =>
             void runCommand('stop', commands.mpvStop, 'Could not stop MPV')
           }
@@ -271,7 +275,7 @@ export default function NowPlayingCard(props: {
         >
           <SkipForward class="h-5 w-5" />
         </button>
-        <Show when={!connected()}>
+        <Show when={current()?.status === 'offline' && !connected()}>
           <button
             type="button"
             class="btn-secondary"
