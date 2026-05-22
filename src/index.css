@@ -166,7 +166,7 @@ body {
   }
 
   .input-filled {
-    @apply h-14 rounded-2xl border border-outline-variant bg-surface-container-high px-4 text-on-surface placeholder-on-surface-variant/70 outline-none transition-colors duration-200 hover:border-outline focus:border-primary focus:ring-2 focus:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply h-14 rounded-2xl border border-outline/80 bg-surface-container-highest/70 px-4 text-on-surface placeholder-on-surface-variant/70 outline-none transition-colors duration-200 hover:border-secondary/70 focus:border-secondary focus:ring-2 focus:ring-secondary/30 disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .input-outlined {

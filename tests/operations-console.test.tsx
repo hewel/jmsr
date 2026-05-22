@@ -429,3 +429,21 @@ test('sign out confirms and clears saved session', async () => {
 
   cleanup();
 });
+
+test('settings and session actions keep shared visual semantics', async () => {
+  const cleanup = renderConsole();
+
+  await screen.findByDisplayValue('JMSR Test');
+  const mpvPath = screen.getByPlaceholderText('Path to mpv executable');
+  expect(mpvPath).toHaveClass('input-filled');
+  expect(mpvPath.className).not.toMatch(/mpv/);
+
+  const disconnect = screen.getByRole('button', { name: 'Disconnect' });
+  expect(disconnect).toHaveClass('btn-outlined');
+  expect(disconnect.className).not.toContain('border-error');
+
+  const signOut = screen.getByRole('button', { name: 'Sign out' });
+  expect(signOut.className).toContain('border-error');
+
+  cleanup();
+});

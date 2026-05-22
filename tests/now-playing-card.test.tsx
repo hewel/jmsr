@@ -111,6 +111,22 @@ test('offline now playing offers start mpv when Jellyfin is connected', async ()
   cleanup();
 });
 
+test('media controls use shared icon buttons and primary text action', async () => {
+  const cleanup = renderCard();
+
+  await waitFor(() =>
+    expect(screen.getByText('Player bridge offline')).toBeVisible(),
+  );
+
+  expect(screen.getByLabelText('Previous episode')).toHaveClass('btn-icon');
+  expect(screen.getByLabelText('Stop playback')).toHaveClass('btn-icon');
+  const startMpv = screen.getByRole('button', { name: 'Start MPV' });
+  expect(startMpv).toHaveTextContent('Start MPV');
+  expect(startMpv.querySelector('svg')).not.toBeNull();
+
+  cleanup();
+});
+
 test('offline now playing blocks start mpv when Jellyfin is disconnected', async () => {
   const startMpv = rstest
     .spyOn(commands, 'mpvStart')
