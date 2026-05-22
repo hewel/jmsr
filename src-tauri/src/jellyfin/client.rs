@@ -22,6 +22,15 @@ pub struct JellyfinClient {
   http: Client,
   state: Arc<RwLock<ClientState>>,
 }
+/// Login/session lifecycle interface for the Jellyfin HTTP adapter.
+pub struct JellyfinLogin<'a> {
+  client: &'a JellyfinClient,
+}
+
+/// Playback/media interface for the Jellyfin HTTP adapter.
+pub struct JellyfinPlayback<'a> {
+  client: &'a JellyfinClient,
+}
 
 /// Internal connection state.
 struct ClientState {
@@ -54,6 +63,15 @@ impl JellyfinClient {
         device_name: DEFAULT_DEVICE_NAME.to_string(),
       })),
     }
+  }
+  /// Login/session lifecycle operations.
+  pub fn login(&self) -> JellyfinLogin<'_> {
+    JellyfinLogin { client: self }
+  }
+
+  /// Playback/media operations used by the playback target session.
+  pub fn playback(&self) -> JellyfinPlayback<'_> {
+    JellyfinPlayback { client: self }
   }
 
   /// Set the device name (shown in Jellyfin cast menu).
@@ -855,6 +873,142 @@ impl JellyfinClient {
   }
 }
 
+impl<'a> JellyfinLogin<'a> {
+  pub async fn authenticate(&self, creds: &Credentials) -> Result<AuthResponse, JellyfinError> {
+    self.client.authenticate(creds).await
+  }
+
+  pub async fn quick_connect_start(
+    &self,
+    server_url: &str,
+  ) -> Result<QuickConnectRequest, JellyfinError> {
+    self.client.quick_connect_start(server_url).await
+  }
+
+  pub async fn quick_connect_check(
+    &self,
+    server_url: &str,
+    secret: &str,
+  ) -> Result<QuickConnectStatus, JellyfinError> {
+    self.client.quick_connect_check(server_url, secret).await
+  }
+
+  pub async fn quick_connect_authenticate(
+    &self,
+    server_url: &str,
+    secret: &str,
+  ) -> Result<AuthResponse, JellyfinError> {
+    self
+      .client
+      .quick_connect_authenticate(server_url, secret)
+      .await
+  }
+
+  pub async fn restore_session(&self, session: &SavedSession) -> Result<(), JellyfinError> {
+    self.client.restore_session(session).await
+  }
+
+  pub fn disconnect(&self) {
+    self.client.disconnect();
+  }
+
+  pub fn get_saved_session(&self) -> Option<SavedSession> {
+    self.client.get_saved_session()
+  }
+
+  pub fn is_connected(&self) -> bool {
+    self.client.is_connected()
+  }
+
+  pub fn connection_state(&self) -> ConnectionState {
+    self.client.connection_state()
+  }
+}
+
+impl<'a> JellyfinPlayback<'a> {
+  pub fn device_id(&self) -> String {
+    self.client.device_id()
+  }
+
+  pub async fn get_item(&self, item_id: &str) -> Result<MediaItem, JellyfinError> {
+    self.client.get_item(item_id).await
+  }
+
+  pub async fn get_playback_info(
+    &self,
+    item_id: &str,
+    audio_stream_index: Option<i32>,
+    subtitle_stream_index: Option<i32>,
+  ) -> Result<PlaybackInfoResponse, JellyfinError> {
+    self
+      .client
+      .get_playback_info(item_id, audio_stream_index, subtitle_stream_index)
+      .await
+  }
+
+  pub async fn get_intro_skipper_ranges(
+    &self,
+    item_id: &str,
+  ) -> Result<Vec<IntroSkipRange>, JellyfinError> {
+    self.client.get_intro_skipper_ranges(item_id).await
+  }
+
+  pub fn build_stream_url(&self, item_id: &str, media_source: &MediaSource) -> Option<String> {
+    self.client.build_stream_url(item_id, media_source)
+  }
+
+  pub fn build_subtitle_url(
+    &self,
+    item_id: &str,
+    media_source_id: &str,
+    stream: &MediaStream,
+  ) -> Option<String> {
+    self
+      .client
+      .build_subtitle_url(item_id, media_source_id, stream)
+  }
+
+  pub fn websocket_url(&self) -> Result<String, JellyfinError> {
+    self.client.websocket_url()
+  }
+
+  pub async fn report_playback_start(&self, info: &PlaybackStartInfo) -> Result<(), JellyfinError> {
+    self.client.report_playback_start(info).await
+  }
+
+  pub async fn report_playback_progress(
+    &self,
+    info: &PlaybackProgressInfo,
+  ) -> Result<(), JellyfinError> {
+    self.client.report_playback_progress(info).await
+  }
+
+  pub async fn report_playback_stop(&self, info: &PlaybackStopInfo) -> Result<(), JellyfinError> {
+    self.client.report_playback_stop(info).await
+  }
+
+  pub async fn report_capabilities(&self) -> Result<(), JellyfinError> {
+    self.client.report_capabilities().await
+  }
+
+  pub async fn get_next_episode(
+    &self,
+    current_item: &MediaItem,
+  ) -> Result<Option<MediaItem>, JellyfinError> {
+    self.client.get_next_episode(current_item).await
+  }
+
+  pub async fn get_previous_episode(
+    &self,
+    current_item: &MediaItem,
+  ) -> Result<Option<MediaItem>, JellyfinError> {
+    self.client.get_previous_episode(current_item).await
+  }
+
+  pub async fn validate_session(&self) -> Result<(), JellyfinError> {
+    self.client.validate_session().await
+  }
+}
 impl Default for JellyfinClient {
   fn default() -> Self {
     Self::new()
@@ -1053,5 +1207,12 @@ mod tests {
       matches!(err, JellyfinError::HttpError(_)),
       "expected HTTP error for missing endpoint, got {err:?}"
     );
+  }
+  #[test]
+  fn login_and_playback_interfaces_are_separate() {
+    let client = JellyfinClient::new();
+
+    crate::jellyfin::client_facade::assert_login_interface(&client);
+    crate::jellyfin::client_facade::assert_playback_interface(&client);
   }
 }

@@ -3,6 +3,8 @@
 //! Handles authentication, WebSocket remote control, and playback reporting.
 
 mod client;
+#[cfg(test)]
+mod client_facade;
 mod error;
 mod intro_skipper;
 mod play_resolution;

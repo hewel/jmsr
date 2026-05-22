@@ -178,17 +178,17 @@ impl SessionManager {
   pub async fn start(&self) -> Result<(), JellyfinError> {
     log::info!(
       "Starting session with Device ID: {}",
-      self.client.device_id()
+      self.client.playback().device_id()
     );
 
     // Connect WebSocket first
-    let ws_url = self.client.websocket_url()?;
+    let ws_url = self.client.playback().websocket_url()?;
     self.websocket.connect(&ws_url).await?;
 
     // Then report capabilities via HTTP (must be after WebSocket is established)
-    self.client.report_capabilities().await?;
+    self.client.playback().report_capabilities().await?;
 
-    if let Err(e) = self.client.validate_session().await {
+    if let Err(e) = self.client.playback().validate_session().await {
       log::warn!("Session validation failed: {} - cast may not work", e);
     } else {
       log::info!("Session validated - we should appear as cast target");
@@ -273,7 +273,7 @@ impl SessionManager {
         tokio::time::sleep(std::time::Duration::from_secs(delay)).await;
 
         // Attempt to reconnect
-        let ws_url = match client.websocket_url() {
+        let ws_url = match client.playback().websocket_url() {
           Ok(url) => url,
           Err(e) => {
             log::error!("Failed to get WebSocket URL: {}", e);
@@ -287,7 +287,7 @@ impl SessionManager {
             AppNotification::info(&app_handle, "Reconnected to Jellyfin");
 
             // Re-report capabilities after reconnection
-            if let Err(e) = client.report_capabilities().await {
+            if let Err(e) = client.playback().report_capabilities().await {
               log::error!("Failed to report capabilities after reconnect: {}", e);
             }
           }
@@ -482,12 +482,13 @@ impl SessionManager {
     log::info!("Playing item_id: {}", item_id);
 
     // Fetch media item metadata for title
-    let item = client.get_item(item_id).await?;
+    let item = client.playback().get_item(item_id).await?;
     let title = Self::format_title(&item);
     log::info!("Media title: {}", title);
 
     // Get playback info
     let playback_info = client
+      .playback()
       .get_playback_info(
         item_id,
         request.audio_stream_index,
@@ -549,12 +550,13 @@ impl SessionManager {
 
     // Build stream URL
     let url = client
+      .playback()
       .build_stream_url(item_id, media_source)
       .ok_or(JellyfinError::NotConnected)?;
     log::info!("Built stream URL: {}", redact_url(&url));
 
     let intro_skipper_ranges = if resolution.should_fetch_intro_skipper_ranges {
-      match client.get_intro_skipper_ranges(item_id).await {
+      match client.playback().get_intro_skipper_ranges(item_id).await {
         Ok(ranges) => {
           log::info!("Loaded {} Intro Skipper ranges", ranges.len());
           ranges
@@ -604,7 +606,7 @@ impl SessionManager {
       play_method: resolution.play_method.to_string(),
       can_seek: true,
     };
-    client.report_playback_start(&start_info).await?;
+    client.playback().report_playback_start(&start_info).await?;
 
     // Send action to MPV with converted indices
     log::info!(
@@ -627,7 +629,11 @@ impl SessionManager {
 
     // Load external subtitle if the selected subtitle is external
     if let Some(ext_sub_stream) = resolution.external_subtitle_stream {
-      if let Some(sub_url) = client.build_subtitle_url(item_id, &media_source.id, ext_sub_stream) {
+      if let Some(sub_url) =
+        client
+          .playback()
+          .build_subtitle_url(item_id, &media_source.id, ext_sub_stream)
+      {
         log::info!(
           "Loading external subtitle: codec={:?}, url={}",
           ext_sub_stream.codec,
@@ -747,7 +753,7 @@ impl SessionManager {
             play_session_id: session.play_session_id,
             position_ticks: Some(session.position_ticks),
           };
-          if let Err(e) = client.report_playback_stop(&stop_info).await {
+          if let Err(e) = client.playback().report_playback_stop(&stop_info).await {
             log::error!("Failed to report playback stop: {}", e);
           }
         }
@@ -972,7 +978,11 @@ impl SessionManager {
             match (item_id, media_source_id) {
               (Some(item_id), Some((ms_id, ext_stream))) => {
                 // External subtitle - build URL and use sub-add
-                if let Some(sub_url) = client.build_subtitle_url(&item_id, &ms_id, &ext_stream) {
+                if let Some(sub_url) =
+                  client
+                    .playback()
+                    .build_subtitle_url(&item_id, &ms_id, &ext_stream)
+                {
                   log::info!("SetSubtitleStreamIndex: loading external subtitle via sub-add");
                   let _ = action_tx
                     .send(MpvAction::AddExternalSubtitle(sub_url))
@@ -1250,7 +1260,7 @@ impl SessionManager {
 
     log::debug!("Progress payload: {:?}", progress);
 
-    if let Err(e) = client.report_playback_progress(&progress).await {
+    if let Err(e) = client.playback().report_playback_progress(&progress).await {
       log::error!("Failed to report playback progress: {}", e);
     }
   }
@@ -1369,7 +1379,7 @@ impl SessionManager {
         play_session_id: session.play_session_id,
         position_ticks: Some(session.position_ticks),
       };
-      if let Err(e) = client.report_playback_stop(&stop_info).await {
+      if let Err(e) = client.playback().report_playback_stop(&stop_info).await {
         log::error!("Failed to report playback stop: {}", e);
       }
     }
@@ -1400,9 +1410,9 @@ impl SessionManager {
     report_current_stopped: bool,
   ) -> Result<(), String> {
     let result = if next {
-      client.get_next_episode(current_item).await
+      client.playback().get_next_episode(current_item).await
     } else {
-      client.get_previous_episode(current_item).await
+      client.playback().get_previous_episode(current_item).await
     };
 
     match result {
@@ -1531,7 +1541,11 @@ impl SessionManager {
         play_session_id: session.play_session_id,
         position_ticks: Some(session.position_ticks),
       };
-      self.client.report_playback_stop(&stop_info).await?;
+      self
+        .client
+        .playback()
+        .report_playback_stop(&stop_info)
+        .await?;
     }
 
     self.websocket.disconnect().await;

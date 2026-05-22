@@ -494,6 +494,7 @@ pub async fn jellyfin_connect(
   // Authenticate with server
   state
     .client
+    .login()
     .authenticate(&credentials)
     .await
     .map_err(|e| CommandError::auth_failed(e.to_string()))?;
@@ -528,6 +529,7 @@ pub async fn jellyfin_quick_connect_start(
 ) -> Result<QuickConnectRequest, CommandError> {
   state
     .client
+    .login()
     .quick_connect_start(&server_url)
     .await
     .map_err(jellyfin_err)
@@ -543,6 +545,7 @@ pub async fn jellyfin_quick_connect_check(
 ) -> Result<QuickConnectStatus, CommandError> {
   state
     .client
+    .login()
     .quick_connect_check(&server_url, &secret)
     .await
     .map_err(jellyfin_err)
@@ -560,6 +563,7 @@ pub async fn jellyfin_quick_connect_authenticate(
 ) -> Result<(), CommandError> {
   state
     .client
+    .login()
     .quick_connect_authenticate(&server_url, &secret)
     .await
     .map_err(jellyfin_err)?;
@@ -601,7 +605,7 @@ pub async fn jellyfin_disconnect(
   }
 
   // Disconnect client
-  state.client.disconnect();
+  state.client.login().disconnect();
   emit_now_playing_changed(&app, &state).await;
 
   Ok(())
@@ -611,21 +615,21 @@ pub async fn jellyfin_disconnect(
 #[tauri::command]
 #[specta]
 pub fn jellyfin_get_state(state: State<'_, JellyfinState>) -> ConnectionState {
-  state.client.connection_state()
+  state.client.login().connection_state()
 }
 
 /// Check if connected to Jellyfin.
 #[tauri::command]
 #[specta]
 pub fn jellyfin_is_connected(state: State<'_, JellyfinState>) -> bool {
-  state.client.is_connected()
+  state.client.login().is_connected()
 }
 
 /// Get the current session data for saving.
 #[tauri::command]
 #[specta]
 pub fn jellyfin_get_session(state: State<'_, JellyfinState>) -> Option<SavedSession> {
-  state.client.get_saved_session()
+  state.client.login().get_saved_session()
 }
 
 /// Restore a session from saved data.
@@ -640,6 +644,7 @@ pub async fn jellyfin_restore_session(
   // Restore connection from saved session
   state
     .client
+    .login()
     .restore_session(&session)
     .await
     .map_err(|e| CommandError::network(e.to_string()))?;
@@ -684,7 +689,7 @@ pub async fn jellyfin_clear_session(
   }
 
   // Disconnect client (clears internal state)
-  state.client.disconnect();
+  state.client.login().disconnect();
 
   log::info!("Session cleared");
   emit_now_playing_changed(&app, &state).await;
@@ -773,12 +778,12 @@ pub async fn config_set(
   log::info!("MPV config updated (applies on next spawn)");
 
   // Apply Jellyfin device name change if connected
-  if jellyfin_state.client.is_connected() {
+  if jellyfin_state.client.login().is_connected() {
     jellyfin_state
       .client
       .set_device_name(config.device_name.clone());
     // Re-register capabilities with new device name
-    if let Err(e) = jellyfin_state.client.report_capabilities().await {
+    if let Err(e) = jellyfin_state.client.playback().report_capabilities().await {
       log::warn!("Failed to re-register capabilities: {}", e);
     } else {
       log::info!("Jellyfin capabilities re-registered with new device name");
