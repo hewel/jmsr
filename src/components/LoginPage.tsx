@@ -1,3 +1,6 @@
+import { Checkbox } from '@ark-ui/solid/checkbox';
+import { Field as ArkField } from '@ark-ui/solid/field';
+import { Tabs } from '@ark-ui/solid/tabs';
 import { createForm } from '@tanstack/solid-form';
 import { Check, CircleAlert, LoaderCircle, RadioTower } from 'lucide-solid';
 import { createSignal, onCleanup, onMount, Show } from 'solid-js';
@@ -322,9 +325,14 @@ export default function LoginPage(props: LoginPageProps) {
               </form.Field>
               <form.Field name="host">
                 {(field) => (
-                  <label class="block">
-                    <span class="sr-only">Jellyfin host</span>
-                    <input
+                  <ArkField.Root
+                    class="block"
+                    disabled={isQuickConnectWaiting()}
+                  >
+                    <ArkField.Label class="sr-only">
+                      Jellyfin host
+                    </ArkField.Label>
+                    <ArkField.Input
                       type="text"
                       value={field().state.value}
                       onInput={(event) => {
@@ -337,11 +345,10 @@ export default function LoginPage(props: LoginPageProps) {
                           explicitScheme ?? defaultSchemeForHost(value),
                         );
                       }}
-                      disabled={isQuickConnectWaiting()}
                       class="input-filled w-full"
                       placeholder="jellyfin.local or media.example.com/jellyfin"
                     />
-                  </label>
+                  </ArkField.Root>
                 )}
               </form.Field>
             </div>
@@ -357,50 +364,70 @@ export default function LoginPage(props: LoginPageProps) {
               </p>
             </div>
 
-            <div
-              class="grid grid-cols-2 rounded-full border border-outline-variant bg-surface-container-high p-1"
-              role="tablist"
-              aria-label="Login Method"
+            <Tabs.Root
+              value={loginMethod()}
+              activationMode="manual"
+              lazyMount
+              unmountOnExit
+              onValueChange={(details) => {
+                const value = details.value as LoginMethod;
+                if (value !== 'quickConnect' && value !== 'password') return;
+                resetQuickConnect();
+                setLoginMethod(value);
+              }}
             >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={loginMethod() === 'quickConnect'}
-                disabled={isQuickConnectWaiting()}
-                class={`rounded-full px-4 py-3 text-label-large transition ${loginMethod() === 'quickConnect' ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:bg-primary/10'}`}
-                onClick={() => {
-                  resetQuickConnect();
-                  setLoginMethod('quickConnect');
-                }}
+              <Tabs.List
+                class="grid grid-cols-2 rounded-full border border-outline-variant bg-surface-container-high p-1"
+                aria-label="Login Method"
               >
-                Quick Connect
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={loginMethod() === 'password'}
-                disabled={isQuickConnectWaiting()}
-                class={`rounded-full px-4 py-3 text-label-large transition ${loginMethod() === 'password' ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:bg-primary/10'}`}
-                onClick={() => {
-                  resetQuickConnect();
-                  setLoginMethod('password');
-                }}
-              >
-                Password
-              </button>
-            </div>
+                <Tabs.Trigger
+                  value="quickConnect"
+                  disabled={isQuickConnectWaiting()}
+                  class={`rounded-full px-4 py-3 text-label-large transition ${loginMethod() === 'quickConnect' ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:bg-primary/10'}`}
+                >
+                  Quick Connect
+                </Tabs.Trigger>
+                <Tabs.Trigger
+                  value="password"
+                  disabled={isQuickConnectWaiting()}
+                  class={`rounded-full px-4 py-3 text-label-large transition ${loginMethod() === 'password' ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:bg-primary/10'}`}
+                >
+                  Password
+                </Tabs.Trigger>
+              </Tabs.List>
 
-            <Show
-              when={loginMethod() === 'quickConnect'}
-              fallback={
+              <Tabs.Content value="quickConnect">
+                <div class="rounded-3xl border border-secondary/30 bg-secondary-container/60 p-5 text-center">
+                  <RadioTower class="mx-auto h-8 w-8 text-secondary" />
+                  <p class="mt-3 text-body-medium text-on-secondary-container">
+                    Approve this code from another signed-in Jellyfin client.
+                    JMSR will finish login automatically after approval.
+                  </p>
+                  <p class="mt-2 text-body-small text-on-surface-variant">
+                    You are authorizing this Playback Target.
+                  </p>
+                  <Show when={quickConnectCode()}>
+                    <p class="mt-5 font-mono text-display-small tracking-[0.35em] text-secondary">
+                      {quickConnectCode()}
+                    </p>
+                  </Show>
+                  <Show when={isQuickConnectWaiting()}>
+                    <p class="mt-4 text-label-medium uppercase text-secondary">
+                      Awaiting Quick Connect Approval…
+                    </p>
+                  </Show>
+                </div>
+              </Tabs.Content>
+
+              <Tabs.Content value="password">
                 <div class="space-y-4">
                   <form.Field name="username">
                     {(field) => (
-                      <label class="block">
-                        <span class="mb-1 block text-label-medium uppercase text-on-surface-variant">
+                      <ArkField.Root class="block">
+                        <ArkField.Label class="mb-1 block text-label-medium uppercase text-on-surface-variant">
                           Username
-                        </span>
-                        <input
+                        </ArkField.Label>
+                        <ArkField.Input
                           class="input-filled w-full"
                           value={field().state.value}
                           onInput={(event) =>
@@ -408,16 +435,16 @@ export default function LoginPage(props: LoginPageProps) {
                           }
                           placeholder="Jellyfin username"
                         />
-                      </label>
+                      </ArkField.Root>
                     )}
                   </form.Field>
                   <form.Field name="password">
                     {(field) => (
-                      <label class="block">
-                        <span class="mb-1 block text-label-medium uppercase text-on-surface-variant">
+                      <ArkField.Root class="block">
+                        <ArkField.Label class="mb-1 block text-label-medium uppercase text-on-surface-variant">
                           Password
-                        </span>
-                        <input
+                        </ArkField.Label>
+                        <ArkField.Input
                           type="password"
                           class="input-filled w-full"
                           value={field().state.value}
@@ -426,54 +453,33 @@ export default function LoginPage(props: LoginPageProps) {
                           }
                           placeholder="Jellyfin password"
                         />
-                      </label>
+                      </ArkField.Root>
                     )}
                   </form.Field>
                   <form.Field name="rememberMe">
                     {(field) => (
-                      <label class="flex items-center gap-3 text-body-medium text-on-surface">
-                        <span class="relative flex h-5 w-5 items-center justify-center">
-                          <input
-                            type="checkbox"
-                            checked={field().state.value}
-                            onChange={(event) =>
-                              field().handleChange(event.currentTarget.checked)
-                            }
-                            class="peer h-5 w-5 appearance-none rounded border-2 border-outline-variant bg-transparent checked:border-primary checked:bg-primary"
-                          />
-                          <Check
-                            class="pointer-events-none absolute h-3.5 w-3.5 opacity-0 text-on-primary peer-checked:opacity-100"
-                            stroke-width={4}
-                          />
-                        </span>
-                        Remember Server URL and username
-                      </label>
+                      <Checkbox.Root
+                        checked={field().state.value}
+                        onCheckedChange={(details) =>
+                          field().handleChange(details.checked === true)
+                        }
+                        class="ark-checkbox text-body-medium text-on-surface"
+                      >
+                        <Checkbox.Control class="ark-checkbox__control">
+                          <Checkbox.Indicator class="ark-checkbox__indicator">
+                            <Check class="h-3.5 w-3.5" stroke-width={4} />
+                          </Checkbox.Indicator>
+                        </Checkbox.Control>
+                        <Checkbox.Label>
+                          Remember Server URL and username
+                        </Checkbox.Label>
+                        <Checkbox.HiddenInput />
+                      </Checkbox.Root>
                     )}
                   </form.Field>
                 </div>
-              }
-            >
-              <div class="rounded-3xl border border-secondary/30 bg-secondary-container/60 p-5 text-center">
-                <RadioTower class="mx-auto h-8 w-8 text-secondary" />
-                <p class="mt-3 text-body-medium text-on-secondary-container">
-                  Approve this code from another signed-in Jellyfin client. JMSR
-                  will finish login automatically after approval.
-                </p>
-                <p class="mt-2 text-body-small text-on-surface-variant">
-                  You are authorizing this Playback Target.
-                </p>
-                <Show when={quickConnectCode()}>
-                  <p class="mt-5 font-mono text-display-small tracking-[0.35em] text-secondary">
-                    {quickConnectCode()}
-                  </p>
-                </Show>
-                <Show when={isQuickConnectWaiting()}>
-                  <p class="mt-4 text-label-medium uppercase text-secondary">
-                    Awaiting Quick Connect Approval…
-                  </p>
-                </Show>
-              </div>
-            </Show>
+              </Tabs.Content>
+            </Tabs.Root>
 
             <Show when={error()}>
               <div

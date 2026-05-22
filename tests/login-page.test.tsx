@@ -35,6 +35,31 @@ test('login page shows quick connect as the default login method', () => {
 
   cleanup();
 });
+test('login page uses Ark tabs, fields, and checkbox primitives', async () => {
+  const cleanup = renderLoginPage();
+
+  const quickConnectTab = screen.getByRole('tab', { name: 'Quick Connect' });
+  expect(quickConnectTab.closest('[data-scope="tabs"]')).not.toBeNull();
+
+  const serverHost = screen.getByPlaceholderText(
+    'jellyfin.local or media.example.com/jellyfin',
+  );
+  expect(serverHost.closest('[data-scope="field"]')).not.toBeNull();
+
+  fireEvent.click(screen.getByRole('tab', { name: 'Password' }));
+
+  await waitFor(() =>
+    expect(screen.getByText('Remember Server URL and username')).toBeVisible(),
+  );
+  const rememberMe = screen.getByRole('checkbox', {
+    name: 'Remember Server URL and username',
+  });
+  expect(rememberMe.closest('[data-scope="checkbox"]')).not.toBeNull();
+  fireEvent.click(rememberMe);
+  expect(rememberMe).toBeChecked();
+
+  cleanup();
+});
 
 test('login page builds local http server url preview with jellyfin port', () => {
   const cleanup = renderLoginPage();
