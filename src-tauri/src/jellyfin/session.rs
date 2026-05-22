@@ -10,6 +10,10 @@ use tokio::sync::mpsc;
 use super::client::JellyfinClient;
 use super::error::JellyfinError;
 use super::intro_skipper::evaluate_skip;
+use super::mpv_event::{
+  apply_property_update, client_message_direction, is_natural_end, property_report_decision,
+  should_report_progress, PropertyReportDecision,
+};
 use super::play_resolution::{resolve_play_request, PlayResolutionConfig};
 use super::types::*;
 use super::websocket::{JellyfinCommand, JellyfinWebSocket};
@@ -1104,25 +1108,26 @@ impl SessionManager {
           match event.event.as_str() {
             "property-change" => {
               let property_name = event.name.as_deref().unwrap_or("");
-              let should_report = match property_name {
-                "pause" | "volume" | "mute" => {
-                  // Update state immediately for these properties
-                  Self::update_state_from_property(&state, &event);
-                  true // Always report immediately for user-initiated changes
-                }
-                "time-pos" => {
-                  // Update state but throttle reporting
-                  Self::update_state_from_property(&state, &event);
+              let decision = property_report_decision(property_name);
+              let should_report = if decision == PropertyReportDecision::Ignore {
+                false
+              } else {
+                Self::update_state_from_property(&state, &event);
+                if property_name == "time-pos" {
                   Self::apply_intro_skipper(&state, &action_tx, &config, &event).await;
-                  let now = std::time::Instant::now();
-                  if now.duration_since(last_progress_report) >= progress_report_interval {
-                    last_progress_report = now;
-                    true
-                  } else {
-                    false
-                  }
                 }
-                _ => false,
+
+                let now = std::time::Instant::now();
+                let should_report = should_report_progress(
+                  decision,
+                  now,
+                  last_progress_report,
+                  progress_report_interval,
+                );
+                if should_report && decision == PropertyReportDecision::ReportWhenThrottleElapsed {
+                  last_progress_report = now;
+                }
+                should_report
               };
 
               if should_report {
@@ -1168,33 +1173,7 @@ impl SessionManager {
       None => return,
     };
 
-    match property_name {
-      "pause" => {
-        if let Some(paused) = data.as_bool() {
-          playback.is_paused = paused;
-          log::debug!("State updated: pause = {}", paused);
-        }
-      }
-      "volume" => {
-        if let Some(vol) = data.as_f64() {
-          playback.volume = vol as i32;
-          log::debug!("State updated: volume = {}", vol);
-        }
-      }
-      "mute" => {
-        if let Some(muted) = data.as_bool() {
-          playback.is_muted = muted;
-          log::debug!("State updated: mute = {}", muted);
-        }
-      }
-      "time-pos" => {
-        if let Some(pos) = data.as_f64() {
-          playback.position_ticks = seconds_to_ticks(pos);
-          // Don't log time-pos updates, too noisy
-        }
-      }
-      _ => {}
-    }
+    apply_property_update(playback, property_name, data);
   }
 
   /// Apply Intro Skipper seek decisions for a time-position update.
@@ -1277,7 +1256,7 @@ impl SessionManager {
     log::info!("MPV end-file event, reason: {}", reason);
 
     // "eof" means natural end of file, "stop" means user stopped
-    if reason != "eof" {
+    if !is_natural_end(event.reason.as_deref()) {
       return;
     }
 
@@ -1321,47 +1300,30 @@ impl SessionManager {
       _ => return,
     };
 
-    let command = args[0].as_str();
-    log::info!("MPV client-message: {}", command);
+    let Some(direction) = client_message_direction(args) else {
+      log::debug!("Unknown client-message command: {}", args[0]);
+      return;
+    };
 
-    match command {
-      "jmsr-next" => {
-        let current_item = {
-          let s = state.read();
-          s.current_item.clone()
-        };
+    let current_item = {
+      let s = state.read();
+      s.current_item.clone()
+    };
 
-        if let Some(item) = current_item {
-          log::info!("Keyboard shortcut: playing next episode");
-          if let Err(e) =
-            Self::play_adjacent_episode(client, state, action_tx, config, &item, true, true).await
-          {
-            log::warn!("Keyboard shortcut next unavailable: {}", e);
-          }
-        } else {
-          log::warn!("jmsr-next: No current item");
-        }
-      }
-      "jmsr-prev" => {
-        let current_item = {
-          let s = state.read();
-          s.current_item.clone()
-        };
+    let Some(item) = current_item else {
+      log::warn!("{}: No current item", args[0]);
+      return;
+    };
 
-        if let Some(item) = current_item {
-          log::info!("Keyboard shortcut: playing previous episode");
-          if let Err(e) =
-            Self::play_adjacent_episode(client, state, action_tx, config, &item, false, true).await
-          {
-            log::warn!("Keyboard shortcut previous unavailable: {}", e);
-          }
-        } else {
-          log::warn!("jmsr-prev: No current item");
-        }
-      }
-      _ => {
-        log::debug!("Unknown client-message command: {}", command);
-      }
+    let next = direction == crate::playback_control::AdjacentDirection::Next;
+    log::info!(
+      "Keyboard shortcut: playing {} episode",
+      if next { "next" } else { "previous" }
+    );
+    if let Err(e) =
+      Self::play_adjacent_episode(client, state, action_tx, config, &item, next, true).await
+    {
+      log::warn!("Keyboard shortcut {} unavailable: {}", args[0], e);
     }
   }
 
