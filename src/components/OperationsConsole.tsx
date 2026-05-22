@@ -364,29 +364,6 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
               </p>
             </div>
             <div class="flex flex-wrap gap-3">
-              <Show when={!state()?.connected && loadSavedSession()}>
-                <button
-                  type="button"
-                  class="btn-primary"
-                  disabled={reconnecting()}
-                  onClick={handleReconnect}
-                >
-                  <Power class="h-5 w-5" />
-                  {reconnecting() ? 'Reconnecting...' : 'Reconnect'}
-                </button>
-              </Show>
-              <Show when={state()?.connected && !mpvConnected()}>
-                <button
-                  type="button"
-                  class="btn-secondary"
-                  onClick={() =>
-                    void commands.mpvStart().then(() => refetchMpv())
-                  }
-                >
-                  <Play class="h-5 w-5" />
-                  Start MPV
-                </button>
-              </Show>
               <button
                 type="button"
                 onClick={handleRefresh}
@@ -449,8 +426,6 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
 
         <div class="console-grid">
           <div class="space-y-6">
-            <NowPlayingCard />
-
             <SectionCard icon={<Activity class="h-6 w-6" />} title="Connection">
               <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div class="rounded-2xl bg-surface-container-high p-4">
@@ -496,7 +471,7 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
                   onClick={handleDisconnect}
                 >
                   <Power class="h-5 w-5" />
-                  {disconnecting() ? 'Disconnecting...' : 'Disconnect now'}
+                  {disconnecting() ? 'Disconnecting...' : 'Disconnect'}
                 </button>
                 <Show when={!state()?.connected && loadSavedSession()}>
                   <button
@@ -509,8 +484,13 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
                   </button>
                 </Show>
               </div>
+              <p class="mt-3 text-body-small text-on-surface-variant">
+                Disconnect ends the active Jellyfin connection but keeps the
+                Saved Session available for Reconnect.
+              </p>
             </SectionCard>
 
+            <NowPlayingCard />
             <form
               onSubmit={(event) => {
                 event.preventDefault();
@@ -914,8 +894,8 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
                 <div>
                   <h2 class="text-title-medium text-on-surface">Session</h2>
                   <p class="mt-1 text-body-small text-on-surface-variant">
-                    Sign Out removes the Saved Session and requires
-                    authentication before reconnecting.
+                    Sign out removes the Saved Session and requires
+                    authentication before Reconnect is available.
                   </p>
                 </div>
               </div>

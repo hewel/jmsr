@@ -194,6 +194,31 @@ test('operations console clears preferred subtitle languages', async () => {
   cleanup();
 });
 
+test('connection comes before now playing and hero keeps only refresh', async () => {
+  const cleanup = renderConsole();
+
+  await waitFor(() =>
+    expect(screen.getByText('Operations Console')).toBeVisible(),
+  );
+
+  const headings = screen.getAllByRole('heading').map((heading) => ({
+    text: heading.textContent,
+    top: heading.getBoundingClientRect().top,
+  }));
+  expect(
+    headings.findIndex((heading) => heading.text === 'Connection'),
+  ).toBeLessThan(
+    headings.findIndex(
+      (heading) => heading.text === 'No active playback metadata',
+    ),
+  );
+  expect(screen.getByRole('button', { name: 'Refresh status' })).toBeVisible();
+  expect(screen.queryByRole('button', { name: 'Start MPV' })).toBeVisible();
+  expect(screen.queryByRole('button', { name: 'Reconnect' })).toBeNull();
+
+  cleanup();
+});
+
 test('disconnect keeps saved session and stays on console', async () => {
   localStorage.setItem('jmsr_auth_session', JSON.stringify({ serverUrl: 'x' }));
   const disconnect = rstest
@@ -209,14 +234,19 @@ test('disconnect keeps saved session and stays on console', async () => {
   );
   await waitFor(() =>
     expect(
-      screen.getByRole('button', { name: 'Disconnect now' }),
+      screen.getByRole('button', { name: 'Disconnect' }),
     ).not.toBeDisabled(),
   );
-  fireEvent.click(screen.getByRole('button', { name: 'Disconnect now' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
 
   await waitFor(() => expect(disconnect).toHaveBeenCalledTimes(1));
   expect(localStorage.getItem('jmsr_auth_session')).not.toBeNull();
   expect(screen.getByText('Operations Console')).toBeVisible();
+  expect(
+    screen.getByText(
+      /Disconnect ends the active Jellyfin connection but keeps the Saved Session available for Reconnect./,
+    ),
+  ).toBeVisible();
 
   cleanup();
 });
