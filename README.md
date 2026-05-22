@@ -62,6 +62,9 @@ JMSR allows you to cast media from any Jellyfin client (web, mobile, TV) to your
 
 ## 📦 Release Notes
 
+### v1.3.2
+
+- Migrated login, diagnostics, settings, subtitle priorities, session dialog, and now playing controls to headless Ark UI Solid primitives while preserving JMSR Control Room styling and behavior.
 ### v1.3.1
 
 - Added Arch Linux `.pkg.tar.zst` release packaging.
