@@ -347,6 +347,43 @@ test('autosaves are serialized without overwriting newer drafts', async () => {
   cleanup();
 });
 
+test('player bridge autosave failure recovers on later save', async () => {
+  const configSet = rstest
+    .spyOn(commands, 'configSet')
+    .mockResolvedValueOnce({
+      status: 'error',
+      error: { message: 'Disk unavailable' },
+    })
+    .mockResolvedValueOnce({ status: 'ok', data: null });
+  const cleanup = renderConsole();
+
+  await screen.findByDisplayValue('JMSR Test');
+  const mpvPath = screen.getByPlaceholderText(
+    'Path to mpv executable',
+  ) as HTMLInputElement;
+  fireEvent.input(mpvPath, { target: { value: '/broken/mpv' } });
+  fireEvent.blur(mpvPath);
+
+  await waitFor(() =>
+    expect(screen.getAllByText('Disk unavailable').length).toBeGreaterThan(0),
+  );
+
+  const deviceName = screen.getByDisplayValue('JMSR Test') as HTMLInputElement;
+  fireEvent.input(deviceName, { target: { value: 'JMSR Recovery' } });
+  fireEvent.blur(deviceName);
+
+  await waitFor(() => expect(configSet).toHaveBeenCalledTimes(2));
+  expect(configSet).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      deviceName: 'JMSR Recovery',
+      mpvPath: '/broken/mpv',
+    }),
+  );
+  expect(screen.getByText('Saved')).toBeVisible();
+
+  cleanup();
+});
+
 test('connection comes before now playing and hero keeps only refresh', async () => {
   const cleanup = renderConsole();
 
@@ -368,6 +405,36 @@ test('connection comes before now playing and hero keeps only refresh', async ()
   expect(screen.getByRole('button', { name: 'Refresh status' })).toBeVisible();
   expect(screen.queryByRole('button', { name: 'Start MPV' })).toBeNull();
   expect(screen.queryByRole('button', { name: 'Reconnect' })).toBeNull();
+
+  cleanup();
+});
+
+test('final console structure covers all operational areas in order', async () => {
+  const cleanup = renderConsole();
+
+  await screen.findByDisplayValue('JMSR Test');
+  const headings = screen
+    .getAllByRole('heading')
+    .map((heading) => heading.textContent);
+  expect(headings).toEqual(
+    expect.arrayContaining([
+      'Connection',
+      'No active playback metadata',
+      'Player Bridge settings',
+      'Diagnostics',
+      'Automatic Intro Skip',
+      'Session',
+    ]),
+  );
+  expect(headings.indexOf('Connection')).toBeLessThan(
+    headings.indexOf('No active playback metadata'),
+  );
+  expect(headings.indexOf('Diagnostics')).toBeLessThan(
+    headings.indexOf('Automatic Intro Skip'),
+  );
+  expect(
+    screen.getByRole('button', { name: 'Toggle diagnostics' }),
+  ).toHaveAttribute('aria-expanded', 'false');
 
   cleanup();
 });
