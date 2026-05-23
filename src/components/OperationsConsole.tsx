@@ -5,6 +5,7 @@ import { Dialog } from '@ark-ui/solid/dialog';
 import { Field as ArkField } from '@ark-ui/solid/field';
 import { TagsInput } from '@ark-ui/solid/tags-input';
 import { createForm } from '@tanstack/solid-form';
+import { Effect, Exit } from 'effect';
 import {
   Activity,
   Bot,
@@ -29,6 +30,7 @@ import {
 } from 'solid-js';
 import { Portal } from 'solid-js/web';
 import { type AppConfig, type ConnectionState, commands } from '../bindings';
+import { detectMpv } from '../effects/config';
 import { clearSavedSession, loadSavedSession } from '../router';
 import DiagnosticsPanel from './DiagnosticsPanel';
 import NowPlayingCard from './NowPlayingCard';
@@ -495,8 +497,9 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
 
   const handleDetectMpv = async () => {
     setDetectingMpv(true);
-    try {
-      const path = await commands.configDetectMpv();
+    const exit = await Effect.runPromiseExit(detectMpv());
+    if (Exit.isSuccess(exit)) {
+      const path = exit.value;
       if (path) {
         form.setFieldValue('mpvPath', path);
         queueConfigSave(buildConfigSnapshot({ mpvPath: path }));
@@ -507,12 +510,12 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
           'MPV not found in PATH. Configure the path manually.',
         );
       }
-    } catch (error) {
+    } else {
+      const error = exit.cause.reasons[0].error;
       console.error('Failed to detect MPV:', error);
       showToast('error', 'Failed to detect MPV');
-    } finally {
-      setDetectingMpv(false);
     }
+    setDetectingMpv(false);
   };
 
   const handleIntroSkipperToggle = (enabled: boolean) => {
