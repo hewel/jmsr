@@ -1651,8 +1651,10 @@ mod tests {
   async fn disabled_intro_skipper_setting_emits_no_seek_action() {
     let state = test_state_with_intro_range();
     let (action_tx, mut action_rx) = mpsc::channel(1);
-    let mut config = AppConfig::default();
-    config.intro_skipper_enabled = false;
+    let config = AppConfig {
+      intro_skipper_enabled: false,
+      ..Default::default()
+    };
     let config = RwLock::new(config);
     let event = crate::mpv::MpvEvent {
       event: "property-change".to_string(),
@@ -1672,8 +1674,10 @@ mod tests {
   async fn disabled_intro_skipper_setting_blocks_credit_seek_action() {
     let state = test_state_with_range(IntroSkipKind::Credits, 1200.0, 1260.0);
     let (action_tx, mut action_rx) = mpsc::channel(1);
-    let mut config = AppConfig::default();
-    config.intro_skipper_enabled = false;
+    let config = AppConfig {
+      intro_skipper_enabled: false,
+      ..Default::default()
+    };
     let config = RwLock::new(config);
     let event = crate::mpv::MpvEvent {
       event: "property-change".to_string(),
@@ -1855,7 +1859,10 @@ mod regression_tests {
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
       action_tx.send(MpvAction::SetVolume(volume)).await.unwrap();
-      assert!(matches!(action_rx.recv().await, Some(MpvAction::SetVolume(50))));
+      assert!(matches!(
+        action_rx.recv().await,
+        Some(MpvAction::SetVolume(50))
+      ));
     });
   }
 

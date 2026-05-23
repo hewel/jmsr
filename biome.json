@@ -1,7 +1,14 @@
 {
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
   "files": {
-    "includes": ["src/**", "tests/**", "!**/bindings.ts"]
+    "includes": [
+      "{package,biome,tsconfig}.json",
+      "*.config.{js,json,jsonc,mjs,ts}",
+      "src/**",
+      "tests/**",
+      "src-tauri/**/*.json",
+      "!**/bindings.ts"
+    ]
   },
   "assist": {
     "actions": {

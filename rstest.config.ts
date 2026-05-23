@@ -1,6 +1,6 @@
-import { defineConfig } from '@rstest/core';
 import { pluginBabel } from '@rsbuild/plugin-babel';
 import { pluginSolid } from '@rsbuild/plugin-solid';
+import { defineConfig } from '@rstest/core';
 
 // Docs: https://rstest.rs/config/
 export default defineConfig({
