@@ -220,3 +220,42 @@ test('login page completes quick connect when approval is observed', async () =>
 
   cleanup();
 });
+
+import { Effect, Exit } from 'effect';
+import { StorageParseError } from '../src/effects/errors';
+import {
+  CREDENTIALS_STORAGE_KEY,
+  loadSavedCredentials,
+} from '../src/effects/session';
+
+test('loadSavedCredentials returns StorageParseError for malformed JSON', () => {
+  localStorage.setItem(CREDENTIALS_STORAGE_KEY, 'not json');
+  const exit = Effect.runSyncExit(loadSavedCredentials());
+  expect(Exit.isFailure(exit)).toBe(true);
+  if (Exit.isFailure(exit)) {
+    const error = exit.cause.reasons[0].error;
+    expect(error).toBeInstanceOf(StorageParseError);
+    expect(error.key).toBe(CREDENTIALS_STORAGE_KEY);
+  }
+});
+
+test('loadSavedCredentials returns StorageParseError for wrong shape', () => {
+  localStorage.setItem(
+    CREDENTIALS_STORAGE_KEY,
+    JSON.stringify({ notServerUrl: true }),
+  );
+  const exit = Effect.runSyncExit(loadSavedCredentials());
+  expect(Exit.isFailure(exit)).toBe(true);
+  if (Exit.isFailure(exit)) {
+    const error = exit.cause.reasons[0].error;
+    expect(error).toBeInstanceOf(StorageParseError);
+  }
+});
+
+test('loadSavedCredentials returns null for missing key', () => {
+  const exit = Effect.runSyncExit(loadSavedCredentials());
+  expect(Exit.isSuccess(exit)).toBe(true);
+  if (Exit.isSuccess(exit)) {
+    expect(exit.value).toBeNull();
+  }
+});

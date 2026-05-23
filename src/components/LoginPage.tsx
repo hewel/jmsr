@@ -2,9 +2,15 @@ import { Checkbox } from '@ark-ui/solid/checkbox';
 import { Field as ArkField } from '@ark-ui/solid/field';
 import { Tabs } from '@ark-ui/solid/tabs';
 import { createForm } from '@tanstack/solid-form';
+import { Effect, Exit } from 'effect';
 import { Check, CircleAlert, LoaderCircle, RadioTower } from 'lucide-solid';
 import { createSignal, onCleanup, onMount, Show } from 'solid-js';
 import { type Credentials, commands } from '../bindings';
+import {
+  clearSavedCredentials,
+  loadSavedCredentials,
+  saveCredentials,
+} from '../effects/session';
 import { saveSession } from '../router';
 import {
   buildServerUrl,
@@ -19,17 +25,8 @@ import { Card, PageFooter } from './ui';
 interface LoginPageProps {
   onConnected: () => void;
 }
-
-const STORAGE_KEY = 'jmsr_saved_credentials';
-
 type LoginMethod = 'quickConnect' | 'password';
 type QuickConnectState = 'idle' | 'waiting' | 'failed';
-
-interface SavedCredentials {
-  serverUrl: string;
-  username: string;
-  rememberMe: boolean;
-}
 
 interface LoginValues {
   scheme: ServerScheme;
@@ -37,27 +34,6 @@ interface LoginValues {
   username: string;
   password: string;
   rememberMe: boolean;
-}
-
-function loadSavedCredentials(): SavedCredentials | null {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) return JSON.parse(saved) as SavedCredentials;
-  } catch {
-    // Ignore parse errors.
-  }
-  return null;
-}
-
-function saveCredentials(serverUrl: string, username: string): void {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({ serverUrl, username, rememberMe: true }),
-  );
-}
-
-function clearSavedCredentials(): void {
-  localStorage.removeItem(STORAGE_KEY);
 }
 
 export default function LoginPage(props: LoginPageProps) {
@@ -238,8 +214,9 @@ export default function LoginPage(props: LoginPageProps) {
     try {
       const result = await commands.jellyfinConnect(credentials);
       if (result.status === 'ok') {
-        if (value.rememberMe) saveCredentials(finalServerUrl, value.username);
-        else clearSavedCredentials();
+        if (value.rememberMe)
+          Effect.runSync(saveCredentials(finalServerUrl, value.username));
+        else Effect.runSync(clearSavedCredentials());
         await finishConnected();
       } else {
         setError(result.error.message);
@@ -256,13 +233,14 @@ export default function LoginPage(props: LoginPageProps) {
   };
 
   onMount(() => {
-    const saved = loadSavedCredentials();
+    const exit = Effect.runSyncExit(loadSavedCredentials());
+    if (!Exit.isSuccess(exit)) return;
+    const saved = exit.value;
     if (!saved) return;
     const parsed = parseServerUrl(saved.serverUrl);
     form.reset({
       scheme: parsed.scheme,
       host: parsed.host,
-      username: saved.username,
       password: '',
       rememberMe: saved.rememberMe,
     });

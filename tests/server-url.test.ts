@@ -1,4 +1,7 @@
 import { expect, test } from '@rstest/core';
+import { Effect, Exit } from 'effect';
+import { InvalidServerUrl } from '../src/effects/errors';
+import { buildServerUrlEffect } from '../src/effects/serverUrl';
 import {
   buildServerUrl,
   defaultSchemeForHost,
@@ -57,4 +60,28 @@ test('rejects missing host', () => {
   expect(() => buildServerUrl({ scheme: 'https', host: '' })).toThrow(
     'Server host is required',
   );
+});
+
+test('buildServerUrlEffect fails with InvalidServerUrl for missing host', () => {
+  const result = Effect.runSyncExit(
+    buildServerUrlEffect({ scheme: 'https', host: '' }),
+  );
+  expect(Exit.isFailure(result)).toBe(true);
+  if (Exit.isFailure(result)) {
+    const error = result.cause.reasons[0].error;
+    expect(error).toBeInstanceOf(InvalidServerUrl);
+    expect(error.message).toBe('Server host is required');
+  }
+});
+
+test('buildServerUrlEffect fails with InvalidServerUrl for invalid host', () => {
+  const result = Effect.runSyncExit(
+    buildServerUrlEffect({ scheme: 'https', host: 'not a valid host?!' }),
+  );
+  expect(Exit.isFailure(result)).toBe(true);
+  if (Exit.isFailure(result)) {
+    const error = result.cause.reasons[0].error;
+    expect(error).toBeInstanceOf(InvalidServerUrl);
+    expect(error.message).toBe('Enter a valid Jellyfin server host');
+  }
 });
