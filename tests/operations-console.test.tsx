@@ -639,3 +639,59 @@ test('settings and session actions keep shared visual semantics', async () => {
 
   cleanup();
 });
+
+import { Effect, Exit } from 'effect';
+import {
+  clearSavedSession,
+  loadSavedSession,
+  SESSION_STORAGE_KEY,
+  saveSession,
+} from '../src/effects/auth';
+import { StorageParseError } from '../src/effects/errors';
+
+const sampleSession = {
+  serverUrl: 'https://jellyfin.example.com',
+  accessToken: 'token-1',
+  userId: 'user-1',
+  userName: 'Ada',
+  serverName: 'Jellyfin Home',
+  deviceId: 'device-1',
+};
+
+test('session save and load round-trips through Effect', () => {
+  Effect.runSync(saveSession(sampleSession));
+  const exit = Effect.runSyncExit(loadSavedSession());
+  expect(Exit.isSuccess(exit)).toBe(true);
+  if (Exit.isSuccess(exit)) {
+    expect(exit.value).toEqual(sampleSession);
+  }
+});
+
+test('clearSavedSession removes the stored session', () => {
+  Effect.runSync(saveSession(sampleSession));
+  Effect.runSync(clearSavedSession());
+  const exit = Effect.runSyncExit(loadSavedSession());
+  expect(Exit.isSuccess(exit)).toBe(true);
+  if (Exit.isSuccess(exit)) {
+    expect(exit.value).toBeNull();
+  }
+});
+
+test('loadSavedSession returns StorageParseError for malformed JSON', () => {
+  localStorage.setItem(SESSION_STORAGE_KEY, '{bad');
+  const exit = Effect.runSyncExit(loadSavedSession());
+  expect(Exit.isFailure(exit)).toBe(true);
+  if (Exit.isFailure(exit)) {
+    const error = exit.cause.reasons[0].error;
+    expect(error).toBeInstanceOf(StorageParseError);
+    expect(error.key).toBe(SESSION_STORAGE_KEY);
+  }
+});
+
+test('loadSavedSession returns null when no session is stored', () => {
+  const exit = Effect.runSyncExit(loadSavedSession());
+  expect(Exit.isSuccess(exit)).toBe(true);
+  if (Exit.isSuccess(exit)) {
+    expect(exit.value).toBeNull();
+  }
+});

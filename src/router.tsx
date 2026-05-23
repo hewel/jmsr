@@ -6,28 +6,28 @@ import {
   redirect,
   useNavigate,
 } from '@tanstack/solid-router';
+import { Effect, Exit } from 'effect';
 import { commands, type SavedSession } from './bindings';
 import LoginPage from './components/LoginPage';
 import OperationsConsole from './components/OperationsConsole';
-
-const SESSION_STORAGE_KEY = 'jmsr_auth_session';
+import {
+  clearSavedSession as clearSessionEffect,
+  loadSavedSession as loadSessionEffect,
+  saveSession as saveSessionEffect,
+} from './effects/auth';
 
 export function loadSavedSession(): SavedSession | null {
-  try {
-    const saved = localStorage.getItem(SESSION_STORAGE_KEY);
-    if (saved) return JSON.parse(saved) as SavedSession;
-  } catch {
-    // Ignore parse errors.
-  }
+  const exit = Effect.runSyncExit(loadSessionEffect());
+  if (Exit.isSuccess(exit)) return exit.value;
   return null;
 }
 
 export function saveSession(session: SavedSession): void {
-  localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+  Effect.runSync(saveSessionEffect(session));
 }
 
 export function clearSavedSession(): void {
-  localStorage.removeItem(SESSION_STORAGE_KEY);
+  Effect.runSync(clearSessionEffect());
 }
 
 async function restoreSavedSession(): Promise<boolean> {
