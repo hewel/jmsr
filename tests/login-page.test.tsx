@@ -3,7 +3,16 @@ import { fireEvent, screen, waitFor } from '@testing-library/dom';
 import { render } from 'solid-js/web';
 import { commands } from '../src/bindings';
 import LoginPage from '../src/components/LoginPage';
+import { loadSavedSession } from '../src/sessionAccess';
 
+const sampleSession = {
+  serverUrl: 'https://jellyfin.example.com',
+  accessToken: 'token-1',
+  userId: 'user-1',
+  userName: 'Ada',
+  serverName: 'Jellyfin Home',
+  deviceId: 'device-1',
+};
 function renderLoginPage(onConnected = () => undefined) {
   const root = document.createElement('div');
   document.body.append(root);
@@ -192,14 +201,7 @@ test('login page completes quick connect when approval is observed', async () =>
     status: 'ok',
     data: null,
   });
-  rstest.spyOn(commands, 'jellyfinGetSession').mockResolvedValue({
-    serverUrl: 'https://jellyfin.example.com',
-    accessToken: 'token-1',
-    userId: 'user-1',
-    userName: 'Ada',
-    serverName: 'Jellyfin Home',
-    deviceId: 'device-1',
-  });
+  rstest.spyOn(commands, 'jellyfinGetSession').mockResolvedValue(sampleSession);
   const onConnected = rstest.fn();
   const cleanup = renderLoginPage(onConnected);
 
@@ -217,6 +219,39 @@ test('login page completes quick connect when approval is observed', async () =>
   await rstest.advanceTimersByTimeAsync(5000);
 
   await waitFor(() => expect(onConnected).toHaveBeenCalledTimes(1));
+  expect(loadSavedSession()).toEqual(sampleSession);
+
+  cleanup();
+});
+
+test('password login saves the authenticated session', async () => {
+  rstest.spyOn(commands, 'jellyfinConnect').mockResolvedValue({
+    status: 'ok',
+    data: null,
+  });
+  rstest.spyOn(commands, 'jellyfinGetSession').mockResolvedValue(sampleSession);
+  const onConnected = rstest.fn();
+  const cleanup = renderLoginPage(onConnected);
+
+  fireEvent.input(
+    screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin'),
+    {
+      target: { value: 'jellyfin.example.com' },
+    },
+  );
+  fireEvent.click(screen.getByRole('tab', { name: 'Password' }));
+
+  await waitFor(() => expect(screen.getByText('Username')).toBeVisible());
+  fireEvent.input(screen.getByPlaceholderText('Jellyfin username'), {
+    target: { value: 'ada' },
+  });
+  fireEvent.input(screen.getByPlaceholderText('Jellyfin password'), {
+    target: { value: 'secret' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
+
+  await waitFor(() => expect(onConnected).toHaveBeenCalledTimes(1));
+  expect(loadSavedSession()).toEqual(sampleSession);
 
   cleanup();
 });

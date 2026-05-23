@@ -11,7 +11,6 @@ import {
   loadSavedCredentials,
   saveCredentials,
 } from '../effects/session';
-import { saveSession } from '../router';
 import {
   buildServerUrl,
   defaultSchemeForHost,
@@ -20,6 +19,7 @@ import {
   type ServerScheme,
   stripServerScheme,
 } from '../serverUrl';
+import { saveCurrentSession } from '../sessionAccess';
 import { Card, PageFooter } from './ui';
 
 interface LoginPageProps {
@@ -102,8 +102,7 @@ export default function LoginPage(props: LoginPageProps) {
   };
 
   const finishConnected = async () => {
-    const session = await commands.jellyfinGetSession();
-    if (session) saveSession(session);
+    await saveCurrentSession();
     props.onConnected();
   };
 
