@@ -7,6 +7,14 @@ type LogHandler = (event: {
   payload: { level: number; message: string };
 }) => void;
 
+declare global {
+  interface Window {
+    __TAURI_INTERNALS__: {
+      transformCallback: (callback: LogHandler) => number;
+    };
+  }
+}
+
 let logHandler: LogHandler | null = null;
 let clipboardWriteText: ReturnType<typeof rstest.fn>;
 

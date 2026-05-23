@@ -30,6 +30,7 @@ import {
 } from 'solid-js';
 import { Portal } from 'solid-js/web';
 import { type AppConfig, type ConnectionState, commands } from '../bindings';
+import { commandFailure, commandFailureMessage } from '../effects/commands';
 import { detectMpv } from '../effects/config';
 import { clearSavedSession, loadSavedSession } from '../router';
 import DiagnosticsPanel from './DiagnosticsPanel';
@@ -511,8 +512,11 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
         );
       }
     } else {
-      const error = exit.cause.reasons[0].error;
-      console.error('Failed to detect MPV:', error);
+      console.error(
+        'Failed to detect MPV:',
+        commandFailure(exit.cause) ??
+          commandFailureMessage(exit.cause, 'Failed to detect MPV'),
+      );
       showToast('error', 'Failed to detect MPV');
     }
     setDetectingMpv(false);

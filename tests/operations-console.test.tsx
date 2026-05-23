@@ -1,7 +1,12 @@
 import { afterEach, expect, rstest, test } from '@rstest/core';
 import { fireEvent, screen, waitFor, within } from '@testing-library/dom';
 import { render } from 'solid-js/web';
-import { commands, events, type NowPlayingState } from '../src/bindings';
+import {
+  type AppConfig,
+  commands,
+  events,
+  type NowPlayingState,
+} from '../src/bindings';
 import OperationsConsole from '../src/components/OperationsConsole';
 import { ToastProvider } from '../src/components/ToastProvider';
 
@@ -12,7 +17,7 @@ const connectedState = {
   userName: 'Ada',
 };
 
-const config = {
+const config: AppConfig = {
   deviceName: 'JMSR Test',
   mpvPath: null,
   mpvArgs: [],
@@ -147,7 +152,7 @@ test('automatic intro skip tile toggles the synced checkbox optimistically', asy
 test('automatic intro skip rolls back and shows inline error on save failure', async () => {
   rstest.spyOn(commands, 'configSet').mockResolvedValue({
     status: 'error',
-    error: { message: 'Config write failed' },
+    error: { code: 'internal', message: 'Config write failed' },
   });
   const cleanup = renderConsole();
 
@@ -380,7 +385,7 @@ test('player bridge autosave failure recovers on later save', async () => {
     .spyOn(commands, 'configSet')
     .mockResolvedValueOnce({
       status: 'error',
-      error: { message: 'Disk unavailable' },
+      error: { code: 'internal', message: 'Disk unavailable' },
     })
     .mockResolvedValueOnce({ status: 'ok', data: null });
   const cleanup = renderConsole();
@@ -640,7 +645,7 @@ test('settings and session actions keep shared visual semantics', async () => {
   cleanup();
 });
 
-import { Effect, Exit } from 'effect';
+import { Cause, Effect, Exit } from 'effect';
 import {
   clearSavedSession,
   loadSavedSession,
@@ -682,7 +687,11 @@ test('loadSavedSession returns StorageParseError for malformed JSON', () => {
   const exit = Effect.runSyncExit(loadSavedSession());
   expect(Exit.isFailure(exit)).toBe(true);
   if (Exit.isFailure(exit)) {
-    const error = exit.cause.reasons[0].error;
+    const reason = exit.cause.reasons[0];
+    if (!reason || !Cause.isFailReason(reason)) {
+      throw new Error('Expected typed StorageParseError failure');
+    }
+    const error = reason.error;
     expect(error).toBeInstanceOf(StorageParseError);
     expect(error.key).toBe(SESSION_STORAGE_KEY);
   }

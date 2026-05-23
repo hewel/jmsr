@@ -1,5 +1,5 @@
 import { expect, test } from '@rstest/core';
-import { Effect, Exit } from 'effect';
+import { Cause, Effect, Exit } from 'effect';
 import { InvalidServerUrl } from '../src/effects/errors';
 import { buildServerUrlEffect } from '../src/effects/serverUrl';
 import {
@@ -68,7 +68,11 @@ test('buildServerUrlEffect fails with InvalidServerUrl for missing host', () => 
   );
   expect(Exit.isFailure(result)).toBe(true);
   if (Exit.isFailure(result)) {
-    const error = result.cause.reasons[0].error;
+    const reason = result.cause.reasons[0];
+    if (!reason || !Cause.isFailReason(reason)) {
+      throw new Error('Expected typed InvalidServerUrl failure');
+    }
+    const error = reason.error;
     expect(error).toBeInstanceOf(InvalidServerUrl);
     expect(error.message).toBe('Server host is required');
   }
@@ -80,7 +84,11 @@ test('buildServerUrlEffect fails with InvalidServerUrl for invalid host', () => 
   );
   expect(Exit.isFailure(result)).toBe(true);
   if (Exit.isFailure(result)) {
-    const error = result.cause.reasons[0].error;
+    const reason = result.cause.reasons[0];
+    if (!reason || !Cause.isFailReason(reason)) {
+      throw new Error('Expected typed InvalidServerUrl failure');
+    }
+    const error = reason.error;
     expect(error).toBeInstanceOf(InvalidServerUrl);
     expect(error.message).toBe('Enter a valid Jellyfin server host');
   }

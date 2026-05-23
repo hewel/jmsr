@@ -1,4 +1,5 @@
 import { Data } from 'effect';
+import type { CommandErrorCode } from '../bindings';
 
 export class InvalidServerUrl extends Data.TaggedError('InvalidServerUrl')<{
   readonly message: string;
@@ -10,5 +11,6 @@ export class StorageParseError extends Data.TaggedError('StorageParseError')<{
 }> {}
 
 export class CommandError extends Data.TaggedError('CommandError')<{
+  readonly code?: CommandErrorCode;
   readonly message: string;
 }> {}

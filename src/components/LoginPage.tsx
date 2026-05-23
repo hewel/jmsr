@@ -241,6 +241,7 @@ export default function LoginPage(props: LoginPageProps) {
     form.reset({
       scheme: parsed.scheme,
       host: parsed.host,
+      username: saved.username,
       password: '',
       rememberMe: saved.rememberMe,
     });

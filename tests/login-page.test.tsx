@@ -221,7 +221,7 @@ test('login page completes quick connect when approval is observed', async () =>
   cleanup();
 });
 
-import { Effect, Exit } from 'effect';
+import { Cause, Effect, Exit } from 'effect';
 import { StorageParseError } from '../src/effects/errors';
 import {
   CREDENTIALS_STORAGE_KEY,
@@ -233,7 +233,11 @@ test('loadSavedCredentials returns StorageParseError for malformed JSON', () => 
   const exit = Effect.runSyncExit(loadSavedCredentials());
   expect(Exit.isFailure(exit)).toBe(true);
   if (Exit.isFailure(exit)) {
-    const error = exit.cause.reasons[0].error;
+    const reason = exit.cause.reasons[0];
+    if (!reason || !Cause.isFailReason(reason)) {
+      throw new Error('Expected typed StorageParseError failure');
+    }
+    const error = reason.error;
     expect(error).toBeInstanceOf(StorageParseError);
     expect(error.key).toBe(CREDENTIALS_STORAGE_KEY);
   }
@@ -247,7 +251,11 @@ test('loadSavedCredentials returns StorageParseError for wrong shape', () => {
   const exit = Effect.runSyncExit(loadSavedCredentials());
   expect(Exit.isFailure(exit)).toBe(true);
   if (Exit.isFailure(exit)) {
-    const error = exit.cause.reasons[0].error;
+    const reason = exit.cause.reasons[0];
+    if (!reason || !Cause.isFailReason(reason)) {
+      throw new Error('Expected typed StorageParseError failure');
+    }
+    const error = reason.error;
     expect(error).toBeInstanceOf(StorageParseError);
   }
 });

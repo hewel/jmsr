@@ -1,4 +1,4 @@
-import { Effect } from 'effect';
+import { Cause, Effect } from 'effect';
 import type { CommandError } from '../bindings';
 import { CommandError as CommandErrorTag } from './errors';
 
@@ -15,7 +15,10 @@ export function runTauriCommand<T>(
     try: async () => {
       const result = await command();
       if (result.status === 'error') {
-        throw new CommandErrorTag({ message: result.error.message });
+        throw new CommandErrorTag({
+          code: result.error.code,
+          message: result.error.message,
+        });
       }
       return result.data;
     },
@@ -26,6 +29,23 @@ export function runTauriCommand<T>(
       });
     },
   });
+}
+export function commandFailure(
+  cause: Cause.Cause<CommandErrorTag>,
+): CommandErrorTag | null {
+  for (const reason of cause.reasons) {
+    if (Cause.isFailReason(reason)) {
+      return reason.error;
+    }
+  }
+  return null;
+}
+
+export function commandFailureMessage(
+  cause: Cause.Cause<CommandErrorTag>,
+  fallback: string,
+): string {
+  return commandFailure(cause)?.message || fallback;
 }
 
 /**

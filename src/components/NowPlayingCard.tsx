@@ -10,8 +10,13 @@ import {
   VolumeX,
 } from 'lucide-solid';
 import { createSignal, onCleanup, onMount, Show } from 'solid-js';
-import { commands, events, type NowPlayingState } from '../bindings';
-import { runTauriCommand } from '../effects/commands';
+import {
+  type CommandError,
+  commands,
+  events,
+  type NowPlayingState,
+} from '../bindings';
+import { commandFailureMessage, runTauriCommand } from '../effects/commands';
 import { useToast } from './ToastProvider';
 import { StatusBadge } from './ui';
 
@@ -84,7 +89,7 @@ export default function NowPlayingCard(props: {
   const runCommand = async (
     key: string,
     command: () => Promise<
-      { status: 'ok' } | { status: 'error'; error: { message: string } }
+      { status: 'ok'; data: null } | { status: 'error'; error: CommandError }
     >,
     failure: string,
   ) => {
@@ -93,8 +98,7 @@ export default function NowPlayingCard(props: {
     if (Exit.isSuccess(exit)) {
       await loadState();
     } else {
-      const error = exit.cause.reasons[0].error;
-      showToast('error', error.message || failure);
+      showToast('error', commandFailureMessage(exit.cause, failure));
     }
     setBusy(null);
   };
