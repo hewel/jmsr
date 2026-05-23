@@ -331,7 +331,7 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
         return;
     } else if (field === 'mpvPath') {
       if (override.mpvPath === desired.mpvPath) return;
-    } else if (override[field] === desired[field]) {
+    } else if (value === desired[field]) {
       return;
     }
 
@@ -583,7 +583,7 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
           />
           <button
             type="button"
-            class="status-tile w-full text-left transition hover:border-primary/50 hover:bg-surface-container-high focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            class="status-tile w-full text-left transition hover:border-primary/50 hover:bg-surface-container-high focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             aria-pressed={introSkipperEnabled()}
             onClick={() => handleIntroSkipperToggle(!introSkipperEnabled())}
           >
@@ -955,6 +955,7 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
                             Add preferred subtitle language
                           </TagsInput.Label>
                           <Combobox.Input
+                            autocomplete="off"
                             asChild={(comboboxInputProps) => (
                               <TagsInput.Input
                                 {...comboboxInputProps({
@@ -971,7 +972,6 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
                                   },
                                   class: 'input-filled w-full font-mono',
                                   placeholder: 'eng',
-                                  autoComplete: 'off',
                                   'aria-label':
                                     'Add preferred subtitle language',
                                 })}
