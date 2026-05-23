@@ -301,6 +301,20 @@ test('loadSavedCredentials returns StorageParseError for malformed JSON', () => 
     expect(error.key).toBe(CREDENTIALS_STORAGE_KEY);
   }
 });
+test('loadSavedCredentials returns StorageParseError for empty malformed JSON', () => {
+  localStorage.setItem(CREDENTIALS_STORAGE_KEY, '');
+  const exit = Effect.runSyncExit(loadSavedCredentials());
+  expect(Exit.isFailure(exit)).toBe(true);
+  if (Exit.isFailure(exit)) {
+    const reason = exit.cause.reasons[0];
+    if (!reason || !Cause.isFailReason(reason)) {
+      throw new Error('Expected typed StorageParseError failure');
+    }
+    const error = reason.error;
+    expect(error).toBeInstanceOf(StorageParseError);
+    expect(error.key).toBe(CREDENTIALS_STORAGE_KEY);
+  }
+});
 
 test('loadSavedCredentials returns StorageParseError for wrong shape', () => {
   localStorage.setItem(

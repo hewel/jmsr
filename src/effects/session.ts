@@ -27,19 +27,16 @@ export function loadSavedCredentials(): Effect.Effect<
     const raw = yield* Effect.sync(() =>
       localStorage.getItem(CREDENTIALS_STORAGE_KEY),
     );
-    if (!raw) return null;
+    if (raw === null) return null;
 
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      return yield* Effect.fail(
+    const parsed: unknown = yield* Effect.try({
+      try: () => JSON.parse(raw),
+      catch: () =>
         new StorageParseError({
           message: 'Could not parse stored credentials',
           key: CREDENTIALS_STORAGE_KEY,
         }),
-      );
-    }
+    });
 
     if (!isSavedCredentials(parsed)) {
       return yield* Effect.fail(

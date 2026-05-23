@@ -8,6 +8,13 @@ test('Saved Session JSON parsing uses an Effect throwing boundary', () => {
   expect(authSource).toContain('try: () => JSON.parse(raw)');
   expect(authSource).toContain('new StorageParseError({');
 });
+test('Login Prefill JSON parsing uses an Effect throwing boundary', () => {
+  const sessionSource = readFileSync('src/effects/session.ts', 'utf8');
+
+  expect(sessionSource).toContain('yield* Effect.try({');
+  expect(sessionSource).toContain('try: () => JSON.parse(raw)');
+  expect(sessionSource).toContain('new StorageParseError({');
+});
 
 test('Saved Session restore and route checks use typed command helpers', () => {
   const sessionAccessSource = readFileSync('src/sessionAccess.ts', 'utf8');
