@@ -27,17 +27,14 @@ export function loadSavedSession(): Effect.Effect<
     );
     if (!raw) return null;
 
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      return yield* Effect.fail(
+    const parsed: unknown = yield* Effect.try({
+      try: () => JSON.parse(raw),
+      catch: () =>
         new StorageParseError({
           message: 'Could not parse saved session',
           key: SESSION_STORAGE_KEY,
         }),
-      );
-    }
+    });
 
     if (!isSavedSession(parsed)) {
       return yield* Effect.fail(
