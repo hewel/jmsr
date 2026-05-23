@@ -6,58 +6,16 @@ import {
   redirect,
   useNavigate,
 } from '@tanstack/solid-router';
-import { Effect, Exit } from 'effect';
-import { commands, type SavedSession } from './bindings';
 import LoginPage from './components/LoginPage';
 import OperationsConsole from './components/OperationsConsole';
-import {
-  clearSavedSession as clearSessionEffect,
-  loadSavedSession as loadSessionEffect,
-  saveSession as saveSessionEffect,
-} from './effects/auth';
+import { canAccessConsole, checkAuthWithRestore } from './sessionAccess';
 
-export function loadSavedSession(): SavedSession | null {
-  const exit = Effect.runSyncExit(loadSessionEffect());
-  if (Exit.isSuccess(exit)) return exit.value;
-  return null;
-}
-
-export function saveSession(session: SavedSession): void {
-  Effect.runSync(saveSessionEffect(session));
-}
-
-export function clearSavedSession(): void {
-  Effect.runSync(clearSessionEffect());
-}
-
-async function restoreSavedSession(): Promise<boolean> {
-  const savedSession = loadSavedSession();
-  if (!savedSession) return false;
-
-  const result = await commands.jellyfinRestoreSession(savedSession);
-  if (result.status === 'ok') return true;
-
-  clearSavedSession();
-  return false;
-}
-
-async function checkAuthWithRestore(): Promise<boolean> {
-  try {
-    if (await commands.jellyfinIsConnected()) return true;
-    return await restoreSavedSession();
-  } catch {
-    return false;
-  }
-}
-
-async function canAccessConsole(): Promise<boolean> {
-  try {
-    if (await commands.jellyfinIsConnected()) return true;
-  } catch {
-    // Fall back to Saved Session check.
-  }
-  return loadSavedSession() !== null;
-}
+export type { SavedSession } from './bindings';
+export {
+  clearSavedSession,
+  loadSavedSession,
+  saveSession,
+} from './sessionAccess';
 
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
