@@ -1,31 +1,7 @@
-import { Collapsible } from '@ark-ui/solid/collapsible';
 import { createListCollection } from '@ark-ui/solid/collection';
-import { Dialog } from '@ark-ui/solid/dialog';
-import { Field as ArkField } from '@ark-ui/solid/field';
-import { Select } from '@ark-ui/solid/select';
-import { TagsInput } from '@ark-ui/solid/tags-input';
 import { createForm } from '@tanstack/solid-form';
 import { Effect, Exit } from 'effect';
-import {
-  Activity,
-  Bot,
-  ChevronDown,
-  ClipboardList,
-  Keyboard,
-  LogOut,
-  Power,
-  RefreshCw,
-  Settings,
-  ShieldAlert,
-} from 'lucide-solid';
-import {
-  createEffect,
-  createResource,
-  createSignal,
-  For,
-  Show,
-} from 'solid-js';
-import { Portal } from 'solid-js/web';
+import { createEffect, createResource, createSignal } from 'solid-js';
 import {
   type AppConfig,
   type ConnectionState,
@@ -33,7 +9,6 @@ import {
   type IntroSkipperMode,
 } from '../bindings';
 import {
-  commandFailure,
   commandFailureMessage,
   runTauriCommand,
   runTauriCommandRaw,
@@ -44,10 +19,19 @@ import {
   loadSavedSession,
   restoreSavedSession,
 } from '../sessionAccess';
-import DiagnosticsPanel from './DiagnosticsPanel';
 import NowPlayingCard from './NowPlayingCard';
+import ConnectionCard from './OperationsConsole/ConnectionCard';
+import DiagnosticsCard from './OperationsConsole/DiagnosticsCard';
+import IntroSkipCard from './OperationsConsole/IntroSkipCard';
+import PlayerBridgeSettingsCard from './OperationsConsole/PlayerBridgeSettingsCard';
+import SessionCard from './OperationsConsole/SessionCard';
+import ShortcutKeysCard from './OperationsConsole/ShortcutKeysCard';
+import {
+  normalizePreferredSubtitleLanguages,
+  parseSubtitleLanguageInput,
+} from './OperationsConsole/subtitleLanguages';
 import { useToast } from './ToastProvider';
-import { PageFooter, SectionCard } from './ui';
+import { PageFooter } from './ui';
 
 interface OperationsConsoleProps {
   onSignedOut: () => void;
@@ -59,70 +43,6 @@ async function fetchConnectionState(): Promise<ConnectionState> {
 
 async function fetchMpvStatus(): Promise<boolean> {
   return await commands.mpvIsConnected();
-}
-
-const COMMON_SUBTITLE_LANGUAGE_OPTIONS = [
-  { code: 'eng', label: 'English' },
-  { code: 'jpn', label: 'Japanese' },
-  { code: 'spa', label: 'Spanish' },
-  { code: 'fre', label: 'French' },
-  { code: 'ger', label: 'German' },
-  { code: 'ita', label: 'Italian' },
-  { code: 'por', label: 'Portuguese' },
-  { code: 'chi', label: 'Chinese' },
-  { code: 'kor', label: 'Korean' },
-] as const;
-
-const INTRO_SKIPPER_MODES: {
-  mode: IntroSkipperMode;
-  label: string;
-  description: string;
-}[] = [
-  {
-    mode: 'automatic',
-    label: 'Automatic',
-    description: 'Skip ranges as playback reaches them.',
-  },
-  {
-    mode: 'manual',
-    label: 'Manual',
-    description: 'Show an MPV prompt and wait for the shortcut.',
-  },
-  {
-    mode: 'off',
-    label: 'Off',
-    description: 'Do not fetch or apply Intro Skipper ranges.',
-  },
-];
-
-function parseSubtitleLanguageInput(value: string) {
-  return value
-    .split(/[\n,]+/)
-    .map((language) => language.trim().toLowerCase())
-    .filter((language) => language.length > 0);
-}
-
-function normalizePreferredSubtitleLanguages(
-  languages: string[] | null | undefined,
-) {
-  const normalized: string[] = [];
-  const seen = new Set<string>();
-
-  for (const language of languages ?? []) {
-    const [code] = parseSubtitleLanguageInput(language);
-    if (!code || seen.has(code)) continue;
-    seen.add(code);
-    normalized.push(code);
-  }
-
-  return normalized;
-}
-
-function getSubtitleLanguageLabel(code: string) {
-  return (
-    COMMON_SUBTITLE_LANGUAGE_OPTIONS.find((option) => option.code === code)
-      ?.label ?? 'Custom'
-  );
 }
 
 export default function OperationsConsole(props: OperationsConsoleProps) {
@@ -160,7 +80,17 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
     createSignal<string[]>([]);
   const [subtitleLanguageInput, setSubtitleLanguageInput] = createSignal('');
   const subtitleLanguageSelectCollection = createListCollection({
-    items: COMMON_SUBTITLE_LANGUAGE_OPTIONS.map((option) => ({
+    items: [
+      { code: 'eng', label: 'English' },
+      { code: 'jpn', label: 'Japanese' },
+      { code: 'spa', label: 'Spanish' },
+      { code: 'fre', label: 'French' },
+      { code: 'ger', label: 'German' },
+      { code: 'ita', label: 'Italian' },
+      { code: 'por', label: 'Portuguese' },
+      { code: 'chi', label: 'Chinese' },
+      { code: 'kor', label: 'Korean' },
+    ].map((option) => ({
       value: option.code,
       label: `${option.code} — ${option.label}`,
     })),
@@ -521,8 +451,7 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
     } else {
       console.error(
         'Failed to detect MPV:',
-        commandFailure(exit.cause) ??
-          commandFailureMessage(exit.cause, 'Failed to detect MPV'),
+        commandFailureMessage(exit.cause, 'Failed to detect MPV'),
       );
       showToast('error', 'Failed to detect MPV');
     }
@@ -539,705 +468,72 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
       <div class="console-container">
         <div class="console-grid">
           <div class="space-y-6">
-            <SectionCard icon={<Activity class="h-6 w-6" />} title="Connection">
-              <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <div class="rounded-2xl bg-surface-container-high p-4">
-                  <p class="text-label-small uppercase text-on-surface-variant">
-                    Server
-                  </p>
-                  <p
-                    class="truncate text-title-medium text-on-surface"
-                    title={state()?.serverName ?? ''}
-                  >
-                    {state()?.serverName ?? 'Not connected'}
-                  </p>
-                </div>
-                <div class="rounded-2xl bg-surface-container-high p-4 md:col-span-2">
-                  <p class="text-label-small uppercase text-on-surface-variant">
-                    Server URL
-                  </p>
-                  <p
-                    class="truncate font-mono text-body-medium text-on-surface"
-                    title={state()?.serverUrl ?? ''}
-                  >
-                    {state()?.serverUrl ??
-                      'Reconnect with the Saved Session or sign in again'}
-                  </p>
-                </div>
-                <div class="rounded-2xl bg-surface-container-high p-4">
-                  <p class="text-label-small uppercase text-on-surface-variant">
-                    User
-                  </p>
-                  <p
-                    class="truncate text-title-medium text-on-surface"
-                    title={state()?.userName ?? ''}
-                  >
-                    {state()?.userName ?? 'No active user'}
-                  </p>
-                </div>
-              </div>
-              <div class="mt-5 flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  class="btn-outlined"
-                  disabled={disconnecting() || !state()?.connected}
-                  onClick={handleDisconnect}
-                >
-                  <Power class="h-5 w-5" />
-                  {disconnecting() ? 'Disconnecting...' : 'Disconnect'}
-                </button>
-                <Show when={!state()?.connected && loadSavedSession()}>
-                  <button
-                    type="button"
-                    class="btn-primary"
-                    disabled={reconnecting()}
-                    onClick={handleReconnect}
-                  >
-                    {reconnecting() ? 'Reconnecting...' : 'Reconnect'}
-                  </button>
-                </Show>
-                <button
-                  type="button"
-                  onClick={handleRefresh}
-                  class="btn-icon ml-auto"
-                  aria-label="Refresh status"
-                  title="Refresh status"
-                >
-                  <RefreshCw class="h-5 w-5" />
-                </button>
-              </div>
-              <p class="mt-3 text-body-small text-on-surface-variant">
-                Disconnect ends the active Jellyfin connection but keeps the
-                Saved Session available for Reconnect.
-              </p>
-            </SectionCard>
+            <ConnectionCard
+              state={state()}
+              disconnecting={disconnecting()}
+              reconnecting={reconnecting()}
+              canReconnect={!!loadSavedSession()}
+              onDisconnect={handleDisconnect}
+              onReconnect={handleReconnect}
+              onRefresh={handleRefresh}
+            />
 
             <NowPlayingCard
               jellyfinConnected={state()?.connected ?? false}
               onPlayerStarted={() => refetchMpv()}
             />
             <form class="space-y-6">
-              <SectionCard
-                icon={<Settings class="h-6 w-6" />}
-                title="Player Bridge settings"
-                trailing={
-                  <Show when={playerBridgeSaveStatus()}>
-                    {(status) => (
-                      <span
-                        class={`text-label-small font-semibold ${status().type === 'error' ? 'text-error' : 'text-secondary'}`}
-                      >
-                        {status().text}
-                      </span>
-                    )}
-                  </Show>
+              <PlayerBridgeSettingsCard
+                form={form}
+                saveStatus={playerBridgeSaveStatus()}
+                detectingMpv={detectingMpv()}
+                advancedOpen={advancedOpen()}
+                selectedSubtitleLanguages={selectedSubtitleLanguages()}
+                subtitleLanguageInput={subtitleLanguageInput()}
+                subtitleLanguageSelectCollection={
+                  subtitleLanguageSelectCollection
                 }
-              >
-                <div class="space-y-5">
-                  <form.Field
-                    name="deviceName"
-                    validators={{
-                      onBlur: ({ value }) =>
-                        !value.trim() ? 'Device name is required' : undefined,
-                    }}
-                  >
-                    {(field) => (
-                      <ArkField.Root
-                        class="block"
-                        invalid={field().state.meta.errors.length > 0}
-                      >
-                        <ArkField.Label class="mb-1 block text-label-medium uppercase text-on-surface-variant">
-                          Playback Target name
-                        </ArkField.Label>
-                        <ArkField.Input
-                          id={field().name}
-                          name={field().name}
-                          type="text"
-                          value={field().state.value}
-                          onInput={(event) =>
-                            field().handleChange(event.currentTarget.value)
-                          }
-                          onBlur={(event) => {
-                            field().handleBlur();
-                            saveTextSetting(
-                              'deviceName',
-                              event.currentTarget.value,
-                            );
-                          }}
-                          class="input-filled w-full"
-                          placeholder="JMSR"
-                        />
-                        <Show when={field().state.meta.errors.length > 0}>
-                          <ArkField.ErrorText class="mt-1 text-body-small text-error">
-                            {field().state.meta.errors[0]}
-                          </ArkField.ErrorText>
-                        </Show>
-                        <ArkField.HelperText class="mt-1 text-body-small text-on-surface-variant">
-                          Name displayed in Jellyfin cast menu.
-                        </ArkField.HelperText>
-                      </ArkField.Root>
-                    )}
-                  </form.Field>
-
-                  <form.Field name="mpvPath">
-                    {(field) => (
-                      <ArkField.Root class="block">
-                        <ArkField.Label class="mb-1 block text-label-medium uppercase text-on-surface-variant">
-                          MPV executable path
-                        </ArkField.Label>
-                        <div class="flex flex-col gap-2 sm:flex-row">
-                          <ArkField.Input
-                            id={field().name}
-                            name={field().name}
-                            type="text"
-                            value={field().state.value}
-                            onInput={(event) =>
-                              field().handleChange(event.currentTarget.value)
-                            }
-                            onBlur={(event) => {
-                              field().handleBlur();
-                              saveTextSetting(
-                                'mpvPath',
-                                event.currentTarget.value,
-                              );
-                            }}
-                            placeholder="Path to mpv executable"
-                            class="input-filled min-w-0 flex-1"
-                          />
-                          <button
-                            type="button"
-                            onClick={handleDetectMpv}
-                            disabled={detectingMpv()}
-                            class="btn-secondary"
-                          >
-                            {detectingMpv() ? 'Detecting...' : 'Detect MPV'}
-                          </button>
-                        </div>
-                      </ArkField.Root>
-                    )}
-                  </form.Field>
-
-                  <Collapsible.Root
-                    open={advancedOpen()}
-                    onOpenChange={(details) => setAdvancedOpen(details.open)}
-                    lazyMount
-                    unmountOnExit
-                  >
-                    <Collapsible.Trigger class="btn-text px-0">
-                      <Collapsible.Indicator>
-                        <ChevronDown
-                          class={`h-5 w-5 transition-transform ${advancedOpen() ? 'rotate-180' : ''}`}
-                        />
-                      </Collapsible.Indicator>
-                      Advanced MPV options
-                    </Collapsible.Trigger>
-
-                    <Collapsible.Content class="rounded-3xl border border-outline-variant bg-surface-container-lowest p-4">
-                      <section class="space-y-3">
-                        <div>
-                          <h3 class="text-title-small text-on-surface">
-                            MPV arguments
-                          </h3>
-                          <p class="mt-1 text-body-small text-on-surface-variant">
-                            Extra command-line flags passed to the external MPV
-                            process.
-                          </p>
-                        </div>
-
-                        <form.Field name="mpvArgs">
-                          {(field) => (
-                            <ArkField.Root class="block">
-                              <ArkField.Label class="mb-1 block text-label-medium uppercase text-on-surface-variant">
-                                Extra arguments
-                              </ArkField.Label>
-                              <ArkField.Textarea
-                                value={field().state.value}
-                                onInput={(event) =>
-                                  field().handleChange(
-                                    event.currentTarget.value,
-                                  )
-                                }
-                                onBlur={(event) => {
-                                  field().handleBlur();
-                                  saveTextSetting(
-                                    'mpvArgs',
-                                    event.currentTarget.value,
-                                  );
-                                }}
-                                rows={4}
-                                placeholder="--fullscreen&#10;--force-window"
-                                class="input-filled h-auto w-full py-3 font-mono text-body-small"
-                              />
-                            </ArkField.Root>
-                          )}
-                        </form.Field>
-                      </section>
-                    </Collapsible.Content>
-                  </Collapsible.Root>
-                  <TagsInput.Root
-                    value={selectedSubtitleLanguages()}
-                    inputValue=""
-                    editable={false}
-                    class="rounded-2xl bg-surface-container-high p-4"
-                  >
-                    <div class="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <h3 class="text-title-medium text-on-surface">
-                          Preferred subtitle languages
-                        </h3>
-                        <p class="mt-1 text-body-small text-on-surface-variant">
-                          Add Jellyfin language codes in fallback priority
-                          order.
-                        </p>
-                      </div>
-                      <Show when={selectedSubtitleLanguages().length > 0}>
-                        <button
-                          type="button"
-                          class="btn-text min-w-0 px-3"
-                          onClick={clearPreferredSubtitleLanguages}
-                        >
-                          Clear all
-                        </button>
-                        <TagsInput.ClearTrigger class="hidden" />
-                      </Show>
-                    </div>
-
-                    <div class="mt-4 flex flex-col gap-3 sm:flex-row">
-                      <Select.Root
-                        collection={subtitleLanguageSelectCollection}
-                        closeOnSelect
-                        onValueChange={(details) => {
-                          if (details.value.length > 0) {
-                            addPreferredSubtitleLanguageCodes(details.value);
-                          }
-                        }}
-                        value={[]}
-                      >
-                        <Select.Label class="mb-1 block text-label-medium uppercase text-on-surface-variant">
-                          Predefined languages
-                        </Select.Label>
-                        <Select.Control class="select-filled flex w-full items-center">
-                          <Select.Trigger class="flex h-14 w-full items-center justify-between gap-2 rounded-2xl border border-outline/80 bg-surface-container-highest/70 px-4 text-on-surface outline-none transition-colors duration-200 hover:border-secondary/70 focus:border-secondary focus:ring-2 focus:ring-secondary/30">
-                            <Select.ValueText
-                              placeholder="Select a language…"
-                              class="text-on-surface-variant/70"
-                            />
-                            <Select.Indicator>
-                              <ChevronDown class="h-4 w-4 text-on-surface-variant" />
-                            </Select.Indicator>
-                          </Select.Trigger>
-                        </Select.Control>
-                        <Select.Positioner>
-                          <Select.Content class="mt-2 rounded-2xl border border-outline-variant bg-surface-container-lowest p-2 shadow-lg shadow-black/30">
-                            <For each={subtitleLanguageSelectCollection.items}>
-                              {(item) => (
-                                <Select.Item
-                                  item={item}
-                                  class="flex cursor-pointer items-center justify-between rounded-xl px-3 py-2 text-body-small text-on-surface-variant hover:bg-surface-container-high"
-                                >
-                                  <Select.ItemText>
-                                    {item.label}
-                                  </Select.ItemText>
-                                </Select.Item>
-                              )}
-                            </For>
-                          </Select.Content>
-                        </Select.Positioner>
-                        <Select.HiddenSelect />
-                      </Select.Root>
-
-                      <div class="flex min-w-0 flex-1 flex-col">
-                        <label
-                          for="custom-subtitle-lang-input"
-                          class="mb-1 block text-label-medium uppercase text-on-surface-variant"
-                        >
-                          Custom code
-                        </label>
-                        <div class="flex gap-2">
-                          <input
-                            id="custom-subtitle-lang-input"
-                            type="text"
-                            value={subtitleLanguageInput()}
-                            onInput={(event) =>
-                              setSubtitleLanguageInput(
-                                event.currentTarget.value,
-                              )
-                            }
-                            onKeyDown={(event) => {
-                              if (event.key !== 'Enter') return;
-                              event.preventDefault();
-                              addPreferredSubtitleLanguages();
-                            }}
-                            class="input-filled min-w-0 flex-1 font-mono"
-                            placeholder="e.g. pol, tha"
-                            aria-label="Custom subtitle language code"
-                          />
-                          <button
-                            type="button"
-                            class="inline-flex h-14 min-w-[5.5rem] items-center justify-center rounded-2xl bg-secondary-container px-4 text-[14px] leading-[20px] font-semibold text-on-secondary-container transition duration-200 hover:bg-secondary-container/80 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
-                            disabled={
-                              parseSubtitleLanguageInput(
-                                subtitleLanguageInput(),
-                              ).length === 0
-                            }
-                            onClick={addPreferredSubtitleLanguages}
-                          >
-                            Add
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <Show
-                      when={selectedSubtitleLanguages().length > 0}
-                      fallback={
-                        <p class="mt-4 rounded-2xl border border-dashed border-outline-variant px-4 py-3 text-body-small text-on-surface-variant">
-                          No preferred subtitle languages selected. JMSR will
-                          use Jellyfin and media defaults.
-                        </p>
-                      }
-                    >
-                      <ol
-                        class="mt-4 flex flex-wrap gap-2"
-                        aria-label="Selected preferred subtitle languages"
-                      >
-                        <For each={selectedSubtitleLanguages()}>
-                          {(language, index) => (
-                            <TagsInput.Item
-                              index={index()}
-                              value={language}
-                              class="inline-flex max-w-full items-center gap-2 rounded-full border border-outline-variant bg-surface-container-lowest px-3 py-2"
-                            >
-                              <TagsInput.ItemPreview class="contents">
-                                <span class="text-label-small text-on-surface-variant">
-                                  {index() + 1}
-                                </span>
-                                <TagsInput.ItemText class="font-mono text-label-large text-on-surface">
-                                  {language}
-                                </TagsInput.ItemText>
-                                <span class="text-body-small text-on-surface-variant">
-                                  {getSubtitleLanguageLabel(language)}
-                                </span>
-                              </TagsInput.ItemPreview>
-                              <button
-                                type="button"
-                                class="btn-text min-w-0 px-1"
-                                disabled={index() === 0}
-                                aria-label={`Move ${language} up`}
-                                onClick={() =>
-                                  movePreferredSubtitleLanguage(index(), -1)
-                                }
-                              >
-                                ↑
-                              </button>
-                              <button
-                                type="button"
-                                class="btn-text min-w-0 px-1"
-                                disabled={
-                                  index() ===
-                                  selectedSubtitleLanguages().length - 1
-                                }
-                                aria-label={`Move ${language} down`}
-                                onClick={() =>
-                                  movePreferredSubtitleLanguage(index(), 1)
-                                }
-                              >
-                                ↓
-                              </button>
-                              <TagsInput.ItemDeleteTrigger
-                                class="btn-text min-w-0 px-1"
-                                aria-label={`Remove ${language}`}
-                                onClick={() =>
-                                  removePreferredSubtitleLanguage(language)
-                                }
-                              >
-                                Remove
-                              </TagsInput.ItemDeleteTrigger>
-                            </TagsInput.Item>
-                          )}
-                        </For>
-                      </ol>
-                    </Show>
-                    <TagsInput.HiddenInput />
-                  </TagsInput.Root>
-                </div>
-              </SectionCard>
+                onSaveTextSetting={(field, value) => {
+                  if (
+                    field === 'deviceName' ||
+                    field === 'mpvPath' ||
+                    field === 'mpvArgs'
+                  ) {
+                    saveTextSetting(field, value);
+                  }
+                }}
+                onDetectMpv={handleDetectMpv}
+                onAdvancedOpenChange={setAdvancedOpen}
+                onAddSubtitleLanguageCodes={addPreferredSubtitleLanguageCodes}
+                onAddSubtitleLanguages={addPreferredSubtitleLanguages}
+                onRemoveSubtitleLanguage={removePreferredSubtitleLanguage}
+                onClearSubtitleLanguages={clearPreferredSubtitleLanguages}
+                onMoveSubtitleLanguage={movePreferredSubtitleLanguage}
+                onSubtitleLanguageInputChange={setSubtitleLanguageInput}
+              />
             </form>
           </div>
 
           <aside class="space-y-6">
-            <SectionCard
-              icon={<ClipboardList class="h-6 w-6" />}
-              title="Diagnostics"
-              trailing={
-                <button
-                  type="button"
-                  class="btn-text min-w-0 px-3"
-                  onClick={() =>
-                    setDiagnosticsExpanded((expanded) => !expanded)
-                  }
-                  aria-expanded={diagnosticsExpanded()}
-                  aria-label="Toggle diagnostics"
-                >
-                  {diagnosticsExpanded() ? 'Collapse' : 'Expand'}
-                </button>
-              }
-            >
-              <DiagnosticsPanel compact={!diagnosticsExpanded()} />
-            </SectionCard>
+            <DiagnosticsCard
+              expanded={diagnosticsExpanded()}
+              onToggle={() => setDiagnosticsExpanded((expanded) => !expanded)}
+            />
 
-            <SectionCard icon={<Bot class="h-6 w-6" />} title="Intro Skip">
-              <div class="space-y-4">
-                <fieldset
-                  class="grid grid-cols-1 gap-3"
-                  aria-label="Intro Skip Mode"
-                >
-                  <For each={INTRO_SKIPPER_MODES}>
-                    {(option) => (
-                      <button
-                        type="button"
-                        class={`rounded-2xl border px-4 py-3 text-left transition ${
-                          introSkipperMode() === option.mode
-                            ? 'border-primary bg-primary-container text-on-primary-container'
-                            : 'border-outline-variant bg-surface-container-high text-on-surface hover:border-primary/50'
-                        }`}
-                        aria-pressed={introSkipperMode() === option.mode}
-                        onClick={() =>
-                          handleIntroSkipperModeChange(option.mode)
-                        }
-                      >
-                        <span class="block text-title-medium">
-                          {option.label}
-                        </span>
-                        <span class="mt-1 block text-body-small opacity-80">
-                          {option.description}
-                        </span>
-                      </button>
-                    )}
-                  </For>
-                </fieldset>
-                <Show when={introSkipperSaving()}>
-                  <p class="text-body-small text-secondary">
-                    Saving preference…
-                  </p>
-                </Show>
-                <p class="text-body-small text-on-surface-variant">
-                  Changes take effect after restarting MPV.
-                </p>
-                <Show when={introSkipperError()}>
-                  {(message) => (
-                    <p class="rounded-2xl bg-error-container px-4 py-3 text-body-small text-on-error-container">
-                      {message()}
-                    </p>
-                  )}
-                </Show>
-              </div>
-            </SectionCard>
-            <SectionCard
-              icon={<Keyboard class="h-6 w-6" />}
-              title="Shortcut keys"
-            >
-              <div class="space-y-4">
-                <p class="text-body-small text-on-surface-variant">
-                  MPV input bindings for episode navigation and manual intro
-                  skipping.
-                </p>
+            <IntroSkipCard
+              currentMode={introSkipperMode()}
+              saving={introSkipperSaving()}
+              error={introSkipperError()}
+              onModeChange={handleIntroSkipperModeChange}
+            />
+            <ShortcutKeysCard form={form} onSaveTextSetting={saveTextSetting} />
 
-                <form.Field
-                  name="keybindNext"
-                  validators={{
-                    onBlur: ({ value }) =>
-                      !value.trim() ? 'Keybinding is required' : undefined,
-                  }}
-                >
-                  {(field) => (
-                    <ArkField.Root
-                      class="block"
-                      invalid={field().state.meta.errors.length > 0}
-                    >
-                      <ArkField.Label class="mb-1 block text-label-medium uppercase text-on-surface-variant">
-                        Next episode key
-                      </ArkField.Label>
-                      <ArkField.Input
-                        id={field().name}
-                        name={field().name}
-                        type="text"
-                        value={field().state.value}
-                        onInput={(event) =>
-                          field().handleChange(event.currentTarget.value)
-                        }
-                        onBlur={(event) => {
-                          field().handleBlur();
-                          saveTextSetting(
-                            'keybindNext',
-                            event.currentTarget.value,
-                          );
-                        }}
-                        class="input-filled w-full font-mono"
-                        placeholder="Shift+>"
-                      />
-                    </ArkField.Root>
-                  )}
-                </form.Field>
-
-                <form.Field
-                  name="keybindPrev"
-                  validators={{
-                    onBlur: ({ value }) =>
-                      !value.trim() ? 'Keybinding is required' : undefined,
-                  }}
-                >
-                  {(field) => (
-                    <ArkField.Root
-                      class="block"
-                      invalid={field().state.meta.errors.length > 0}
-                    >
-                      <ArkField.Label class="mb-1 block text-label-medium uppercase text-on-surface-variant">
-                        Previous episode key
-                      </ArkField.Label>
-                      <ArkField.Input
-                        id={field().name}
-                        name={field().name}
-                        type="text"
-                        value={field().state.value}
-                        onInput={(event) =>
-                          field().handleChange(event.currentTarget.value)
-                        }
-                        onBlur={(event) => {
-                          field().handleBlur();
-                          saveTextSetting(
-                            'keybindPrev',
-                            event.currentTarget.value,
-                          );
-                        }}
-                        class="input-filled w-full font-mono"
-                        placeholder="Shift+<"
-                      />
-                    </ArkField.Root>
-                  )}
-                </form.Field>
-
-                <form.Field
-                  name="keybindIntroSkip"
-                  validators={{
-                    onBlur: ({ value }) =>
-                      !value.trim() ? 'Keybinding is required' : undefined,
-                  }}
-                >
-                  {(field) => (
-                    <ArkField.Root
-                      class="block"
-                      invalid={field().state.meta.errors.length > 0}
-                    >
-                      <ArkField.Label class="mb-1 block text-label-medium uppercase text-on-surface-variant">
-                        Intro skip key
-                      </ArkField.Label>
-                      <ArkField.Input
-                        id={field().name}
-                        name={field().name}
-                        type="text"
-                        value={field().state.value}
-                        onInput={(event) =>
-                          field().handleChange(event.currentTarget.value)
-                        }
-                        onBlur={(event) => {
-                          field().handleBlur();
-                          saveTextSetting(
-                            'keybindIntroSkip',
-                            event.currentTarget.value,
-                          );
-                        }}
-                        class="input-filled w-full font-mono"
-                        placeholder="g"
-                      />
-                    </ArkField.Root>
-                  )}
-                </form.Field>
-              </div>
-            </SectionCard>
-
-            <Dialog.Root
+            <SessionCard
               open={confirmSignOut()}
-              onOpenChange={(details) => {
-                if (signingOut() && !details.open) return;
-                setConfirmSignOut(details.open);
-              }}
-              closeOnEscape={!signingOut()}
-              closeOnInteractOutside={!signingOut()}
-              onEscapeKeyDown={() => {
-                if (!signingOut()) setConfirmSignOut(false);
-              }}
-              onInteractOutside={() => {
-                if (!signingOut()) setConfirmSignOut(false);
-              }}
-              lazyMount
-              unmountOnExit
-              role="dialog"
-            >
-              <section class="card-filled border-error/30">
-                <div class="flex items-start gap-3">
-                  <ShieldAlert class="mt-1 h-5 w-5 text-error" />
-                  <div>
-                    <h2 class="text-title-medium text-on-surface">Session</h2>
-                    <p class="mt-1 text-body-small text-on-surface-variant">
-                      Sign out removes the Saved Session and requires
-                      authentication before Reconnect is available.
-                    </p>
-                  </div>
-                </div>
-                <Dialog.Trigger class="btn-outlined mt-5 w-full border-error/60 text-error hover:bg-error/10">
-                  <LogOut class="h-5 w-5" />
-                  Sign out
-                </Dialog.Trigger>
-              </section>
-
-              <Portal>
-                <Dialog.Backdrop
-                  class="fixed inset-0 z-50 bg-black/60"
-                  onClick={() => {
-                    if (!signingOut()) setConfirmSignOut(false);
-                  }}
-                />
-                <Dialog.Positioner class="fixed inset-0 z-50 flex items-center justify-center p-4">
-                  <Dialog.Content
-                    class="card-elevated max-w-md"
-                    onKeyDown={(event) => {
-                      if (event.key === 'Escape' && !signingOut()) {
-                        setConfirmSignOut(false);
-                      }
-                    }}
-                  >
-                    <Dialog.Title
-                      id="sign-out-title"
-                      class="text-title-large text-on-surface"
-                    >
-                      Sign out?
-                    </Dialog.Title>
-                    <Dialog.Description class="mt-3 text-body-medium text-on-surface-variant">
-                      This removes the Saved Session and you’ll need to
-                      authenticate again before reconnecting.
-                    </Dialog.Description>
-                    <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                      <button
-                        type="button"
-                        class="btn-secondary"
-                        onClick={() => setConfirmSignOut(false)}
-                        disabled={signingOut()}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        class="btn-outlined border-error/60 text-error hover:bg-error/10"
-                        onClick={handleSignOut}
-                        disabled={signingOut()}
-                      >
-                        {signingOut() ? 'Signing out...' : 'Sign out'}
-                      </button>
-                    </div>
-                  </Dialog.Content>
-                </Dialog.Positioner>
-              </Portal>
-            </Dialog.Root>
+              signingOut={signingOut()}
+              onOpenChange={setConfirmSignOut}
+              onSignOut={handleSignOut}
+            />
 
             <PageFooter />
           </aside>
