@@ -1,7 +1,8 @@
 import { createListCollection } from '@ark-ui/solid/collection';
 import { createForm } from '@tanstack/solid-form';
 import { Effect, Exit } from 'effect';
-import { createEffect, createResource, createSignal } from 'solid-js';
+import { createEffect, createResource } from 'solid-js';
+import { createStore } from 'solid-js/store';
 import {
   type AppConfig,
   type ConnectionState,
@@ -37,6 +38,27 @@ interface OperationsConsoleProps {
   onSignedOut: () => void;
 }
 
+type PlayerBridgeSaveStatus = {
+  type: 'saving' | 'saved' | 'error';
+  text: string;
+};
+
+interface OperationsConsoleState {
+  disconnecting: boolean;
+  reconnecting: boolean;
+  signingOut: boolean;
+  confirmSignOut: boolean;
+  detectingMpv: boolean;
+  advancedOpen: boolean;
+  diagnosticsExpanded: boolean;
+  playerBridgeSaveStatus: PlayerBridgeSaveStatus | null;
+  introSkipperDraft: IntroSkipperMode | null;
+  introSkipperSaving: boolean;
+  introSkipperError: string | null;
+  selectedSubtitleLanguages: string[];
+  subtitleLanguageInput: string;
+}
+
 async function fetchConnectionState(): Promise<ConnectionState> {
   return await commands.jellyfinGetState();
 }
@@ -59,26 +81,21 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
   let latestConfigSnapshot: AppConfig | null = null;
   let clearPlayerBridgeStatusTimer: ReturnType<typeof setTimeout> | null = null;
 
-  const [disconnecting, setDisconnecting] = createSignal(false);
-  const [reconnecting, setReconnecting] = createSignal(false);
-  const [signingOut, setSigningOut] = createSignal(false);
-  const [confirmSignOut, setConfirmSignOut] = createSignal(false);
-  const [detectingMpv, setDetectingMpv] = createSignal(false);
-  const [advancedOpen, setAdvancedOpen] = createSignal(false);
-  const [diagnosticsExpanded, setDiagnosticsExpanded] = createSignal(false);
-  const [playerBridgeSaveStatus, setPlayerBridgeSaveStatus] = createSignal<{
-    type: 'saving' | 'saved' | 'error';
-    text: string;
-  } | null>(null);
-  const [introSkipperDraft, setIntroSkipperDraft] =
-    createSignal<IntroSkipperMode | null>(null);
-  const [introSkipperSaving, setIntroSkipperSaving] = createSignal(false);
-  const [introSkipperError, setIntroSkipperError] = createSignal<string | null>(
-    null,
-  );
-  const [selectedSubtitleLanguages, setSelectedSubtitleLanguages] =
-    createSignal<string[]>([]);
-  const [subtitleLanguageInput, setSubtitleLanguageInput] = createSignal('');
+  const [ui, setUi] = createStore<OperationsConsoleState>({
+    disconnecting: false,
+    reconnecting: false,
+    signingOut: false,
+    confirmSignOut: false,
+    detectingMpv: false,
+    advancedOpen: false,
+    diagnosticsExpanded: false,
+    playerBridgeSaveStatus: null,
+    introSkipperDraft: null,
+    introSkipperSaving: false,
+    introSkipperError: null,
+    selectedSubtitleLanguages: [],
+    subtitleLanguageInput: '',
+  });
   const subtitleLanguageSelectCollection = createListCollection({
     items: [
       { code: 'eng', label: 'English' },
@@ -135,14 +152,15 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
       form.setFieldValue('keybindNext', cfg.keybindNext ?? 'Shift+>');
       form.setFieldValue('keybindPrev', cfg.keybindPrev ?? 'Shift+<');
       form.setFieldValue('keybindIntroSkip', cfg.keybindIntroSkip ?? 'g');
-      setSelectedSubtitleLanguages(
+      setUi(
+        'selectedSubtitleLanguages',
         normalizePreferredSubtitleLanguages(cfg.preferredSubtitleLanguages),
       );
       form.setFieldValue(
         'introSkipperMode',
         cfg.introSkipperMode ?? 'automatic',
       );
-      if ((cfg.mpvArgs?.length ?? 0) > 0) setAdvancedOpen(true);
+      if ((cfg.mpvArgs?.length ?? 0) > 0) setUi('advancedOpen', true);
       configHydrated = true;
     }
   });
@@ -150,7 +168,7 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
   const state = () => connectionState();
   const config = () => initialConfig();
   const introSkipperMode = () =>
-    introSkipperDraft() ?? config()?.introSkipperMode ?? 'automatic';
+    ui.introSkipperDraft ?? config()?.introSkipperMode ?? 'automatic';
   const showPlayerBridgeStatus = (
     type: 'saving' | 'saved' | 'error',
     text: string,
@@ -159,10 +177,10 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
       clearTimeout(clearPlayerBridgeStatusTimer);
       clearPlayerBridgeStatusTimer = null;
     }
-    setPlayerBridgeSaveStatus({ type, text });
+    setUi('playerBridgeSaveStatus', { type, text });
     if (type === 'saved') {
       clearPlayerBridgeStatusTimer = setTimeout(
-        () => setPlayerBridgeSaveStatus(null),
+        () => setUi('playerBridgeSaveStatus', null),
         3000,
       );
     }
@@ -301,18 +319,18 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
     const desired = latestConfigSnapshot ?? lastSavedConfig ?? config();
     if (desired?.introSkipperMode === mode) return;
 
-    setIntroSkipperDraft(mode);
-    setIntroSkipperSaving(true);
-    setIntroSkipperError(null);
+    setUi('introSkipperDraft', mode);
+    setUi('introSkipperSaving', true);
+    setUi('introSkipperError', null);
     queueConfigSave(buildConfigSnapshot({ introSkipperMode: mode }), {
       onSuccess: () => {
-        setIntroSkipperDraft(null);
-        setIntroSkipperSaving(false);
+        setUi('introSkipperDraft', null);
+        setUi('introSkipperSaving', false);
       },
       onError: (message) => {
-        setIntroSkipperDraft(previous);
-        setIntroSkipperSaving(false);
-        setIntroSkipperError(message);
+        setUi('introSkipperDraft', previous);
+        setUi('introSkipperSaving', false);
+        setUi('introSkipperError', message);
         form.setFieldValue('introSkipperMode', previous);
       },
     });
@@ -321,57 +339,49 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
   const addPreferredSubtitleLanguageCodes = (languages: string[]) => {
     if (languages.length === 0) return;
 
-    let nextLanguages: string[] = [];
-    setSelectedSubtitleLanguages((current) => {
-      const seen = new Set(current);
-      const next = [...current];
+    const current = ui.selectedSubtitleLanguages;
+    const seen = new Set(current);
+    const next = [...current];
 
-      for (const language of languages) {
-        const [code] = parseSubtitleLanguageInput(language);
-        if (!code || seen.has(code)) continue;
-        seen.add(code);
-        next.push(code);
-      }
+    for (const language of languages) {
+      const [code] = parseSubtitleLanguageInput(language);
+      if (!code || seen.has(code)) continue;
+      seen.add(code);
+      next.push(code);
+    }
 
-      nextLanguages = next;
-      return next;
-    });
-    savePreferredSubtitleLanguages(nextLanguages);
-    setSubtitleLanguageInput('');
+    setUi('selectedSubtitleLanguages', next);
+    savePreferredSubtitleLanguages(next);
+    setUi('subtitleLanguageInput', '');
   };
 
   const addPreferredSubtitleLanguages = () => {
     addPreferredSubtitleLanguageCodes(
-      parseSubtitleLanguageInput(subtitleLanguageInput()),
+      parseSubtitleLanguageInput(ui.subtitleLanguageInput),
     );
   };
-
   const removePreferredSubtitleLanguage = (language: string) => {
-    let nextLanguages: string[] = [];
-    setSelectedSubtitleLanguages((current) => {
-      nextLanguages = current.filter((selected) => selected !== language);
-      return nextLanguages;
-    });
-    savePreferredSubtitleLanguages(nextLanguages);
+    const next = ui.selectedSubtitleLanguages.filter(
+      (selected) => selected !== language,
+    );
+    setUi('selectedSubtitleLanguages', next);
+    savePreferredSubtitleLanguages(next);
   };
 
   const clearPreferredSubtitleLanguages = () => {
-    setSelectedSubtitleLanguages([]);
+    setUi('selectedSubtitleLanguages', []);
     savePreferredSubtitleLanguages([]);
   };
 
   const movePreferredSubtitleLanguage = (index: number, direction: -1 | 1) => {
-    let nextLanguages: string[] | null = null;
-    setSelectedSubtitleLanguages((current) => {
-      const target = index + direction;
-      if (target < 0 || target >= current.length) return current;
+    const current = ui.selectedSubtitleLanguages;
+    const target = index + direction;
+    if (target < 0 || target >= current.length) return;
 
-      const next = [...current];
-      [next[index], next[target]] = [next[target], next[index]];
-      nextLanguages = next;
-      return next;
-    });
-    if (nextLanguages) savePreferredSubtitleLanguages(nextLanguages);
+    const next = [...current];
+    [next[index], next[target]] = [next[target], next[index]];
+    setUi('selectedSubtitleLanguages', next);
+    savePreferredSubtitleLanguages(next);
   };
 
   const handleRefresh = () => {
@@ -387,7 +397,7 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
       return;
     }
 
-    setReconnecting(true);
+    setUi('reconnecting', true);
     try {
       if (await restoreSavedSession()) {
         showToast('success', 'Reconnected to Jellyfin');
@@ -397,12 +407,12 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
         props.onSignedOut();
       }
     } finally {
-      setReconnecting(false);
+      setUi('reconnecting', false);
     }
   };
 
   const handleDisconnect = async () => {
-    setDisconnecting(true);
+    setUi('disconnecting', true);
     const exit = await Effect.runPromiseExit(
       runTauriCommand(() => commands.jellyfinDisconnect()),
     );
@@ -415,11 +425,11 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
         commandFailureMessage(exit.cause, 'Disconnect failed'),
       );
     }
-    setDisconnecting(false);
+    setUi('disconnecting', false);
   };
 
   const handleSignOut = async () => {
-    setSigningOut(true);
+    setUi('signingOut', true);
     const exit = await Effect.runPromiseExit(
       runTauriCommand(() => commands.jellyfinClearSession()),
     );
@@ -429,12 +439,12 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
     } else {
       showToast('error', commandFailureMessage(exit.cause, 'Sign out failed'));
     }
-    setSigningOut(false);
-    setConfirmSignOut(false);
+    setUi('signingOut', false);
+    setUi('confirmSignOut', false);
   };
 
   const handleDetectMpv = async () => {
-    setDetectingMpv(true);
+    setUi('detectingMpv', true);
     const exit = await Effect.runPromiseExit(detectMpv());
     if (Exit.isSuccess(exit)) {
       const path = exit.value;
@@ -455,7 +465,7 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
       );
       showToast('error', 'Failed to detect MPV');
     }
-    setDetectingMpv(false);
+    setUi('detectingMpv', false);
   };
 
   const handleIntroSkipperModeChange = (mode: IntroSkipperMode) => {
@@ -470,8 +480,8 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
           <div class="space-y-6">
             <ConnectionCard
               state={state()}
-              disconnecting={disconnecting()}
-              reconnecting={reconnecting()}
+              disconnecting={ui.disconnecting}
+              reconnecting={ui.reconnecting}
               canReconnect={!!loadSavedSession()}
               onDisconnect={handleDisconnect}
               onReconnect={handleReconnect}
@@ -485,11 +495,11 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
             <form class="space-y-6">
               <PlayerBridgeSettingsCard
                 form={form}
-                saveStatus={playerBridgeSaveStatus()}
-                detectingMpv={detectingMpv()}
-                advancedOpen={advancedOpen()}
-                selectedSubtitleLanguages={selectedSubtitleLanguages()}
-                subtitleLanguageInput={subtitleLanguageInput()}
+                saveStatus={ui.playerBridgeSaveStatus}
+                detectingMpv={ui.detectingMpv}
+                advancedOpen={ui.advancedOpen}
+                selectedSubtitleLanguages={ui.selectedSubtitleLanguages}
+                subtitleLanguageInput={ui.subtitleLanguageInput}
                 subtitleLanguageSelectCollection={
                   subtitleLanguageSelectCollection
                 }
@@ -503,35 +513,37 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
                   }
                 }}
                 onDetectMpv={handleDetectMpv}
-                onAdvancedOpenChange={setAdvancedOpen}
+                onAdvancedOpenChange={(open) => setUi('advancedOpen', open)}
                 onAddSubtitleLanguageCodes={addPreferredSubtitleLanguageCodes}
                 onAddSubtitleLanguages={addPreferredSubtitleLanguages}
                 onRemoveSubtitleLanguage={removePreferredSubtitleLanguage}
                 onClearSubtitleLanguages={clearPreferredSubtitleLanguages}
                 onMoveSubtitleLanguage={movePreferredSubtitleLanguage}
-                onSubtitleLanguageInputChange={setSubtitleLanguageInput}
+                onSubtitleLanguageInputChange={(value) =>
+                  setUi('subtitleLanguageInput', value)
+                }
               />
             </form>
           </div>
 
           <aside class="space-y-6">
             <DiagnosticsCard
-              expanded={diagnosticsExpanded()}
-              onToggle={() => setDiagnosticsExpanded((expanded) => !expanded)}
+              expanded={ui.diagnosticsExpanded}
+              onToggle={() => setUi('diagnosticsExpanded', (prev) => !prev)}
             />
 
             <IntroSkipCard
               currentMode={introSkipperMode()}
-              saving={introSkipperSaving()}
-              error={introSkipperError()}
+              saving={ui.introSkipperSaving}
+              error={ui.introSkipperError}
               onModeChange={handleIntroSkipperModeChange}
             />
             <ShortcutKeysCard form={form} onSaveTextSetting={saveTextSetting} />
 
             <SessionCard
-              open={confirmSignOut()}
-              signingOut={signingOut()}
-              onOpenChange={setConfirmSignOut}
+              open={ui.confirmSignOut}
+              signingOut={ui.signingOut}
+              onOpenChange={(open) => setUi('confirmSignOut', open)}
               onSignOut={handleSignOut}
             />
 
