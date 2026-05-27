@@ -225,24 +225,24 @@ body {
   }
 
   .btn-primary {
-    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-primary px-6 py-2.5 text-[14px] leading-[20px] font-semibold text-on-primary shadow-lg shadow-primary/25 transition duration-200 hover:bg-[#B91AED] focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50;
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-primary px-6 py-2.5 text-[14px] leading-[20px] font-semibold text-on-primary shadow-lg shadow-primary/25 transition duration-200 hover:bg-[#B91AED] focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50;
   }
 
   .btn-secondary,
   .btn-tonal {
-    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-secondary-container px-6 py-2.5 text-[14px] leading-[20px] font-semibold text-on-secondary-container transition duration-200 hover:bg-secondary-container/80 focus:outline-none focus:ring-2 focus:ring-secondary/40 focus:ring-offset-2 focus:ring-offset-background active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50;
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-secondary-container px-6 py-2.5 text-[14px] leading-[20px] font-semibold text-on-secondary-container transition duration-200 hover:bg-secondary-container/80 focus:outline-none focus:ring-2 focus:ring-secondary/40 focus:ring-offset-2 focus:ring-offset-background active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50;
   }
 
   .btn-outlined {
-    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-outline px-6 py-2.5 text-[14px] leading-[20px] font-semibold text-on-surface transition duration-200 hover:border-primary hover:bg-primary/10 hover:text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-2 focus:ring-offset-background active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50;
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-outline px-6 py-2.5 text-[14px] leading-[20px] font-semibold text-on-surface transition duration-200 hover:border-primary hover:bg-primary/10 hover:text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-2 focus:ring-offset-background active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50;
   }
 
   .btn-text {
-    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-full px-4 py-2 text-[14px] leading-[20px] font-semibold text-secondary transition duration-200 hover:bg-secondary/10 focus:outline-none focus:ring-2 focus:ring-secondary/40 focus:ring-offset-2 focus:ring-offset-background active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50;
+    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-2xl px-4 py-2 text-[14px] leading-[20px] font-semibold text-secondary transition duration-200 hover:bg-secondary/10 focus:outline-none focus:ring-2 focus:ring-secondary/40 focus:ring-offset-2 focus:ring-offset-background active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50;
   }
 
   .btn-icon {
-    @apply inline-flex h-11 w-11 items-center justify-center rounded-full text-on-surface-variant transition duration-200 hover:bg-primary/10 hover:text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-2 focus:ring-offset-background active:scale-[0.96] disabled:pointer-events-none disabled:opacity-50;
+    @apply inline-flex h-11 w-11 items-center justify-center rounded-2xl text-on-surface-variant transition duration-200 hover:bg-primary/10 hover:text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-2 focus:ring-offset-background active:scale-[0.96] disabled:pointer-events-none disabled:opacity-50;
   }
 
   .card-elevated {

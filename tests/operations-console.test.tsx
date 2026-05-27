@@ -278,13 +278,13 @@ test('operations console autosaves compact preferred subtitle language chips', a
 
   fireEvent.click(screen.getByRole('button', { name: 'Move jpn down' }));
   const input = screen.getByLabelText(
-    'Add preferred subtitle language',
+    'Custom subtitle language code',
   ) as HTMLInputElement;
   fireEvent.input(input, { target: { value: ' SWE ' } });
   fireEvent.keyDown(input, { key: 'Enter' });
   fireEvent.click(screen.getByRole('button', { name: 'Move swe up' }));
   fireEvent.input(input, { target: { value: 'spa' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Add language' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Add' }));
   fireEvent.click(screen.getByRole('button', { name: 'Remove jpn' }));
 
   await waitFor(() =>
@@ -301,7 +301,7 @@ test('operations console autosaves compact preferred subtitle language chips', a
 
   cleanup();
 });
-test('preferred subtitle language editor uses Ark tags input and combobox', async () => {
+test('preferred subtitle language editor uses Ark tags input and select', async () => {
   const configSet = rstest.spyOn(commands, 'configSet').mockResolvedValue({
     status: 'ok',
     data: null,
@@ -309,14 +309,27 @@ test('preferred subtitle language editor uses Ark tags input and combobox', asyn
   const cleanup = renderConsole();
   await screen.findByDisplayValue('JMSR Test');
 
-  const input = await screen.findByLabelText('Add preferred subtitle language');
-  expect(input.closest('[data-scope="tags-input"]')).not.toBeNull();
+  // The custom code input lives inside the tags-input scope
+  const customInput = await screen.findByLabelText(
+    'Custom subtitle language code',
+  );
+  expect(customInput.closest('[data-scope="tags-input"]')).not.toBeNull();
 
-  fireEvent.input(input, { target: { value: 'jap' } });
+  // The Ark Select trigger is rendered with a combobox role
+  const selectTrigger = await screen.findByRole('combobox', {
+    name: 'Predefined languages',
+  });
+  expect(selectTrigger.closest('[data-scope="select"]')).not.toBeNull();
 
-  const suggestion = await screen.findByText('jpn — Japanese');
-  expect(suggestion.closest('[data-scope="combobox"]')).not.toBeNull();
-  fireEvent.click(suggestion);
+  // The select trigger shows a placeholder
+  expect(selectTrigger).toHaveTextContent('Select a language…');
+  // The select offers predefined language options via its collection
+  const selectRoot = selectTrigger.closest('[data-scope="select"]');
+  expect(selectRoot).not.toBeNull();
+
+  // Custom code entry via text input
+  fireEvent.input(customInput, { target: { value: 'jpn' } });
+  fireEvent.keyDown(customInput, { key: 'Enter' });
 
   await waitFor(() =>
     expect(configSet).toHaveBeenLastCalledWith(
@@ -326,6 +339,24 @@ test('preferred subtitle language editor uses Ark tags input and combobox', asyn
     ),
   );
   expect(screen.getByRole('button', { name: 'Remove jpn' })).toBeVisible();
+
+  // Add another custom code
+  fireEvent.input(customInput, { target: { value: 'tha' } });
+  fireEvent.keyDown(customInput, { key: 'Enter' });
+
+  await waitFor(() =>
+    expect(configSet).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        preferredSubtitleLanguages: ['jpn', 'tha'],
+      }),
+    ),
+  );
+  expect(screen.getByRole('button', { name: 'Remove tha' })).toBeVisible();
+
+  // The Add button has rounded corners consistent with the input field (rounded-2xl)
+  const addButton = screen.getByRole('button', { name: 'Add' });
+  expect(addButton.className).toContain('rounded-2xl');
+  expect(addButton.className).toContain('h-14');
 
   cleanup();
 });

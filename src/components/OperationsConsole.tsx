@@ -1,7 +1,10 @@
 import { Collapsible } from '@ark-ui/solid/collapsible';
-import { Combobox, createListCollection } from '@ark-ui/solid/combobox';
 import { Dialog } from '@ark-ui/solid/dialog';
 import { Field as ArkField } from '@ark-ui/solid/field';
+import {
+  createListCollection as createSelectListCollection,
+  Select,
+} from '@ark-ui/solid/select';
 import { TagsInput } from '@ark-ui/solid/tags-input';
 import { createForm } from '@tanstack/solid-form';
 import { Effect, Exit } from 'effect';
@@ -19,7 +22,6 @@ import {
 } from 'lucide-solid';
 import {
   createEffect,
-  createMemo,
   createResource,
   createSignal,
   For,
@@ -159,23 +161,12 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
   const [selectedSubtitleLanguages, setSelectedSubtitleLanguages] =
     createSignal<string[]>([]);
   const [subtitleLanguageInput, setSubtitleLanguageInput] = createSignal('');
-  const filteredSubtitleLanguageOptions = createMemo(() => {
-    const query = subtitleLanguageInput().trim().toLowerCase();
-    if (!query) return COMMON_SUBTITLE_LANGUAGE_OPTIONS;
-    return COMMON_SUBTITLE_LANGUAGE_OPTIONS.filter(
-      (option) =>
-        option.code.includes(query) ||
-        option.label.toLowerCase().includes(query),
-    );
+  const subtitleLanguageSelectCollection = createSelectListCollection({
+    items: COMMON_SUBTITLE_LANGUAGE_OPTIONS.map((option) => ({
+      value: option.code,
+      label: `${option.code} — ${option.label}`,
+    })),
   });
-  const subtitleLanguageCollection = createMemo(() =>
-    createListCollection({
-      items: filteredSubtitleLanguageOptions().map((option) => ({
-        value: option.code,
-        label: `${option.code} — ${option.label}`,
-      })),
-    }),
-  );
 
   const [connectionState, { refetch: refetchConnection }] =
     createResource(fetchConnectionState);
@@ -786,10 +777,7 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
                   </Collapsible.Root>
                   <TagsInput.Root
                     value={selectedSubtitleLanguages()}
-                    inputValue={subtitleLanguageInput()}
-                    onInputValueChange={(details) =>
-                      setSubtitleLanguageInput(details.inputValue)
-                    }
+                    inputValue=""
                     editable={false}
                     class="rounded-2xl bg-surface-container-high p-4"
                   >
@@ -815,84 +803,95 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
                       </Show>
                     </div>
 
-                    <Combobox.Root
-                      collection={subtitleLanguageCollection()}
-                      inputValue={subtitleLanguageInput()}
-                      onInputValueChange={(details) =>
-                        setSubtitleLanguageInput(details.inputValue)
-                      }
-                      onValueChange={(details) =>
-                        addPreferredSubtitleLanguageCodes(details.value)
-                      }
-                      allowCustomValue
-                      selectionBehavior="clear"
-                      openOnClick
-                      class="mt-4"
-                    >
-                      <Combobox.Control class="flex flex-col gap-3 sm:flex-row">
-                        <TagsInput.Control class="min-w-0 flex-1">
-                          <TagsInput.Label class="mb-1 block text-label-medium uppercase text-on-surface-variant">
-                            Add preferred subtitle language
-                          </TagsInput.Label>
-                          <Combobox.Input
-                            autocomplete="off"
-                            asChild={(comboboxInputProps) => (
-                              <TagsInput.Input
-                                {...comboboxInputProps({
-                                  type: 'text',
-                                  value: subtitleLanguageInput(),
-                                  onInput: (event) =>
-                                    setSubtitleLanguageInput(
-                                      event.currentTarget.value,
-                                    ),
-                                  onKeyDown: (event) => {
-                                    if (event.key !== 'Enter') return;
-                                    event.preventDefault();
-                                    addPreferredSubtitleLanguages();
-                                  },
-                                  class: 'input-filled w-full font-mono',
-                                  placeholder: 'eng',
-                                  'aria-label':
-                                    'Add preferred subtitle language',
-                                })}
-                              />
-                            )}
-                          />
-                        </TagsInput.Control>
-                        <button
-                          type="button"
-                          class="btn-secondary self-end"
-                          disabled={
-                            parseSubtitleLanguageInput(subtitleLanguageInput())
-                              .length === 0
+                    <div class="mt-4 flex flex-col gap-3 sm:flex-row">
+                      <Select.Root
+                        collection={subtitleLanguageSelectCollection}
+                        closeOnSelect
+                        onValueChange={(details) => {
+                          if (details.value.length > 0) {
+                            addPreferredSubtitleLanguageCodes(details.value);
                           }
-                          onClick={addPreferredSubtitleLanguages}
-                        >
-                          Add language
-                        </button>
-                      </Combobox.Control>
-                      <Combobox.Content class="mt-2 rounded-2xl border border-outline-variant bg-surface-container-lowest p-2 shadow-lg shadow-black/30">
-                        <Combobox.List>
-                          <For each={subtitleLanguageCollection().items}>
-                            {(item) => (
-                              <Combobox.Item
-                                item={item}
-                                class="cursor-pointer rounded-xl px-3 py-2 text-body-small text-on-surface-variant hover:bg-surface-container-high"
-                                onClick={() =>
-                                  addPreferredSubtitleLanguageCodes([
-                                    item.value,
-                                  ])
-                                }
+                        }}
+                        value={[]}
+                      >
+                        <Select.Label class="mb-1 block text-label-medium uppercase text-on-surface-variant">
+                          Predefined languages
+                        </Select.Label>
+                        <Select.Control class="select-filled flex w-full items-center">
+                          <Select.Trigger class="flex h-14 w-full items-center justify-between gap-2 rounded-2xl border border-outline/80 bg-surface-container-highest/70 px-4 text-on-surface outline-none transition-colors duration-200 hover:border-secondary/70 focus:border-secondary focus:ring-2 focus:ring-secondary/30">
+                            <Select.ValueText
+                              placeholder="Select a language…"
+                              class="text-on-surface-variant/70"
+                            />
+                            <Select.Indicator>
+                              <ChevronDown class="h-4 w-4 text-on-surface-variant" />
+                            </Select.Indicator>
+                          </Select.Trigger>
+                        </Select.Control>
+                        <Portal>
+                          <Select.Positioner>
+                            <Select.Content class="mt-2 rounded-2xl border border-outline-variant bg-surface-container-lowest p-2 shadow-lg shadow-black/30">
+                              <For
+                                each={subtitleLanguageSelectCollection.items}
                               >
-                                <Combobox.ItemText>
-                                  {item.label}
-                                </Combobox.ItemText>
-                              </Combobox.Item>
-                            )}
-                          </For>
-                        </Combobox.List>
-                      </Combobox.Content>
-                    </Combobox.Root>
+                                {(item) => (
+                                  <Select.Item
+                                    item={item}
+                                    class="flex cursor-pointer items-center justify-between rounded-xl px-3 py-2 text-body-small text-on-surface-variant hover:bg-surface-container-high"
+                                  >
+                                    <Select.ItemText>
+                                      {item.label}
+                                    </Select.ItemText>
+                                  </Select.Item>
+                                )}
+                              </For>
+                            </Select.Content>
+                          </Select.Positioner>
+                        </Portal>
+                        <Select.HiddenSelect />
+                      </Select.Root>
+
+                      <div class="flex min-w-0 flex-1 flex-col">
+                        <label
+                          for="custom-subtitle-lang-input"
+                          class="mb-1 block text-label-medium uppercase text-on-surface-variant"
+                        >
+                          Custom code
+                        </label>
+                        <div class="flex gap-2">
+                          <input
+                            id="custom-subtitle-lang-input"
+                            type="text"
+                            value={subtitleLanguageInput()}
+                            onInput={(event) =>
+                              setSubtitleLanguageInput(
+                                event.currentTarget.value,
+                              )
+                            }
+                            onKeyDown={(event) => {
+                              if (event.key !== 'Enter') return;
+                              event.preventDefault();
+                              addPreferredSubtitleLanguages();
+                            }}
+                            class="input-filled min-w-0 flex-1 font-mono"
+                            placeholder="e.g. pol, tha"
+                            aria-label="Custom subtitle language code"
+                          />
+                          <button
+                            type="button"
+                            class="inline-flex h-14 min-w-[5.5rem] items-center justify-center rounded-2xl bg-secondary-container px-4 text-[14px] leading-[20px] font-semibold text-on-secondary-container transition duration-200 hover:bg-secondary-container/80 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
+                            disabled={
+                              parseSubtitleLanguageInput(
+                                subtitleLanguageInput(),
+                              ).length === 0
+                            }
+                            onClick={addPreferredSubtitleLanguages}
+                          >
+                            Add
+                          </button>
+                        </div>
+                      </div>
+                    </div>
 
                     <Show
                       when={selectedSubtitleLanguages().length > 0}
