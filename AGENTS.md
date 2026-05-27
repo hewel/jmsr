@@ -84,7 +84,7 @@ Single-context repo using root `CONTEXT.md` and root `docs/adr/`. See `docs/agen
 - Rstest: https://rstest.rs/llms.txt
 - Tauri v2: https://v2.tauri.app
 - tauri-specta: https://github.com/oscartbeaumont/tauri-specta
-- Solid.js: https://www.solidjs.com
+- Solid.js: https://docs.solidjs.com/
 
 ## Notes
 
