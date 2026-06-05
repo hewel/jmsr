@@ -1364,6 +1364,154 @@ impl<'a> JellyfinLibrary<'a> {
       )
     })
   }
+
+  pub async fn show_detail(&self, series_id: String) -> Result<VideoShowDetail, JellyfinError> {
+    let series_id = series_id.trim().to_string();
+    if series_id.is_empty() {
+      return Err(JellyfinError::HttpError(
+        "Series id is required for show details".to_string(),
+      ));
+    }
+
+    let server_url = self.client.server_url()?;
+    let token = self.client.access_token()?;
+    let user_id = self.client.user_id()?;
+    let configuration = self
+      .client
+      .openapi_configuration(&server_url, Some(&token))?;
+
+    let show_item = jellyfin_api::apis::user_library_api::get_item(
+      &configuration,
+      jellyfin_api::apis::user_library_api::GetItemParams {
+        item_id: series_id.clone(),
+        user_id: Some(user_id.clone()),
+      },
+    )
+    .await
+    .map_err(|err| JellyfinClient::openapi_error("Video show detail", err))?;
+    let mut detail = map_video_show_detail(&server_url, show_item).ok_or_else(|| {
+      JellyfinError::HttpError(
+        "Only Series details are supported by the Show Library Browser".to_string(),
+      )
+    })?;
+
+    detail.seasons = jellyfin_api::apis::tv_shows_api::get_seasons(
+      &configuration,
+      jellyfin_api::apis::tv_shows_api::GetSeasonsParams {
+        series_id: series_id.clone(),
+        user_id: Some(user_id.clone()),
+        fields: Some(video_home_fields()),
+        is_special_season: None,
+        is_missing: Some(false),
+        adjacent_to: None,
+        enable_images: Some(true),
+        image_type_limit: Some(1),
+        enable_image_types: Some(vec![jellyfin_api::models::ImageType::Primary]),
+        enable_user_data: Some(true),
+      },
+    )
+    .await
+    .map_err(|err| JellyfinClient::openapi_error("Video show seasons", err))?
+    .items
+    .unwrap_or_default()
+    .into_iter()
+    .filter_map(|item| map_video_season(&server_url, item))
+    .collect();
+
+    detail.next_episode = jellyfin_api::apis::tv_shows_api::get_next_up(
+      &configuration,
+      jellyfin_api::apis::tv_shows_api::GetNextUpParams {
+        user_id: Some(user_id),
+        start_index: Some(0),
+        limit: Some(1),
+        fields: Some(video_home_fields()),
+        series_id: Some(series_id),
+        parent_id: None,
+        enable_images: Some(true),
+        image_type_limit: Some(1),
+        enable_image_types: Some(vec![jellyfin_api::models::ImageType::Primary]),
+        enable_user_data: Some(true),
+        next_up_date_cutoff: None,
+        enable_total_record_count: Some(false),
+        disable_first_episode: Some(false),
+        enable_resumable: Some(true),
+        enable_rewatching: Some(false),
+      },
+    )
+    .await
+    .map_err(|err| JellyfinClient::openapi_error("Video show next episode", err))?
+    .items
+    .unwrap_or_default()
+    .into_iter()
+    .find_map(|item| map_video_library_item(&server_url, item));
+
+    detail.can_play = detail.next_episode.is_some();
+
+    Ok(detail)
+  }
+
+  pub async fn season_episodes(
+    &self,
+    request: VideoSeasonEpisodesRequest,
+  ) -> Result<VideoSeasonEpisodes, JellyfinError> {
+    let series_id = request.series_id.trim().to_string();
+    if series_id.is_empty() {
+      return Err(JellyfinError::HttpError(
+        "Series id is required for episode browsing".to_string(),
+      ));
+    }
+    let season_id = request.season_id.and_then(|id| {
+      let trimmed = id.trim().to_string();
+      (!trimmed.is_empty()).then_some(trimmed)
+    });
+    if season_id.is_none() && request.season_number.is_none() {
+      return Err(JellyfinError::HttpError(
+        "Season id or number is required for episode browsing".to_string(),
+      ));
+    }
+
+    let server_url = self.client.server_url()?;
+    let token = self.client.access_token()?;
+    let user_id = self.client.user_id()?;
+    let configuration = self
+      .client
+      .openapi_configuration(&server_url, Some(&token))?;
+
+    let episodes = jellyfin_api::apis::tv_shows_api::get_episodes(
+      &configuration,
+      jellyfin_api::apis::tv_shows_api::GetEpisodesParams {
+        series_id: series_id.clone(),
+        user_id: Some(user_id),
+        fields: Some(video_home_fields()),
+        season: request.season_number,
+        season_id: season_id.clone(),
+        is_missing: Some(false),
+        adjacent_to: None,
+        start_item_id: None,
+        start_index: None,
+        limit: None,
+        enable_images: Some(true),
+        image_type_limit: Some(1),
+        enable_image_types: Some(vec![jellyfin_api::models::ImageType::Primary]),
+        enable_user_data: Some(true),
+        sort_by: Some("ParentIndexNumber,IndexNumber".to_string()),
+      },
+    )
+    .await
+    .map_err(|err| JellyfinClient::openapi_error("Video season episodes", err))?
+    .items
+    .unwrap_or_default()
+    .into_iter()
+    .filter_map(|item| map_video_library_item(&server_url, item))
+    .collect();
+
+    Ok(VideoSeasonEpisodes {
+      series_id,
+      season_id,
+      season_number: request.season_number,
+      episodes,
+    })
+  }
 }
 
 async fn latest_video_items(
@@ -1631,6 +1779,67 @@ fn map_video_library_item(
       .and_then(|data| data.is_favorite)
       .unwrap_or(false),
     artwork_url,
+  })
+}
+
+fn map_video_show_detail(
+  server_url: &str,
+  item: jellyfin_api::models::BaseItemDto,
+) -> Option<VideoShowDetail> {
+  if !matches!(item.r#type?, jellyfin_api::models::BaseItemKind::Series) {
+    return None;
+  }
+
+  let id = item.id?.to_string();
+  let user_data = item.user_data.flatten();
+
+  Some(VideoShowDetail {
+    id: id.clone(),
+    name: item
+      .name
+      .flatten()
+      .unwrap_or_else(|| "Untitled".to_string()),
+    overview: item.overview.flatten(),
+    production_year: item.production_year.flatten(),
+    genres: item.genres.flatten().unwrap_or_default(),
+    played: user_data
+      .as_ref()
+      .and_then(|data| data.played)
+      .unwrap_or(false),
+    favorite: user_data
+      .as_ref()
+      .and_then(|data| data.is_favorite)
+      .unwrap_or(false),
+    can_play: false,
+    artwork_url: primary_artwork_url(server_url, &id, item.image_tags.flatten()),
+    next_episode: None,
+    seasons: Vec::new(),
+  })
+}
+
+fn map_video_season(
+  server_url: &str,
+  item: jellyfin_api::models::BaseItemDto,
+) -> Option<VideoSeason> {
+  let id = item.id?.to_string();
+  let user_data = item.user_data.flatten();
+
+  Some(VideoSeason {
+    id: id.clone(),
+    name: item
+      .name
+      .flatten()
+      .unwrap_or_else(|| "Untitled".to_string()),
+    season_number: item.index_number.flatten(),
+    played: user_data
+      .as_ref()
+      .and_then(|data| data.played)
+      .unwrap_or(false),
+    favorite: user_data
+      .as_ref()
+      .and_then(|data| data.is_favorite)
+      .unwrap_or(false),
+    artwork_url: primary_artwork_url(server_url, &id, item.image_tags.flatten()),
   })
 }
 
@@ -2504,6 +2713,115 @@ mod tests {
       err.to_string(),
       "HTTP error: Only Movie and Episode details are supported by the Library Browser"
     );
+  }
+
+  #[tokio::test]
+  async fn show_detail_loads_show_seasons_and_next_playable_episode() {
+    let series_id = "00000000-0000-0000-0000-000000000060";
+    let season_id = "00000000-0000-0000-0000-000000000061";
+    let next_episode_id = "00000000-0000-0000-0000-000000000062";
+    let (server_url, requests) = serve_responses_with_requests(vec![
+      (
+        "200 OK",
+        r#"{"Id":"00000000-0000-0000-0000-000000000060","Name":"Example Show","Type":"Series","Overview":"A show overview.","ProductionYear":2023,"Genres":["Drama"],"ImageTags":{"Primary":"poster-show"},"UserData":{"IsFavorite":true,"Played":false}}"#,
+      ),
+      (
+        "200 OK",
+        r#"{"Items":[{"Id":"00000000-0000-0000-0000-000000000061","Name":"Season 1","Type":"Season","IndexNumber":1,"ImageTags":{"Primary":"poster-season"},"UserData":{"IsFavorite":false,"Played":false}}],"TotalRecordCount":1}"#,
+      ),
+      (
+        "200 OK",
+        r#"{"Items":[{"Id":"00000000-0000-0000-0000-000000000062","Name":"Next Episode","Type":"Episode","ProductionYear":2023,"UserData":{"PlaybackPositionTicks":300000000,"Played":false}}],"TotalRecordCount":1}"#,
+      ),
+    ])
+    .await;
+    let client = JellyfinClient::new();
+    connect_test_client(&client, server_url.clone());
+
+    let detail = client
+      .library()
+      .show_detail(series_id.to_string())
+      .await
+      .expect("show detail should load series metadata, seasons, and next episode");
+
+    assert_eq!(detail.id, series_id);
+    assert_eq!(detail.name, "Example Show");
+    assert_eq!(detail.overview.as_deref(), Some("A show overview."));
+    assert_eq!(detail.genres, vec!["Drama"]);
+    assert!(detail.favorite);
+    assert!(detail.can_play);
+    assert_eq!(detail.seasons.len(), 1);
+    assert_eq!(detail.seasons[0].id, season_id);
+    assert_eq!(detail.seasons[0].season_number, Some(1));
+    assert_eq!(
+      detail
+        .next_episode
+        .as_ref()
+        .map(|episode| episode.id.as_str()),
+      Some(next_episode_id)
+    );
+    let expected_artwork = format!("{server_url}/Items/{series_id}/Images/Primary?tag=poster-show");
+    assert_eq!(
+      detail.artwork_url.as_deref(),
+      Some(expected_artwork.as_str())
+    );
+
+    let captured = requests.lock();
+    assert!(captured[0].starts_with("GET /Items/00000000-0000-0000-0000-000000000060?"));
+    assert!(captured[0].contains("userId=00000000-0000-0000-0000-000000000001"));
+    assert!(captured[1].starts_with("GET /Shows/00000000-0000-0000-0000-000000000060/Seasons?"));
+    assert!(captured[1].contains("enableUserData=true"));
+    assert!(captured[1].contains("isMissing=false"));
+    assert!(captured[2].starts_with("GET /Shows/NextUp?"));
+    assert!(captured[2].contains("seriesId=00000000-0000-0000-0000-000000000060"));
+    assert!(captured[2].contains("limit=1"));
+    assert!(captured[2].contains("enableResumable=true"));
+    assert!(captured[2].contains("enableRewatching=false"));
+  }
+
+  #[tokio::test]
+  async fn season_episodes_loads_exact_season_episode_cards() {
+    let series_id = "00000000-0000-0000-0000-000000000070";
+    let season_id = "00000000-0000-0000-0000-000000000071";
+    let episode_id = "00000000-0000-0000-0000-000000000072";
+    let (server_url, requests) = serve_responses_with_requests(vec![(
+      "200 OK",
+      r#"{"Items":[{"Id":"00000000-0000-0000-0000-000000000072","Name":"Exact Episode","Type":"Episode","RunTimeTicks":18000000000,"ImageTags":{"Primary":"poster-episode"},"UserData":{"IsFavorite":false,"Played":false}}],"TotalRecordCount":1}"#,
+    )])
+    .await;
+    let client = JellyfinClient::new();
+    connect_test_client(&client, server_url.clone());
+
+    let page = client
+      .library()
+      .season_episodes(VideoSeasonEpisodesRequest {
+        series_id: series_id.to_string(),
+        season_id: Some(season_id.to_string()),
+        season_number: Some(1),
+      })
+      .await
+      .expect("season episodes should load exact season listing");
+
+    assert_eq!(page.series_id, series_id);
+    assert_eq!(page.season_id.as_deref(), Some(season_id));
+    assert_eq!(page.season_number, Some(1));
+    assert_eq!(page.episodes.len(), 1);
+    assert_eq!(page.episodes[0].id, episode_id);
+    assert_eq!(page.episodes[0].name, "Exact Episode");
+    assert_eq!(page.episodes[0].runtime_seconds, Some(1800.0));
+    let expected_artwork =
+      format!("{server_url}/Items/{episode_id}/Images/Primary?tag=poster-episode");
+    assert_eq!(
+      page.episodes[0].artwork_url.as_deref(),
+      Some(expected_artwork.as_str())
+    );
+
+    let captured = requests.lock();
+    assert!(captured[0].starts_with("GET /Shows/00000000-0000-0000-0000-000000000070/Episodes?"));
+    assert!(captured[0].contains("season=1"));
+    assert!(captured[0].contains("seasonId=00000000-0000-0000-0000-000000000071"));
+    assert!(captured[0].contains("enableUserData=true"));
+    assert!(captured[0].contains("sortBy=ParentIndexNumber%2CIndexNumber"));
   }
 
   #[test]

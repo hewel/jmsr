@@ -32,6 +32,10 @@ import {
   type VideoLibraryShortcut,
   type VideoLibrarySort,
   type VideoSearchPage,
+  type VideoSeason,
+  type VideoSeasonEpisodes,
+  type VideoSeasonEpisodesRequest,
+  type VideoShowDetail,
 } from '../bindings';
 import {
   commandFailureMessage,
@@ -47,7 +51,8 @@ export type ShellArea = 'library' | 'now-playing' | 'settings' | 'diagnostics';
 export type LibraryView =
   | { kind: 'home' }
   | { kind: 'browse'; collectionType: VideoLibraryKind; libraryId: string }
-  | { kind: 'detail'; itemId: string };
+  | { kind: 'detail'; itemId: string }
+  | { kind: 'show'; seriesId: string };
 
 interface AuthenticatedShellProps {
   activeArea: ShellArea;
@@ -76,6 +81,16 @@ type LibrarySearchState =
 type LibraryDetailState =
   | { kind: 'ready'; detail: VideoItemDetail }
   | { kind: 'disconnected'; state: ConnectionState }
+  | { kind: 'error'; message: string };
+
+type LibraryShowState =
+  | { kind: 'ready'; detail: VideoShowDetail }
+  | { kind: 'disconnected'; state: ConnectionState }
+  | { kind: 'error'; message: string };
+
+type SeasonEpisodesState =
+  | { kind: 'ready'; page: VideoSeasonEpisodes }
+  | { kind: 'empty'; page: VideoSeasonEpisodes }
   | { kind: 'error'; message: string };
 
 const LIBRARY_BROWSE_PAGE_SIZE = 24;
@@ -285,6 +300,66 @@ async function fetchVideoItemDetail(
   }
 
   return { kind: 'ready', detail: detail.value };
+}
+
+async function fetchVideoShowDetail(
+  seriesId: string,
+): Promise<LibraryShowState> {
+  const connection = await Effect.runPromiseExit(
+    runTauriCommandRaw(() => commands.jellyfinGetState()),
+  );
+
+  if (!Exit.isSuccess(connection)) {
+    return {
+      kind: 'error',
+      message: commandFailureMessage(
+        connection.cause,
+        'Could not load Library state',
+      ),
+    };
+  }
+
+  if (!connection.value.connected) {
+    return { kind: 'disconnected', state: connection.value };
+  }
+
+  const detail = await Effect.runPromiseExit(
+    runTauriCommand(() => commands.libraryShowDetail(seriesId)),
+  );
+
+  if (!Exit.isSuccess(detail)) {
+    return {
+      kind: 'error',
+      message: commandFailureMessage(
+        detail.cause,
+        'Could not load show detail',
+      ),
+    };
+  }
+
+  return { kind: 'ready', detail: detail.value };
+}
+
+async function fetchSeasonEpisodes(
+  request: VideoSeasonEpisodesRequest,
+): Promise<SeasonEpisodesState> {
+  const page = await Effect.runPromiseExit(
+    runTauriCommand(() => commands.librarySeasonEpisodes(request)),
+  );
+
+  if (!Exit.isSuccess(page)) {
+    return {
+      kind: 'error',
+      message: commandFailureMessage(
+        page.cause,
+        'Could not load season episodes',
+      ),
+    };
+  }
+
+  return page.value.episodes.length === 0
+    ? { kind: 'empty', page: page.value }
+    : { kind: 'ready', page: page.value };
 }
 
 function statusText(status?: NowPlayingState['status']) {
@@ -1008,6 +1083,10 @@ function VideoLibraryCard(props: {
     props.collectionType === 'tvshows' || props.item.itemType === 'Series'
       ? Tv
       : Film;
+  const href = () =>
+    props.item.itemType === 'Series'
+      ? `/library/shows/${props.item.id}`
+      : `/library/items/${props.item.id}`;
   const subtitle = () => {
     const year = props.item.productionYear
       ? props.item.productionYear.toString()
@@ -1018,7 +1097,7 @@ function VideoLibraryCard(props: {
 
   return (
     <a
-      href={`/library/items/${props.item.id}`}
+      href={href()}
       class="card-filled group block min-h-56 overflow-hidden p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary/70"
     >
       <div class="aspect-video border-b border-outline-variant bg-surface-container-lowest/60">
@@ -1069,6 +1148,16 @@ function detailSubtitle(detail: VideoItemDetail) {
     return `${detail.seriesName} · ${episode}`;
   }
   return detail.productionYear?.toString() ?? detail.itemType;
+}
+
+function showSubtitle(detail: VideoShowDetail) {
+  return detail.productionYear?.toString() ?? 'Series';
+}
+
+function seasonLabel(season: VideoSeason) {
+  return season.seasonNumber !== null
+    ? `Season ${season.seasonNumber}`
+    : season.name;
 }
 
 function LibraryItemDetailView(props: { itemId: string }) {
@@ -1215,6 +1304,270 @@ function LibraryItemDetailView(props: { itemId: string }) {
   );
 }
 
+function LibraryShowDetailView(props: { seriesId: string }) {
+  const [state, { refetch }] = createResource(() =>
+    fetchVideoShowDetail(props.seriesId),
+  );
+  const [selectedSeason, setSelectedSeason] = createSignal<VideoSeason | null>(
+    null,
+  );
+  const [episodes, setEpisodes] = createSignal<SeasonEpisodesState | null>(
+    null,
+  );
+  const [episodesLoading, setEpisodesLoading] = createSignal(false);
+  const detail = () => {
+    const current = state();
+    return current?.kind === 'ready' ? current.detail : null;
+  };
+  const seasonEpisodes = () => {
+    const current = episodes();
+    return current?.kind === 'ready' ? current.page.episodes : [];
+  };
+  const loadEpisodes = async (season: VideoSeason) => {
+    if (episodesLoading()) return;
+    setSelectedSeason(season);
+    setEpisodes(null);
+    setEpisodesLoading(true);
+    const result = await fetchSeasonEpisodes({
+      seriesId: props.seriesId,
+      seasonId: season.id,
+      seasonNumber: season.seasonNumber,
+    });
+    setEpisodes(result);
+    setEpisodesLoading(false);
+  };
+  const statusTitle = () => {
+    const current = state();
+    if (current?.kind === 'error') return 'Could not load show detail';
+    if (current?.kind === 'disconnected') {
+      return 'Library requires a live Jellyfin connection';
+    }
+    return 'Loading show detail';
+  };
+  const statusDescription = () => {
+    const current = state();
+    if (current?.kind === 'error') return current.message;
+    if (current?.kind === 'disconnected') {
+      return 'Reconnect Jellyfin to inspect show details. Saved Sessions remain available, but Library data is not cached offline.';
+    }
+    return 'JMSR is loading Show detail, seasons, and Jellyfin next-up data.';
+  };
+  const episodesStatusTitle = () => {
+    const current = episodes();
+    if (episodesLoading()) return 'Loading season episodes';
+    if (current?.kind === 'empty') return 'Season has no episodes';
+    if (current?.kind === 'error') return 'Could not load season episodes';
+    return 'Choose a season';
+  };
+  const episodesStatusDescription = () => {
+    const current = episodes();
+    if (episodesLoading()) {
+      return 'JMSR is loading exact Episode cards for the selected Season.';
+    }
+    if (current?.kind === 'empty') {
+      return 'Jellyfin returned no Episodes for the selected Season.';
+    }
+    if (current?.kind === 'error') return current.message;
+    return 'Season buttons keep manual episode selection available alongside Jellyfin next-up resolution.';
+  };
+
+  return (
+    <div class="space-y-6">
+      <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <a href="/library" class="btn-outlined rounded-full">
+          <Library class="h-4 w-4" />
+          <span>Video Home</span>
+        </a>
+        <button
+          type="button"
+          class="btn-outlined rounded-full"
+          disabled={state.loading}
+          onClick={() => void refetch()}
+        >
+          <RefreshCw class="h-4 w-4" />
+          <span>Retry Show</span>
+        </button>
+      </div>
+
+      <CompactNowPlayingSummary />
+
+      <Show
+        when={detail()}
+        fallback={
+          <LibraryStatusPanel
+            title={statusTitle()}
+            description={statusDescription()}
+          />
+        }
+      >
+        {(show) => (
+          <div class="space-y-6">
+            <article class="grid gap-6 lg:grid-cols-[minmax(240px,360px)_1fr]">
+              <div class="card-filled overflow-hidden p-0">
+                <div class="aspect-[2/3] bg-surface-container-lowest/60">
+                  <Show
+                    when={show().artworkUrl}
+                    fallback={
+                      <div class="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-on-surface-variant">
+                        <Tv class="h-8 w-8" />
+                        <p class="text-title-medium">{show().name}</p>
+                        <p class="text-label-small">No artwork</p>
+                      </div>
+                    }
+                  >
+                    {(artworkUrl) => (
+                      <img
+                        src={artworkUrl()}
+                        alt={`${show().name} artwork`}
+                        class="h-full w-full object-cover"
+                      />
+                    )}
+                  </Show>
+                </div>
+              </div>
+              <div class="space-y-5">
+                <div>
+                  <p class="text-label-small text-secondary">Series</p>
+                  <h1 class="text-headline-large">{show().name}</h1>
+                  <p class="mt-2 text-body-large">{showSubtitle(show())}</p>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  <StatusBadge variant={show().played ? 'success' : 'neutral'}>
+                    {show().played ? 'Played' : 'Unplayed'}
+                  </StatusBadge>
+                  <StatusBadge
+                    variant={show().favorite ? 'success' : 'neutral'}
+                  >
+                    {show().favorite ? 'Favorite' : 'Not favorite'}
+                  </StatusBadge>
+                </div>
+                <Show when={show().overview}>
+                  {(overview) => <p class="text-body-medium">{overview()}</p>}
+                </Show>
+                <Show when={show().genres.length > 0}>
+                  <div class="flex flex-wrap gap-2">
+                    <For each={show().genres}>
+                      {(genre) => (
+                        <span class="rounded-full border border-outline-variant px-3 py-1 text-label-small">
+                          {genre}
+                        </span>
+                      )}
+                    </For>
+                  </div>
+                </Show>
+                <Show
+                  when={show().nextEpisode}
+                  fallback={
+                    <button
+                      type="button"
+                      class="btn-primary rounded-full"
+                      disabled
+                    >
+                      Play unavailable
+                    </button>
+                  }
+                >
+                  {(nextEpisode) => (
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                      <a
+                        href={`/library/items/${nextEpisode().id}`}
+                        class="btn-primary rounded-full"
+                      >
+                        Play
+                      </a>
+                      <a
+                        href={`/library/items/${nextEpisode().id}`}
+                        class="text-body-small text-secondary underline-offset-4 hover:underline"
+                      >
+                        Next: {nextEpisode().name}
+                      </a>
+                    </div>
+                  )}
+                </Show>
+              </div>
+            </article>
+
+            <section class="space-y-4" aria-labelledby="show-seasons-title">
+              <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p class="text-label-small text-secondary">Manual Browse</p>
+                  <h2 id="show-seasons-title" class="text-title-large">
+                    Seasons and Episodes
+                  </h2>
+                </div>
+                <p class="text-body-small">
+                  {show().seasons.length} seasons available
+                </p>
+              </div>
+
+              <Show
+                when={show().seasons.length > 0}
+                fallback={
+                  <LibraryStatusPanel
+                    title="No seasons available"
+                    description="Jellyfin returned no seasons for this show."
+                  />
+                }
+              >
+                <ul
+                  class="flex gap-2 overflow-x-auto rounded-2xl border border-outline-variant bg-surface-container-low/70 p-2"
+                  aria-label="Show seasons"
+                >
+                  <For each={show().seasons}>
+                    {(season) => (
+                      <li class="shrink-0">
+                        <button
+                          type="button"
+                          class={`btn-outlined rounded-full ${
+                            selectedSeason()?.id === season.id
+                              ? 'border-secondary bg-secondary-container/45 text-on-secondary-container'
+                              : ''
+                          }`}
+                          aria-pressed={selectedSeason()?.id === season.id}
+                          disabled={episodesLoading()}
+                          onClick={() => void loadEpisodes(season)}
+                        >
+                          <span>{seasonLabel(season)}</span>
+                        </button>
+                      </li>
+                    )}
+                  </For>
+                </ul>
+
+                <Show
+                  when={episodes()?.kind === 'ready'}
+                  fallback={
+                    <LibraryStatusPanel
+                      title={episodesStatusTitle()}
+                      description={episodesStatusDescription()}
+                    />
+                  }
+                >
+                  <section
+                    class="space-y-4"
+                    aria-labelledby="season-episodes-title"
+                  >
+                    <h3 id="season-episodes-title" class="text-title-medium">
+                      {selectedSeason()
+                        ? `${selectedSeason()?.name} Episodes`
+                        : 'Episodes'}
+                    </h3>
+                    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                      <For each={seasonEpisodes()}>
+                        {(episode) => <VideoLibraryCard item={episode} />}
+                      </For>
+                    </div>
+                  </section>
+                </Show>
+              </Show>
+            </section>
+          </div>
+        )}
+      </Show>
+    </div>
+  );
+}
+
 function DiagnosticsArea() {
   return (
     <section
@@ -1246,6 +1599,11 @@ export default function AuthenticatedShell(props: AuthenticatedShellProps) {
         }
         if (props.libraryView?.kind === 'detail') {
           return <LibraryItemDetailView itemId={props.libraryView.itemId} />;
+        }
+        if (props.libraryView?.kind === 'show') {
+          return (
+            <LibraryShowDetailView seriesId={props.libraryView.seriesId} />
+          );
         }
         return <LibraryLanding />;
       case 'now-playing':

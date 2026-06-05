@@ -10,6 +10,8 @@ import {
   type VideoItemDetail,
   type VideoLibraryPage,
   type VideoSearchPage,
+  type VideoSeasonEpisodes,
+  type VideoShowDetail,
 } from '../src/bindings';
 import AuthenticatedShell, {
   type LibraryView,
@@ -198,6 +200,64 @@ const episodeDetail: VideoItemDetail = {
   artworkUrl: null,
 };
 
+const showDetail: VideoShowDetail = {
+  id: 'series-1',
+  name: 'Example Show',
+  overview: 'A show overview.',
+  productionYear: 2023,
+  genres: ['Drama'],
+  played: false,
+  favorite: false,
+  canPlay: true,
+  artworkUrl: null,
+  nextEpisode: {
+    id: 'episode-2',
+    name: 'Next Episode',
+    itemType: 'Episode',
+    productionYear: null,
+    runtimeSeconds: null,
+    played: false,
+    favorite: false,
+    artworkUrl: null,
+  },
+  seasons: [
+    {
+      id: 'season-1',
+      name: 'Season 1',
+      seasonNumber: 1,
+      played: false,
+      favorite: false,
+      artworkUrl: null,
+    },
+    {
+      id: 'season-2',
+      name: 'Season 2',
+      seasonNumber: 2,
+      played: false,
+      favorite: true,
+      artworkUrl: null,
+    },
+  ],
+};
+
+const seasonEpisodes: VideoSeasonEpisodes = {
+  seriesId: 'series-1',
+  seasonId: 'season-1',
+  seasonNumber: 1,
+  episodes: [
+    {
+      id: 'episode-2',
+      name: 'Next Episode',
+      itemType: 'Episode',
+      productionYear: null,
+      runtimeSeconds: 1800,
+      played: false,
+      favorite: false,
+      artworkUrl: null,
+    },
+  ],
+};
+
 function videoLibraryPage(startIndex: number): VideoLibraryPage {
   if (startIndex === 0) {
     return {
@@ -325,6 +385,14 @@ function mockShellCommands(state = connectedState) {
       data: itemId === 'detail-episode' ? episodeDetail : movieDetail,
     }),
   );
+  rstest.spyOn(commands, 'libraryShowDetail').mockResolvedValue({
+    status: 'ok',
+    data: showDetail,
+  });
+  rstest.spyOn(commands, 'librarySeasonEpisodes').mockResolvedValue({
+    status: 'ok',
+    data: seasonEpisodes,
+  });
   rstest.spyOn(commands, 'nowPlayingGetState').mockResolvedValue({
     status: 'ok',
     data: nowPlaying,
@@ -439,7 +507,7 @@ test('library search loads paged video results and opens detail links without pl
   ).toHaveAttribute('href', '/library/items/search-movie-1');
   expect(screen.getByRole('link', { name: /Search Show/ })).toHaveAttribute(
     'href',
-    '/library/items/search-show-1',
+    '/library/shows/search-show-1',
   );
   expect(searchCommand).toHaveBeenCalledWith({
     query: 'pilot',
@@ -690,6 +758,46 @@ test('library item detail renders episode metadata and semantic artwork placehol
   expect(screen.getByText('Sci-Fi')).toBeVisible();
   expect(screen.queryByRole('button', { name: 'Resume' })).toBeNull();
   expect(screen.getByRole('button', { name: 'Play' })).toBeVisible();
+
+  cleanup();
+});
+
+test('library show detail renders next episode and loads exact season episodes', async () => {
+  mockShellCommands();
+  const showCommand = rstest.spyOn(commands, 'libraryShowDetail');
+  const seasonCommand = rstest.spyOn(commands, 'librarySeasonEpisodes');
+  const mpvStart = rstest.spyOn(commands, 'mpvStart');
+  const cleanup = renderShell('library', {
+    kind: 'show',
+    seriesId: 'series-1',
+  });
+
+  await screen.findByRole('heading', { name: 'Example Show' });
+  expect(screen.getByText('A show overview.')).toBeVisible();
+  expect(screen.getByText('Drama')).toBeVisible();
+  expect(screen.getByText('Unplayed')).toBeVisible();
+  expect(screen.getByText('Not favorite')).toBeVisible();
+  expect(screen.getByRole('link', { name: 'Play' })).toHaveAttribute(
+    'href',
+    '/library/items/episode-2',
+  );
+  expect(
+    screen.getByRole('link', { name: 'Next: Next Episode' }),
+  ).toHaveAttribute('href', '/library/items/episode-2');
+  expect(screen.getByRole('button', { name: 'Season 1' })).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Season 2' })).toBeVisible();
+  expect(showCommand).toHaveBeenCalledWith('series-1');
+
+  fireEvent.click(screen.getByRole('button', { name: 'Season 1' }));
+  expect(
+    await screen.findByRole('link', { name: /Next Episode/ }),
+  ).toHaveAttribute('href', '/library/items/episode-2');
+  expect(seasonCommand).toHaveBeenCalledWith({
+    seriesId: 'series-1',
+    seasonId: 'season-1',
+    seasonNumber: 1,
+  });
+  expect(mpvStart).not.toHaveBeenCalled();
 
   cleanup();
 });

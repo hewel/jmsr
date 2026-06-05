@@ -79,6 +79,13 @@ const libraryItemDetailRoute = createRoute({
   component: LibraryItemDetailRouteComponent,
 });
 
+const libraryShowDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/library/shows/$seriesId',
+  beforeLoad: requireAuthenticatedShell,
+  component: LibraryShowDetailRouteComponent,
+});
+
 function libraryKindFromParam(value: string): VideoLibraryKind {
   return value === 'tvshows' ? 'tvshows' : 'movies';
 }
@@ -105,6 +112,17 @@ function LibraryItemDetailRouteComponent() {
     <ShellRouteComponent
       activeArea="library"
       libraryView={{ kind: 'detail', itemId: params().itemId }}
+    />
+  );
+}
+
+function LibraryShowDetailRouteComponent() {
+  const params = useParams({ from: '/library/shows/$seriesId' });
+
+  return (
+    <ShellRouteComponent
+      activeArea="library"
+      libraryView={{ kind: 'show', seriesId: params().seriesId }}
     />
   );
 }
@@ -176,6 +194,7 @@ const routeTree = rootRoute.addChildren([
   libraryRoute,
   libraryBrowseRoute,
   libraryItemDetailRoute,
+  libraryShowDetailRoute,
   nowPlayingRoute,
   settingsRoute,
   diagnosticsRoute,

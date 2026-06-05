@@ -202,6 +202,54 @@ pub struct VideoItemDetail {
   pub artwork_url: Option<String>,
 }
 
+/// Show detail data with seasons and Jellyfin next playable episode.
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct VideoShowDetail {
+  pub id: String,
+  pub name: String,
+  pub overview: Option<String>,
+  pub production_year: Option<i32>,
+  pub genres: Vec<String>,
+  pub played: bool,
+  pub favorite: bool,
+  pub can_play: bool,
+  pub artwork_url: Option<String>,
+  pub next_episode: Option<VideoLibraryItem>,
+  pub seasons: Vec<VideoSeason>,
+}
+
+/// Season summary for a Show detail page.
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct VideoSeason {
+  pub id: String,
+  pub name: String,
+  pub season_number: Option<i32>,
+  pub played: bool,
+  pub favorite: bool,
+  pub artwork_url: Option<String>,
+}
+
+/// Request for episodes inside a show season.
+#[derive(Debug, Clone, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct VideoSeasonEpisodesRequest {
+  pub series_id: String,
+  pub season_id: Option<String>,
+  pub season_number: Option<i32>,
+}
+
+/// Episode list for a selected season.
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct VideoSeasonEpisodes {
+  pub series_id: String,
+  pub season_id: Option<String>,
+  pub season_number: Option<i32>,
+  pub episodes: Vec<VideoLibraryItem>,
+}
+
 /// Credentials for authentication.
 #[derive(Debug, Clone, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]

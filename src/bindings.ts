@@ -39,6 +39,10 @@ export const commands = {
 	librarySearchVideo: (request: VideoSearchRequest) => typedError<VideoSearchPage, CommandError>(__TAURI_INVOKE("library_search_video", { request })),
 	/**  Load Movie or Episode details for the Library Browser. */
 	libraryItemDetail: (itemId: string) => typedError<VideoItemDetail, CommandError>(__TAURI_INVOKE("library_item_detail", { itemId })),
+	/**  Load Show details with seasons and the Jellyfin next playable episode. */
+	libraryShowDetail: (seriesId: string) => typedError<VideoShowDetail, CommandError>(__TAURI_INVOKE("library_show_detail", { seriesId })),
+	/**  Load Episodes for one Show season. */
+	librarySeasonEpisodes: (request: VideoSeasonEpisodesRequest) => typedError<VideoSeasonEpisodes, CommandError>(__TAURI_INVOKE("library_season_episodes", { request })),
 	/**  Connect to a Jellyfin server. */
 	jellyfinConnect: (credentials: Credentials) => typedError<null, CommandError>(__TAURI_INVOKE("jellyfin_connect", { credentials })),
 	/**  Disconnect from Jellyfin server. */
@@ -346,6 +350,46 @@ export type VideoSearchRequest = {
 	query: string,
 	startIndex: number,
 	limit: number,
+};
+
+/**  Season summary for a Show detail page. */
+export type VideoSeason = {
+	id: string,
+	name: string,
+	seasonNumber: number | null,
+	played: boolean,
+	favorite: boolean,
+	artworkUrl: string | null,
+};
+
+/**  Episode list for a selected season. */
+export type VideoSeasonEpisodes = {
+	seriesId: string,
+	seasonId: string | null,
+	seasonNumber: number | null,
+	episodes: VideoLibraryItem[],
+};
+
+/**  Request for episodes inside a show season. */
+export type VideoSeasonEpisodesRequest = {
+	seriesId: string,
+	seasonId: string | null,
+	seasonNumber: number | null,
+};
+
+/**  Show detail data with seasons and Jellyfin next playable episode. */
+export type VideoShowDetail = {
+	id: string,
+	name: string,
+	overview: string | null,
+	productionYear: number | null,
+	genres: string[],
+	played: boolean,
+	favorite: boolean,
+	canPlay: boolean,
+	artworkUrl: string | null,
+	nextEpisode: VideoLibraryItem | null,
+	seasons: VideoSeason[],
 };
 
 /* Tauri Specta runtime */

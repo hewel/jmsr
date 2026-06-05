@@ -11,7 +11,8 @@ use crate::config::AppConfig;
 use crate::jellyfin::{
   ConnectionState, Credentials, JellyfinClient, JellyfinError, QuickConnectRequest,
   QuickConnectStatus, SavedSession, SessionManager, VideoHome, VideoItemDetail, VideoLibraryPage,
-  VideoLibraryPageRequest, VideoSearchPage, VideoSearchRequest,
+  VideoLibraryPageRequest, VideoSearchPage, VideoSearchRequest, VideoSeasonEpisodes,
+  VideoSeasonEpisodesRequest, VideoShowDetail,
 };
 use crate::mpv::{write_input_conf, MpvClient, PropertyValue};
 use crate::playback_control;
@@ -660,6 +661,36 @@ pub async fn library_item_detail(
     .map_err(jellyfin_err)
 }
 
+/// Load Show details with seasons and the Jellyfin next playable episode.
+#[tauri::command]
+#[specta]
+pub async fn library_show_detail(
+  state: State<'_, JellyfinState>,
+  series_id: String,
+) -> Result<VideoShowDetail, CommandError> {
+  state
+    .client
+    .library()
+    .show_detail(series_id)
+    .await
+    .map_err(jellyfin_err)
+}
+
+/// Load Episodes for one Show season.
+#[tauri::command]
+#[specta]
+pub async fn library_season_episodes(
+  state: State<'_, JellyfinState>,
+  request: VideoSeasonEpisodesRequest,
+) -> Result<VideoSeasonEpisodes, CommandError> {
+  state
+    .client
+    .library()
+    .season_episodes(request)
+    .await
+    .map_err(jellyfin_err)
+}
+
 /// Get the current session data for saving.
 #[tauri::command]
 #[specta]
@@ -906,6 +937,8 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
       library_browse_video,
       library_search_video,
       library_item_detail,
+      library_show_detail,
+      library_season_episodes,
       // Jellyfin commands
       jellyfin_connect,
       jellyfin_disconnect,
