@@ -276,15 +276,12 @@ export default function PlayerBridgeSettingsCard(
               <Select.HiddenSelect />
             </Select.Root>
 
-            <div class="flex min-w-0 flex-col">
-              <label
-                for="custom-subtitle-lang-input"
-                class="mb-1.5 block text-label-medium"
-              >
+            <ArkField.Root class="flex min-w-0 flex-col">
+              <ArkField.Label class="mb-1.5 block text-label-medium">
                 Custom code
-              </label>
+              </ArkField.Label>
               <div class="flex gap-2">
-                <input
+                <ArkField.Input
                   id="custom-subtitle-lang-input"
                   type="text"
                   value={ui.subtitleLanguageInput}
@@ -313,7 +310,7 @@ export default function PlayerBridgeSettingsCard(
                   <span>Add</span>
                 </button>
               </div>
-            </div>
+            </ArkField.Root>
           </div>
 
           <Show
