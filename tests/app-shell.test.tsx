@@ -8,6 +8,7 @@ import {
   type NowPlayingState,
   type VideoHome,
   type VideoLibraryPage,
+  type VideoSearchPage,
 } from '../src/bindings';
 import AuthenticatedShell, {
   type LibraryView,
@@ -201,6 +202,60 @@ function videoLibraryPage(startIndex: number): VideoLibraryPage {
   };
 }
 
+function videoSearchPage(query: string, startIndex: number): VideoSearchPage {
+  if (startIndex === 0) {
+    return {
+      query,
+      startIndex: 0,
+      limit: 24,
+      totalRecordCount: 25,
+      hasMore: true,
+      items: [
+        {
+          id: 'search-movie-1',
+          name: 'Search Movie',
+          itemType: 'Movie',
+          productionYear: 2024,
+          runtimeSeconds: 7200,
+          played: false,
+          favorite: false,
+          artworkUrl: null,
+        },
+        {
+          id: 'search-show-1',
+          name: 'Search Show',
+          itemType: 'Series',
+          productionYear: null,
+          runtimeSeconds: null,
+          played: false,
+          favorite: true,
+          artworkUrl: null,
+        },
+      ],
+    };
+  }
+
+  return {
+    query,
+    startIndex,
+    limit: 24,
+    totalRecordCount: 25,
+    hasMore: false,
+    items: [
+      {
+        id: 'search-episode-25',
+        name: 'Search Episode 25',
+        itemType: 'Episode',
+        productionYear: null,
+        runtimeSeconds: null,
+        played: false,
+        favorite: false,
+        artworkUrl: null,
+      },
+    ],
+  };
+}
+
 function mockShellCommands(state = connectedState) {
   rstest.spyOn(commands, 'jellyfinGetState').mockResolvedValue(state);
   rstest.spyOn(commands, 'mpvIsConnected').mockResolvedValue(false);
@@ -213,6 +268,12 @@ function mockShellCommands(state = connectedState) {
     Promise.resolve({
       status: 'ok',
       data: videoLibraryPage(request.startIndex),
+    }),
+  );
+  rstest.spyOn(commands, 'librarySearchVideo').mockImplementation((request) =>
+    Promise.resolve({
+      status: 'ok',
+      data: videoSearchPage(request.query, request.startIndex),
     }),
   );
   rstest.spyOn(commands, 'nowPlayingGetState').mockResolvedValue({
@@ -308,6 +369,110 @@ test('library landing renders command-backed rows and compact now playing link',
   expect(
     screen.getByRole('link', { name: 'Open Now Playing' }),
   ).toHaveAttribute('href', '/now-playing');
+
+  cleanup();
+});
+
+test('library search loads paged video results and opens detail links without playback', async () => {
+  mockShellCommands();
+  const searchCommand = rstest.spyOn(commands, 'librarySearchVideo');
+  const mpvStart = rstest.spyOn(commands, 'mpvStart');
+  const cleanup = renderShell();
+
+  await screen.findByRole('heading', { name: 'Library' });
+  fireEvent.input(screen.getByLabelText('Search video library'), {
+    target: { value: 'pilot' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+
+  expect(
+    await screen.findByRole('link', { name: /Search Movie/ }),
+  ).toHaveAttribute('href', '/library/items/search-movie-1');
+  expect(screen.getByRole('link', { name: /Search Show/ })).toHaveAttribute(
+    'href',
+    '/library/items/search-show-1',
+  );
+  expect(searchCommand).toHaveBeenCalledWith({
+    query: 'pilot',
+    startIndex: 0,
+    limit: 24,
+  });
+
+  const movieLink = screen.getByRole('link', { name: /Search Movie/ });
+  movieLink.addEventListener('click', (event) => event.preventDefault());
+  fireEvent.click(movieLink);
+  expect(mpvStart).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Load more results' }));
+  expect(
+    await screen.findByRole('link', { name: /Search Episode 25/ }),
+  ).toHaveAttribute('href', '/library/items/search-episode-25');
+  expect(searchCommand).toHaveBeenLastCalledWith({
+    query: 'pilot',
+    startIndex: 24,
+    limit: 24,
+  });
+
+  cleanup();
+});
+
+test('library search exposes empty results and command errors with retry', async () => {
+  mockShellCommands();
+  const searchCommand = rstest
+    .spyOn(commands, 'librarySearchVideo')
+    .mockResolvedValueOnce({
+      status: 'ok',
+      data: {
+        query: 'missing',
+        startIndex: 0,
+        limit: 24,
+        totalRecordCount: 0,
+        hasMore: false,
+        items: [],
+      },
+    })
+    .mockResolvedValueOnce({
+      status: 'error',
+      error: { code: 'network', message: 'Search unavailable' },
+    })
+    .mockResolvedValueOnce({
+      status: 'ok',
+      data: videoSearchPage('missing', 0),
+    });
+  const cleanup = renderShell();
+
+  await screen.findByRole('heading', { name: 'Library' });
+  fireEvent.input(screen.getByLabelText('Search video library'), {
+    target: { value: 'missing' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+  await screen.findByText('No video search results');
+
+  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+  await screen.findByText('Search unavailable');
+  fireEvent.click(screen.getByRole('button', { name: 'Retry Search' }));
+  expect(
+    await screen.findByRole('link', { name: /Search Movie/ }),
+  ).toBeVisible();
+  expect(searchCommand).toHaveBeenCalledTimes(3);
+
+  cleanup();
+});
+
+test('library search stays disconnected without calling search command', async () => {
+  mockShellCommands(disconnectedState);
+  const searchCommand = rstest.spyOn(commands, 'librarySearchVideo');
+  const cleanup = renderShell();
+
+  await screen.findByRole('heading', { name: 'Library' });
+  fireEvent.input(screen.getByLabelText('Search video library'), {
+    target: { value: 'pilot' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+
+  await screen.findByText('Library requires a live Jellyfin connection');
+  expect(screen.getByRole('button', { name: 'Retry Search' })).toBeVisible();
+  expect(searchCommand).not.toHaveBeenCalled();
 
   cleanup();
 });

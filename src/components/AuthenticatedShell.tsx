@@ -30,6 +30,7 @@ import {
   type VideoLibraryPlayedFilter,
   type VideoLibraryShortcut,
   type VideoLibrarySort,
+  type VideoSearchPage,
 } from '../bindings';
 import {
   commandFailureMessage,
@@ -64,7 +65,14 @@ type LibraryBrowseState =
   | { kind: 'disconnected'; state: ConnectionState }
   | { kind: 'error'; message: string };
 
+type LibrarySearchState =
+  | { kind: 'ready'; page: VideoSearchPage; items: VideoLibraryItem[] }
+  | { kind: 'empty'; page: VideoSearchPage }
+  | { kind: 'disconnected'; state: ConnectionState }
+  | { kind: 'error'; message: string };
+
 const LIBRARY_BROWSE_PAGE_SIZE = 24;
+const LIBRARY_SEARCH_PAGE_SIZE = 24;
 
 const navItems: Array<{
   area: ShellArea;
@@ -177,6 +185,55 @@ async function fetchVideoLibraryPage(
     return {
       kind: 'error',
       message: commandFailureMessage(page.cause, 'Could not load Library page'),
+    };
+  }
+
+  return page.value.items.length === 0
+    ? { kind: 'empty', page: page.value }
+    : { kind: 'ready', page: page.value, items: page.value.items };
+}
+
+async function fetchVideoSearchPage(
+  query: string,
+  startIndex: number,
+): Promise<LibrarySearchState> {
+  const trimmedQuery = query.trim();
+  if (!trimmedQuery) {
+    return { kind: 'error', message: 'Search text is required' };
+  }
+
+  const connection = await Effect.runPromiseExit(
+    runTauriCommandRaw(() => commands.jellyfinGetState()),
+  );
+
+  if (!Exit.isSuccess(connection)) {
+    return {
+      kind: 'error',
+      message: commandFailureMessage(
+        connection.cause,
+        'Could not load Library state',
+      ),
+    };
+  }
+
+  if (!connection.value.connected) {
+    return { kind: 'disconnected', state: connection.value };
+  }
+
+  const page = await Effect.runPromiseExit(
+    runTauriCommand(() =>
+      commands.librarySearchVideo({
+        query: trimmedQuery,
+        startIndex,
+        limit: LIBRARY_SEARCH_PAGE_SIZE,
+      }),
+    ),
+  );
+
+  if (!Exit.isSuccess(page)) {
+    return {
+      kind: 'error',
+      message: commandFailureMessage(page.cause, 'Could not search Library'),
     };
   }
 
@@ -346,6 +403,8 @@ function LibraryLanding() {
 
       <CompactNowPlayingSummary />
 
+      <LibrarySearchPanel />
+
       <Show
         when={!home.loading}
         fallback={<LibraryStatusPanel title="Loading Video Home" />}
@@ -384,6 +443,166 @@ function LibraryLanding() {
               shortcuts={loadedHome()?.libraryShortcuts ?? []}
             />
           </div>
+        </Show>
+      </Show>
+    </div>
+  );
+}
+
+function LibrarySearchPanel() {
+  const [query, setQuery] = createSignal('');
+  const [submittedQuery, setSubmittedQuery] = createSignal('');
+  const [state, setState] = createSignal<LibrarySearchState | null>(null);
+  const [loading, setLoading] = createSignal(false);
+
+  const loadSearchPage = async (
+    nextQuery: string,
+    startIndex: number,
+    replace = false,
+  ) => {
+    if (loading()) return;
+    setLoading(true);
+    const result = await fetchVideoSearchPage(nextQuery, startIndex);
+    setState((current) => {
+      if (!replace && current?.kind === 'ready' && result.kind === 'ready') {
+        return {
+          kind: 'ready',
+          page: result.page,
+          items: [...current.items, ...result.items],
+        };
+      }
+      return result;
+    });
+    setLoading(false);
+  };
+  const submitSearch = () => {
+    const nextQuery = query().trim();
+    setSubmittedQuery(nextQuery);
+    setState(null);
+    void loadSearchPage(nextQuery, 0, true);
+  };
+  const readyState = () => {
+    const current = state();
+    return current?.kind === 'ready' ? current : null;
+  };
+  const statusTitle = () => {
+    const current = state();
+    if (!current) return loading() ? 'Searching Library' : null;
+    if (current.kind === 'empty') return 'No video search results';
+    if (current.kind === 'error') return 'Could not search Library';
+    if (current.kind === 'disconnected') {
+      return 'Library requires a live Jellyfin connection';
+    }
+    return null;
+  };
+  const statusDescription = () => {
+    const current = state();
+    if (!current) return 'JMSR is searching Movies, Shows, and Episodes.';
+    if (current.kind === 'empty') {
+      return `Jellyfin returned no video results for "${current.page.query}".`;
+    }
+    if (current.kind === 'error') return current.message;
+    if (current.kind === 'disconnected') {
+      return 'Reconnect Jellyfin to search video libraries. Saved Sessions remain available, but Library data is not cached offline.';
+    }
+    return 'JMSR is searching Movies, Shows, and Episodes.';
+  };
+  const loadMoreStartIndex = () => {
+    const current = readyState();
+    return current ? current.page.startIndex + current.page.limit : 0;
+  };
+
+  return (
+    <div class="space-y-4">
+      <form
+        class="card-filled flex flex-col gap-3 sm:flex-row sm:items-end"
+        aria-label="Library search"
+        onSubmit={(event) => {
+          event.preventDefault();
+          submitSearch();
+        }}
+      >
+        <label class="min-w-0 flex-1 space-y-2">
+          <span class="text-label-small">Search video library</span>
+          <input
+            class="input-filled w-full"
+            value={query()}
+            disabled={loading()}
+            onInput={(event) => setQuery(event.currentTarget.value)}
+          />
+        </label>
+        <button
+          type="submit"
+          class="btn-primary rounded-full"
+          disabled={loading()}
+        >
+          <span>{loading() ? 'Searching' : 'Search'}</span>
+        </button>
+      </form>
+
+      <Show when={state() !== null || loading()}>
+        <Show
+          when={state()?.kind === 'ready'}
+          fallback={
+            <div class="space-y-3">
+              <LibraryStatusPanel
+                title={statusTitle() ?? 'Searching Library'}
+                description={statusDescription()}
+              />
+              <Show
+                when={
+                  submittedQuery() &&
+                  (state()?.kind === 'error' ||
+                    state()?.kind === 'disconnected')
+                }
+              >
+                <button
+                  type="button"
+                  class="btn-secondary rounded-full"
+                  disabled={loading()}
+                  onClick={() => void loadSearchPage(submittedQuery(), 0, true)}
+                >
+                  <RefreshCw class="h-4 w-4" />
+                  <span>Retry Search</span>
+                </button>
+              </Show>
+            </div>
+          }
+        >
+          <section class="space-y-4" aria-labelledby="library-search-results">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <h2 id="library-search-results" class="text-title-large">
+                Search results
+              </h2>
+              <p class="text-body-small">
+                {readyState()?.items.length ?? 0} of{' '}
+                {readyState()?.page.totalRecordCount ?? 0} for "
+                {submittedQuery()}"
+              </p>
+            </div>
+            <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <For each={readyState()?.items ?? []}>
+                {(item) => <VideoLibraryCard item={item} />}
+              </For>
+            </div>
+            <Show when={readyState()?.page.hasMore}>
+              <div class="flex justify-center pt-2">
+                <button
+                  type="button"
+                  class="btn-secondary rounded-full"
+                  disabled={loading()}
+                  onClick={() =>
+                    void loadSearchPage(submittedQuery(), loadMoreStartIndex())
+                  }
+                >
+                  <RefreshCw class="h-4 w-4" />
+                  <span>
+                    {loading() ? 'Loading more' : 'Load more results'}
+                  </span>
+                </button>
+              </div>
+            </Show>
+          </section>
         </Show>
       </Show>
     </div>
@@ -738,9 +957,12 @@ function LibraryBrowseView(props: {
 
 function VideoLibraryCard(props: {
   item: VideoLibraryItem;
-  collectionType: VideoLibraryKind;
+  collectionType?: VideoLibraryKind;
 }) {
-  const Icon = props.collectionType === 'tvshows' ? Tv : Film;
+  const Icon =
+    props.collectionType === 'tvshows' || props.item.itemType === 'Series'
+      ? Tv
+      : Film;
   const subtitle = () => {
     const year = props.item.productionYear
       ? props.item.productionYear.toString()

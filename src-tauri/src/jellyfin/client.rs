@@ -1282,6 +1282,57 @@ impl<'a> JellyfinLibrary<'a> {
       items,
     })
   }
+
+  pub async fn search_video(
+    &self,
+    request: VideoSearchRequest,
+  ) -> Result<VideoSearchPage, JellyfinError> {
+    let query = request.query.trim().to_string();
+    if query.is_empty() {
+      return Err(JellyfinError::HttpError(
+        "Search text is required for video search".to_string(),
+      ));
+    }
+
+    let server_url = self.client.server_url()?;
+    let token = self.client.access_token()?;
+    let user_id = self.client.user_id()?;
+    let configuration = self
+      .client
+      .openapi_configuration(&server_url, Some(&token))?;
+    let start_index = request.start_index.max(0);
+    let limit = request.limit.clamp(1, 100);
+
+    let response = jellyfin_api::apis::items_api::get_items(
+      &configuration,
+      video_search_items_params(VideoSearchItemsQuery {
+        user_id,
+        query: query.clone(),
+        start_index,
+        limit,
+      }),
+    )
+    .await
+    .map_err(|err| JellyfinClient::openapi_error("Video library search", err))?;
+
+    let total_record_count = response.total_record_count.unwrap_or(0).max(0);
+    let items = response
+      .items
+      .unwrap_or_default()
+      .into_iter()
+      .filter_map(|item| map_video_library_item(&server_url, item))
+      .collect::<Vec<_>>();
+    let returned_count = i32::try_from(items.len()).unwrap_or(i32::MAX);
+
+    Ok(VideoSearchPage {
+      query,
+      start_index,
+      limit,
+      total_record_count,
+      has_more: start_index.saturating_add(returned_count) < total_record_count,
+      items,
+    })
+  }
 }
 
 async fn latest_video_items(
@@ -1441,6 +1492,36 @@ fn video_browse_items_params(
     enable_total_record_count: Some(true),
     enable_images: Some(true),
   }
+}
+
+struct VideoSearchItemsQuery {
+  user_id: String,
+  query: String,
+  start_index: i32,
+  limit: i32,
+}
+
+fn video_search_items_params(
+  query: VideoSearchItemsQuery,
+) -> jellyfin_api::apis::items_api::GetItemsParams {
+  let mut params = video_browse_items_params(VideoBrowseItemsQuery {
+    user_id: query.user_id,
+    library_id: String::new(),
+    start_index: query.start_index,
+    limit: query.limit,
+    include_item_types: vec![
+      jellyfin_api::models::BaseItemKind::Movie,
+      jellyfin_api::models::BaseItemKind::Series,
+      jellyfin_api::models::BaseItemKind::Episode,
+    ],
+    media_types: None,
+    sort: VideoLibrarySort::Title,
+    played_filter: VideoLibraryPlayedFilter::All,
+    favorites_only: false,
+  });
+  params.parent_id = None;
+  params.search_term = Some(query.query);
+  params
 }
 
 fn video_home_fields() -> Vec<jellyfin_api::models::ItemFields> {
@@ -2179,6 +2260,81 @@ mod tests {
     assert_eq!(
       err.to_string(),
       "HTTP error: Library id is required for video browsing"
+    );
+  }
+
+  #[tokio::test]
+  async fn search_video_maps_query_to_video_only_paged_items() {
+    let movie_id = "00000000-0000-0000-0000-000000000040";
+    let show_id = "00000000-0000-0000-0000-000000000041";
+    let episode_id = "00000000-0000-0000-0000-000000000042";
+    let (server_url, requests) = serve_responses_with_requests(vec![(
+      "200 OK",
+      r#"{"Items":[{"Id":"00000000-0000-0000-0000-000000000040","Name":"Search Movie","Type":"Movie","ImageTags":{"Primary":"poster-search"}},{"Id":"00000000-0000-0000-0000-000000000041","Name":"Search Show","Type":"Series"},{"Id":"00000000-0000-0000-0000-000000000042","Name":"Search Episode","Type":"Episode","UserData":{"Played":false}}],"TotalRecordCount":5,"StartIndex":0}"#,
+    )])
+    .await;
+    let client = JellyfinClient::new();
+    connect_test_client(&client, server_url.clone());
+
+    let page = client
+      .library()
+      .search_video(VideoSearchRequest {
+        query: " search text ".to_string(),
+        start_index: 0,
+        limit: 3,
+      })
+      .await
+      .expect("video search should load from generated item listing endpoint");
+
+    assert_eq!(page.query, "search text");
+    assert_eq!(page.start_index, 0);
+    assert_eq!(page.limit, 3);
+    assert_eq!(page.total_record_count, 5);
+    assert!(page.has_more);
+    assert_eq!(
+      page
+        .items
+        .iter()
+        .map(|item| (item.id.as_str(), item.item_type.as_str()))
+        .collect::<Vec<_>>(),
+      vec![
+        (movie_id, "Movie"),
+        (show_id, "Series"),
+        (episode_id, "Episode")
+      ]
+    );
+
+    let captured = requests.lock();
+    assert!(captured[0].starts_with("GET /Items?"));
+    assert!(captured[0].contains("searchTerm=search+text"));
+    assert!(captured[0].contains("startIndex=0"));
+    assert!(captured[0].contains("limit=3"));
+    assert!(captured[0].contains("includeItemTypes=Movie"));
+    assert!(captured[0].contains("includeItemTypes=Series"));
+    assert!(captured[0].contains("includeItemTypes=Episode"));
+    assert!(!captured[0].contains("includeItemTypes=Audio"));
+    assert!(!captured[0].contains("mediaTypes=Audio"));
+    assert!(!captured[0].contains("parentId="));
+  }
+
+  #[tokio::test]
+  async fn search_video_rejects_empty_query() {
+    let client = JellyfinClient::new();
+    connect_test_client(&client, "http://127.0.0.1:8096".to_string());
+
+    let err = client
+      .library()
+      .search_video(VideoSearchRequest {
+        query: "  ".to_string(),
+        start_index: 0,
+        limit: 24,
+      })
+      .await
+      .expect_err("empty search should return a clear command error");
+
+    assert_eq!(
+      err.to_string(),
+      "HTTP error: Search text is required for video search"
     );
   }
 

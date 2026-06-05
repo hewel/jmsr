@@ -35,6 +35,8 @@ export const commands = {
 	libraryVideoHome: () => typedError<VideoHome, CommandError>(__TAURI_INVOKE("library_video_home")),
 	/**  Load one server-paged Movies or Shows library result page. */
 	libraryBrowseVideo: (request: VideoLibraryPageRequest) => typedError<VideoLibraryPage, CommandError>(__TAURI_INVOKE("library_browse_video", { request })),
+	/**  Search Movies, Shows, and Episodes with server paging. */
+	librarySearchVideo: (request: VideoSearchRequest) => typedError<VideoSearchPage, CommandError>(__TAURI_INVOKE("library_search_video", { request })),
 	/**  Connect to a Jellyfin server. */
 	jellyfinConnect: (credentials: Credentials) => typedError<null, CommandError>(__TAURI_INVOKE("jellyfin_connect", { credentials })),
 	/**  Disconnect from Jellyfin server. */
@@ -304,6 +306,23 @@ export type VideoLibraryShortcut = {
 
 /**  Supported Library Browser sort options. */
 export type VideoLibrarySort = "title" | "recentlyAdded" | "releaseDate";
+
+/**  Paged video-only Library search result. */
+export type VideoSearchPage = {
+	query: string,
+	startIndex: number,
+	limit: number,
+	totalRecordCount: number,
+	hasMore: boolean,
+	items: VideoLibraryItem[],
+};
+
+/**  Paged video-only Library search request. */
+export type VideoSearchRequest = {
+	query: string,
+	startIndex: number,
+	limit: number,
+};
 
 /* Tauri Specta runtime */
 async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {

@@ -11,7 +11,7 @@ use crate::config::AppConfig;
 use crate::jellyfin::{
   ConnectionState, Credentials, JellyfinClient, JellyfinError, QuickConnectRequest,
   QuickConnectStatus, SavedSession, SessionManager, VideoHome, VideoLibraryPage,
-  VideoLibraryPageRequest,
+  VideoLibraryPageRequest, VideoSearchPage, VideoSearchRequest,
 };
 use crate::mpv::{write_input_conf, MpvClient, PropertyValue};
 use crate::playback_control;
@@ -630,6 +630,21 @@ pub async fn library_browse_video(
     .map_err(jellyfin_err)
 }
 
+/// Search Movies, Shows, and Episodes with server paging.
+#[tauri::command]
+#[specta]
+pub async fn library_search_video(
+  state: State<'_, JellyfinState>,
+  request: VideoSearchRequest,
+) -> Result<VideoSearchPage, CommandError> {
+  state
+    .client
+    .library()
+    .search_video(request)
+    .await
+    .map_err(jellyfin_err)
+}
+
 /// Get the current session data for saving.
 #[tauri::command]
 #[specta]
@@ -874,6 +889,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
       now_playing_get_state,
       library_video_home,
       library_browse_video,
+      library_search_video,
       // Jellyfin commands
       jellyfin_connect,
       jellyfin_disconnect,

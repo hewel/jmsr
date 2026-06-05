@@ -157,6 +157,27 @@ pub struct VideoLibraryItem {
   pub artwork_url: Option<String>,
 }
 
+/// Paged video-only Library search request.
+#[derive(Debug, Clone, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct VideoSearchRequest {
+  pub query: String,
+  pub start_index: i32,
+  pub limit: i32,
+}
+
+/// Paged video-only Library search result.
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct VideoSearchPage {
+  pub query: String,
+  pub start_index: i32,
+  pub limit: i32,
+  pub total_record_count: i32,
+  pub has_more: bool,
+  pub items: Vec<VideoLibraryItem>,
+}
+
 /// Credentials for authentication.
 #[derive(Debug, Clone, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
