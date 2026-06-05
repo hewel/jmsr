@@ -27,13 +27,13 @@ export default function Toast(props: ToastProps) {
   const getStyles = () => {
     switch (props.level) {
       case 'success':
-        return 'bg-surface-container-high text-on-surface border-outline-variant/30 shadow-lg shadow-black/20';
+        return 'bg-surface-container-high/90 text-on-surface border-tertiary/20 shadow-2xl backdrop-blur-md shadow-tertiary/5';
       case 'error':
-        return 'bg-error-container text-on-error-container border-transparent shadow-lg shadow-error-container/20';
+        return 'bg-error-container/85 text-on-error-container border-error/25 shadow-2xl backdrop-blur-md shadow-error/10';
       case 'warning':
-        return 'bg-secondary-container text-on-secondary-container border-transparent shadow-lg shadow-secondary-container/20';
+        return 'bg-warning-container/85 text-on-warning-container border-warning/25 shadow-2xl backdrop-blur-md shadow-warning/10';
       default:
-        return 'bg-surface-container-high text-on-surface border-outline-variant/30 shadow-lg shadow-black/20';
+        return 'bg-surface-container-high/90 text-on-surface border-outline-variant/60 shadow-2xl backdrop-blur-md';
     }
   };
 
@@ -42,9 +42,9 @@ export default function Toast(props: ToastProps) {
       case 'success':
         return <Check class="w-5 h-5 text-tertiary" />;
       case 'error':
-        return <X class="w-5 h-5" />;
+        return <X class="w-5 h-5 text-error" />;
       case 'warning':
-        return <TriangleAlert class="w-5 h-5" />;
+        return <TriangleAlert class="w-5 h-5 text-warning" />;
       default:
         return <Info class="w-5 h-5 text-primary" />;
     }
@@ -52,7 +52,7 @@ export default function Toast(props: ToastProps) {
 
   return (
     <div
-      class={`flex items-center w-full max-w-sm p-4 mb-4 rounded-xl border animate-in slide-in-from-right duration-300 shadow-md ${getStyles()}`}
+      class={`flex items-center w-full max-w-sm p-4 mb-4 rounded-xl border animate-in slide-in-from-right duration-300 shadow-md pointer-events-auto ${getStyles()}`}
       role="alert"
     >
       <div class="inline-flex items-center justify-center flex-shrink-0">

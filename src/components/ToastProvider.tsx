@@ -64,18 +64,16 @@ export function ToastProvider(props: ParentProps) {
     <ToastContext.Provider value={{ showToast, removeToast }}>
       {props.children}
       <div class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
-        <div class="pointer-events-auto">
-          <For each={toasts()}>
-            {(toast) => (
-              <Toast
-                id={toast.id}
-                level={toast.level}
-                message={toast.message}
-                onDismiss={removeToast}
-              />
-            )}
-          </For>
-        </div>
+        <For each={toasts()}>
+          {(toast) => (
+            <Toast
+              id={toast.id}
+              level={toast.level}
+              message={toast.message}
+              onDismiss={removeToast}
+            />
+          )}
+        </For>
       </div>
     </ToastContext.Provider>
   );

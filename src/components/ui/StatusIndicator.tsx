@@ -16,12 +16,12 @@ export default function StatusIndicator(props: StatusIndicatorProps) {
       <span
         class={`w-2.5 h-2.5 rounded-full ${
           props.connected
-            ? 'bg-tertiary shadow-[0_0_8px_rgba(var(--color-tertiary),0.5)]'
-            : 'bg-error'
+            ? 'bg-tertiary shadow-[0_0_8px_rgba(79,227,177,0.5)] animate-pulse'
+            : 'bg-error shadow-[0_0_8px_rgba(255,107,122,0.5)] animate-pulse'
         }`}
       />
       <span
-        class={`font-medium ${props.connected ? 'text-on-surface' : 'text-error'}`}
+        class={`font-bold ${props.connected ? 'text-on-surface' : 'text-error'}`}
       >
         {props.connected ? connectedText() : disconnectedText()}
       </span>
