@@ -60,6 +60,18 @@ _Avoid_: Account type, server type
 The user-facing playback status shown by JMSR for the current external player session. Now Playing may show transport state before rich Jellyfin media metadata is available.
 _Avoid_: MPV state, playback session internals
 
+**Library Browser**:
+The authenticated JMSR shell area for browsing Jellyfin video libraries, inspecting item details, launching playback through JMSR's Playback Target, and applying user-scoped media state. Library Browser complements the Playback Target; it is not a goal to replace every Jellyfin client feature.
+_Avoid_: Full Jellyfin replacement, embedded player
+
+**Video Home**:
+The Library Browser landing view built from live Jellyfin rows such as Continue Watching, Next Up, latest Movies, latest Episodes, and video library shortcuts. Video Home is not cached offline and should not show fake media.
+_Avoid_: Home page, dashboard mock data
+
+**User Data Action**:
+A user-scoped Jellyfin mutation for item state such as favorite, unfavorite, mark played, or mark unplayed. User Data Actions update visible Library Browser state only after Jellyfin accepts the mutation.
+_Avoid_: Optimistic toggle, local-only media state
+
 **Intro Skipper**:
 A Jellyfin server plugin that detects intro and credit ranges for media items so a Playback Target can skip those ranges during playback. In JMSR, Intro Skipper refers to the plugin-provided ranges, not Jellyfin media segments in general.
 _Avoid_: Media Segment Skipping, chapter skipping, generic skip markers

@@ -138,7 +138,7 @@
 - [x] System tray controls (play/pause, next, previous, mute)
 - [x] [Quick Connect](https://jellyfin.org/docs/general/server/quick-connect/) - Login via code from another device
 - [ ] [Intro Skipper](https://github.com/intro-skipper/intro-skipper) integration - Auto-skip intros/credits
-- [ ] Full-featured client UI - Browse libraries, manage media like other Jellyfin clients
+- [x] Full-featured client UI - Browse libraries, manage media like other Jellyfin clients
 - [ ] Embedded player - Optional built-in video player without external MPV dependency
 - [ ] MPRIS support - Linux media player integration for desktop controls
 - [ ] Keyboard shortcuts for playback control
