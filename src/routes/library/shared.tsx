@@ -1,5 +1,13 @@
 import { createListCollection } from '@ark-ui/solid/collection';
-import { Clapperboard, Film, Library, Tv } from 'lucide-solid';
+import {
+  Check,
+  Clapperboard,
+  Film,
+  Heart,
+  Library,
+  RefreshCw,
+  Tv,
+} from 'lucide-solid';
 import { createSignal, For, Show } from 'solid-js';
 import type {
   VideoHomeItem,
@@ -72,12 +80,18 @@ export function VideoHomeCard(props: { item: VideoHomeItem }) {
     return `${props.item.seriesName} · ${number}`;
   };
 
+  const isPoster = () =>
+    props.item.itemType === 'Movie' || props.item.itemType === 'Series';
+  const aspectClass = () => (isPoster() ? 'aspect-[2/3]' : 'aspect-video');
+
   return (
     <a
       href={`/library/items/${props.item.id}`}
-      class="card-filled group block min-h-56 overflow-hidden p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary/70"
+      class="card-filled group block overflow-hidden p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary/70 transition-all duration-300 hover:border-primary/50 hover:shadow-brand-glow-sm"
     >
-      <div class="aspect-video border-b border-outline-variant bg-surface-container-lowest/60">
+      <div
+        class={`${aspectClass()} border-b border-outline-variant bg-surface-container-lowest/60 overflow-hidden`}
+      >
         <Show
           when={props.item.artworkUrl}
           fallback={
@@ -90,7 +104,7 @@ export function VideoHomeCard(props: { item: VideoHomeItem }) {
             <img
               src={artworkUrl()}
               alt={`${props.item.name} artwork`}
-              class="h-full w-full object-cover"
+              class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
               loading="lazy"
             />
           )}
@@ -111,14 +125,18 @@ export function VideoHomeCard(props: { item: VideoHomeItem }) {
 
 export function LibraryShortcutRow(props: {
   shortcuts: VideoLibraryShortcut[];
+  layout?: 'grid' | 'list';
 }) {
+  const isList = () => props.layout === 'list';
   return (
     <Show when={props.shortcuts.length > 0}>
       <section class="space-y-3" aria-labelledby="library-shortcuts">
         <h2 id="library-shortcuts" class="text-title-large">
           Video Libraries
         </h2>
-        <div class="grid gap-3 sm:grid-cols-2">
+        <div
+          class={isList() ? 'flex flex-col gap-3' : 'grid gap-3 sm:grid-cols-2'}
+        >
           <For each={props.shortcuts}>
             {(shortcut) => (
               <a
@@ -187,12 +205,21 @@ export function VideoLibraryCard(props: {
     return `${year} · ${state}`;
   };
 
+  const isPoster = () =>
+    props.collectionType === 'tvshows' ||
+    props.item.itemType === 'Series' ||
+    props.item.itemType === 'Movie';
+
+  const aspectClass = () => (isPoster() ? 'aspect-[2/3]' : 'aspect-video');
+
   return (
     <a
       href={href()}
-      class="card-filled group block min-h-56 overflow-hidden p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary/70"
+      class="card-filled group block overflow-hidden p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary/70 transition-all duration-300 hover:border-primary/50 hover:shadow-brand-glow-sm"
     >
-      <div class="aspect-video border-b border-outline-variant bg-surface-container-lowest/60">
+      <div
+        class={`${aspectClass()} border-b border-outline-variant bg-surface-container-lowest/60 overflow-hidden`}
+      >
         <Show
           when={props.item.artworkUrl}
           fallback={
@@ -206,7 +233,7 @@ export function VideoLibraryCard(props: {
             <img
               src={artworkUrl()}
               alt={`${props.item.name} artwork`}
-              class="h-full w-full object-cover"
+              class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
               loading="lazy"
             />
           )}
@@ -282,27 +309,51 @@ export function UserDataControls(props: {
       <div class="flex flex-wrap gap-3">
         <button
           type="button"
-          class="btn-secondary rounded-full"
+          class={`btn-secondary rounded-full ${props.favorite ? 'border-error/30' : ''}`}
           disabled={busy() !== null}
           onClick={() => void runAction(favoriteAction())}
         >
-          {busy() === favoriteAction()
-            ? 'Updating'
-            : props.favorite
-              ? `Remove ${props.subject} favorite`
-              : `Favorite ${props.subject}`}
+          <Show
+            when={busy() === favoriteAction()}
+            fallback={
+              <Heart
+                class={`h-4 w-4 ${props.favorite ? 'fill-error text-error' : 'text-on-surface-variant'}`}
+              />
+            }
+          >
+            <RefreshCw class="h-4 w-4 animate-spin text-secondary" />
+          </Show>
+          <span>
+            {busy() === favoriteAction()
+              ? 'Updating...'
+              : props.favorite
+                ? 'Unfavorite'
+                : 'Favorite'}
+          </span>
         </button>
         <button
           type="button"
-          class="btn-secondary rounded-full"
+          class={`btn-secondary rounded-full ${props.played ? 'border-tertiary/30' : ''}`}
           disabled={busy() !== null}
           onClick={() => void runAction(playedAction())}
         >
-          {busy() === playedAction()
-            ? 'Updating'
-            : props.played
-              ? `Mark ${props.subject} unplayed`
-              : `Mark ${props.subject} played`}
+          <Show
+            when={busy() === playedAction()}
+            fallback={
+              <Check
+                class={`h-4 w-4 ${props.played ? 'text-tertiary font-bold' : 'text-on-surface-variant'}`}
+              />
+            }
+          >
+            <RefreshCw class="h-4 w-4 animate-spin text-secondary" />
+          </Show>
+          <span>
+            {busy() === playedAction()
+              ? 'Updating...'
+              : props.played
+                ? 'Mark Unplayed'
+                : 'Mark Played'}
+          </span>
         </button>
       </div>
       <Show when={error()}>

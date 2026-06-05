@@ -1,5 +1,5 @@
 import { useParams } from '@tanstack/solid-router';
-import { Film, Library, RefreshCw } from 'lucide-solid';
+import { Film, Library, Play, RefreshCw, RotateCcw } from 'lucide-solid';
 import { createResource, createSignal, For, Show } from 'solid-js';
 import type { VideoLibraryPlayMode } from '../../bindings';
 import { StatusBadge } from '../../components/ui';
@@ -211,7 +211,15 @@ export function LibraryItemDetailView(props: { itemId: string }) {
                         disabled={playBusy() !== null}
                         onClick={() => void playItem('start')}
                       >
-                        {playBusy() === 'start' ? 'Starting' : 'Play'}
+                        <Show
+                          when={playBusy() === 'start'}
+                          fallback={<Play class="h-4 w-4 fill-current" />}
+                        >
+                          <RefreshCw class="h-4 w-4 animate-spin" />
+                        </Show>
+                        <span>
+                          {playBusy() === 'start' ? 'Starting...' : 'Play'}
+                        </span>
                       </button>
                     }
                   >
@@ -221,7 +229,15 @@ export function LibraryItemDetailView(props: { itemId: string }) {
                       disabled={playBusy() !== null}
                       onClick={() => void playItem('resume')}
                     >
-                      {playBusy() === 'resume' ? 'Starting' : 'Resume'}
+                      <Show
+                        when={playBusy() === 'resume'}
+                        fallback={<Play class="h-4 w-4 fill-current" />}
+                      >
+                        <RefreshCw class="h-4 w-4 animate-spin" />
+                      </Show>
+                      <span>
+                        {playBusy() === 'resume' ? 'Starting...' : 'Resume'}
+                      </span>
                     </button>
                     <button
                       type="button"
@@ -229,9 +245,17 @@ export function LibraryItemDetailView(props: { itemId: string }) {
                       disabled={playBusy() !== null}
                       onClick={() => void playItem('start')}
                     >
-                      {playBusy() === 'start'
-                        ? 'Starting'
-                        : 'Play from beginning'}
+                      <Show
+                        when={playBusy() === 'start'}
+                        fallback={<RotateCcw class="h-4 w-4" />}
+                      >
+                        <RefreshCw class="h-4 w-4 animate-spin" />
+                      </Show>
+                      <span>
+                        {playBusy() === 'start'
+                          ? 'Starting...'
+                          : 'Play from beginning'}
+                      </span>
                     </button>
                   </Show>
                 </div>

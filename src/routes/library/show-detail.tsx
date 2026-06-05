@@ -186,94 +186,12 @@ export function LibraryShowDetailView(props: { seriesId: string }) {
         }
       >
         {(show) => (
-          <div class="space-y-6">
-            {/* Series header: poster + metadata + secondary Play next */}
-            <article class="grid gap-6 lg:grid-cols-[minmax(180px,240px)_1fr]">
-              <div class="card-filled overflow-hidden p-0">
-                <div class="aspect-[2/3] bg-surface-container-lowest/60">
-                  <Show
-                    when={show().artworkUrl}
-                    fallback={
-                      <div class="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-on-surface-variant">
-                        <Tv class="h-8 w-8" />
-                        <p class="text-title-medium">{show().name}</p>
-                        <p class="text-label-small">No artwork</p>
-                      </div>
-                    }
-                  >
-                    {(artworkUrl) => (
-                      <img
-                        src={artworkUrl()}
-                        alt={`${show().name} artwork`}
-                        class="h-full w-full object-cover"
-                      />
-                    )}
-                  </Show>
-                </div>
-              </div>
-              <div class="space-y-4">
-                <div>
-                  <p class="text-label-small text-secondary">Series</p>
-                  <h1 class="text-headline-large">{show().name}</h1>
-                  <p class="mt-2 text-body-large">{showSubtitle(show())}</p>
-                </div>
-                <div class="flex flex-wrap gap-2">
-                  <StatusBadge variant={show().played ? 'success' : 'neutral'}>
-                    {show().played ? 'Played' : 'Unplayed'}
-                  </StatusBadge>
-                  <StatusBadge
-                    variant={show().favorite ? 'success' : 'neutral'}
-                  >
-                    {show().favorite ? 'Favorite' : 'Not favorite'}
-                  </StatusBadge>
-                </div>
-                <UserDataControls
-                  itemId={show().id}
-                  played={show().played}
-                  favorite={show().favorite}
-                  subject="show"
-                  onSuccess={() => void refetch()}
-                />
-                <Show when={show().overview}>
-                  {(overview) => <p class="text-body-medium">{overview()}</p>}
-                </Show>
-                <Show when={show().genres.length > 0}>
-                  <div class="flex flex-wrap gap-2">
-                    <For each={show().genres}>
-                      {(genre) => (
-                        <span class="rounded-full border border-outline-variant px-3 py-1 text-label-small">
-                          {genre}
-                        </span>
-                      )}
-                    </For>
-                  </div>
-                </Show>
-                {/* Secondary Play next episode shortcut */}
-                <Show when={show().nextEpisode}>
-                  {(nextEpisode) => (
-                    <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-                      <button
-                        type="button"
-                        class="btn-secondary rounded-full"
-                        disabled={playBusy()}
-                        onClick={() => void playShow()}
-                      >
-                        {playBusy() ? 'Starting' : 'Play next episode'}
-                      </button>
-                      <a
-                        href={`/library/items/${nextEpisode().id}`}
-                        class="text-body-small text-secondary underline-offset-4 hover:underline"
-                      >
-                        Next: {nextEpisode().name}
-                      </a>
-                    </div>
-                  )}
-                </Show>
-              </div>
-            </article>
-
-            {/* Episodes-first: dominant season episode list */}
-            <section class="space-y-4" aria-labelledby="show-seasons-title">
+          <div class="console-grid">
+            {/* Left Column (Interactive): Seasons & Episode List */}
+            <section
+              class="space-y-4 min-w-0 order-2 lg:order-1"
+              aria-labelledby="show-seasons-title"
+            >
               <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                   <h2 id="show-seasons-title" class="text-title-large">
@@ -329,7 +247,7 @@ export function LibraryShowDetailView(props: { seriesId: string }) {
                   }
                 >
                   <section
-                    class="space-y-2"
+                    class="space-y-3"
                     aria-labelledby="season-episodes-title"
                   >
                     <h3 id="season-episodes-title" class="text-title-medium">
@@ -337,33 +255,34 @@ export function LibraryShowDetailView(props: { seriesId: string }) {
                         ? `${selectedSeason()?.name} Episodes`
                         : 'Episodes'}
                     </h3>
-                    <For each={seasonEpisodes()}>
-                      {(episode) => (
-                        <div class="card-filled grid gap-3 p-3 sm:grid-cols-[minmax(120px,180px)_1fr]">
-                          {/* Episode thumbnail - landscape, episode-specific */}
-                          <div class="aspect-video overflow-hidden rounded-lg bg-surface-container-lowest/60">
-                            <Show
-                              when={episode.artworkUrl}
-                              fallback={
-                                <div class="flex h-full items-center justify-center text-label-small text-on-surface-variant">
-                                  <Film class="h-5 w-5" />
-                                </div>
-                              }
-                            >
-                              {(artworkUrl) => (
-                                <img
-                                  src={artworkUrl()}
-                                  alt={`${episode.name} artwork`}
-                                  class="h-full w-full object-cover"
-                                  loading="lazy"
-                                />
-                              )}
-                            </Show>
-                          </div>
-                          {/* Episode metadata row */}
-                          <div class="flex flex-col justify-between gap-2">
-                            <div>
-                              <div class="flex items-center gap-2">
+                    <div class="flex flex-col gap-3 animate-fade-in">
+                      <For each={seasonEpisodes()}>
+                        {(episode) => (
+                          <div class="card-filled grid gap-4 p-3 grid-cols-1 sm:grid-cols-[160px_1fr_auto] items-center">
+                            {/* Episode thumbnail - landscape, episode-specific */}
+                            <div class="aspect-video w-full overflow-hidden rounded-lg bg-surface-container-lowest/60">
+                              <Show
+                                when={episode.artworkUrl}
+                                fallback={
+                                  <div class="flex h-full items-center justify-center text-label-small text-on-surface-variant">
+                                    <Film class="h-5 w-5" />
+                                  </div>
+                                }
+                              >
+                                {(artworkUrl) => (
+                                  <img
+                                    src={artworkUrl()}
+                                    alt={`${episode.name} artwork`}
+                                    class="h-full w-full object-cover"
+                                    loading="lazy"
+                                  />
+                                )}
+                              </Show>
+                            </div>
+
+                            {/* Episode metadata column */}
+                            <div class="min-w-0 space-y-1.5">
+                              <div class="flex flex-wrap items-center gap-2">
                                 <span class="text-label-small text-secondary">
                                   {episodeLabel(episode)}
                                 </span>
@@ -377,81 +296,186 @@ export function LibraryShowDetailView(props: { seriesId: string }) {
                                     Favorite
                                   </StatusBadge>
                                 </Show>
-                              </div>
-                              <a
-                                href={`/library/items/${episode.id}`}
-                                class="text-title-medium hover:underline"
-                              >
-                                {episode.name}
-                              </a>
-                            </div>
-                            <div class="flex flex-wrap items-center gap-2 text-body-small text-secondary">
-                              <Show
-                                when={formatRuntime(episode.runtimeSeconds)}
-                              >
-                                {(runtime) => <span>{runtime()}</span>}
-                              </Show>
-                              <Show
-                                when={
-                                  episode.resumePositionSeconds != null &&
-                                  episode.resumePositionSeconds > 0 &&
-                                  !episode.played
-                                }
-                              >
-                                <span>
-                                  {Math.round(episode.playedPercentage ?? 0)}%
-                                  watched
-                                </span>
-                              </Show>
-                              <div class="flex gap-2">
+                                <Show
+                                  when={formatRuntime(episode.runtimeSeconds)}
+                                >
+                                  {(runtime) => (
+                                    <>
+                                      <span class="text-on-surface-variant/70">
+                                        ·
+                                      </span>{' '}
+                                      <span class="text-body-small text-on-surface-variant/70">
+                                        {runtime()}
+                                      </span>
+                                    </>
+                                  )}
+                                </Show>
                                 <Show
                                   when={
                                     episode.resumePositionSeconds != null &&
                                     episode.resumePositionSeconds > 0 &&
                                     !episode.played
                                   }
-                                  fallback={
-                                    <button
-                                      type="button"
-                                      class="btn-primary rounded-full px-3 py-1 text-label-small"
-                                      disabled={episodePlayBusy() !== null}
-                                      onClick={() => void playEpisode(episode)}
-                                    >
-                                      {episodePlayBusy() === episode.id
-                                        ? 'Starting'
-                                        : 'Play'}
-                                    </button>
-                                  }
                                 >
+                                  <>
+                                    <span class="text-on-surface-variant/70">
+                                      ·
+                                    </span>{' '}
+                                    <span class="text-body-small text-secondary font-semibold">
+                                      {Math.round(
+                                        episode.playedPercentage ?? 0,
+                                      )}
+                                      % watched
+                                    </span>
+                                  </>
+                                </Show>
+                              </div>
+                              <a
+                                href={`/library/items/${episode.id}`}
+                                class="block text-title-medium hover:underline truncate"
+                              >
+                                {episode.name}
+                              </a>
+                            </div>
+
+                            {/* Episode Action Column on the far right */}
+                            <div class="flex shrink-0">
+                              <Show
+                                when={
+                                  episode.resumePositionSeconds != null &&
+                                  episode.resumePositionSeconds > 0 &&
+                                  !episode.played
+                                }
+                                fallback={
                                   <button
                                     type="button"
-                                    class="btn-primary rounded-full px-3 py-1 text-label-small"
+                                    class="btn-primary rounded-full px-5 py-2 text-label-large"
                                     disabled={episodePlayBusy() !== null}
                                     onClick={() => void playEpisode(episode)}
                                   >
                                     {episodePlayBusy() === episode.id
-                                      ? 'Starting'
-                                      : 'Resume'}
+                                      ? 'Starting...'
+                                      : 'Play'}
                                   </button>
-                                </Show>
-                              </div>
+                                }
+                              >
+                                <button
+                                  type="button"
+                                  class="btn-primary rounded-full px-5 py-2 text-label-large"
+                                  disabled={episodePlayBusy() !== null}
+                                  onClick={() => void playEpisode(episode)}
+                                >
+                                  {episodePlayBusy() === episode.id
+                                    ? 'Starting...'
+                                    : 'Resume'}
+                                </button>
+                              </Show>
                             </div>
                           </div>
-                        </div>
-                      )}
-                    </For>
+                        )}
+                      </For>
+                    </div>
                   </section>
                 </Show>
               </Show>
             </section>
 
-            <Show when={playError()}>
-              {(message) => (
-                <p class="text-body-small text-error">{message()}</p>
-              )}
-            </Show>
+            {/* Right Column (Sidebar): Series Info */}
+            <aside class="space-y-6 order-1 lg:order-2">
+              <article class="card-filled space-y-4">
+                <div class="aspect-[2/3] overflow-hidden rounded-2xl bg-surface-container-lowest/60 border border-outline-variant">
+                  <Show
+                    when={show().artworkUrl}
+                    fallback={
+                      <div class="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-on-surface-variant">
+                        <Tv class="h-8 w-8" />
+                        <p class="text-title-medium">{show().name}</p>
+                        <p class="text-label-small">No artwork</p>
+                      </div>
+                    }
+                  >
+                    {(artworkUrl) => (
+                      <img
+                        src={artworkUrl()}
+                        alt={`${show().name} artwork`}
+                        class="h-full w-full object-cover animate-fade-in"
+                      />
+                    )}
+                  </Show>
+                </div>
+                <div>
+                  <p class="text-label-small text-secondary">Series</p>
+                  <h1 class="text-headline-medium">{show().name}</h1>
+                  <p class="mt-1 text-body-medium">{showSubtitle(show())}</p>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  <StatusBadge variant={show().played ? 'success' : 'neutral'}>
+                    {show().played ? 'Played' : 'Unplayed'}
+                  </StatusBadge>
+                  <StatusBadge
+                    variant={show().favorite ? 'success' : 'neutral'}
+                  >
+                    {show().favorite ? 'Favorite' : 'Not favorite'}
+                  </StatusBadge>
+                </div>
+
+                <UserDataControls
+                  itemId={show().id}
+                  played={show().played}
+                  favorite={show().favorite}
+                  subject="show"
+                  onSuccess={() => void refetch()}
+                />
+
+                <Show when={show().overview}>
+                  {(overview) => (
+                    <p class="text-body-medium border-t border-outline-variant/30 pt-3 leading-relaxed">
+                      {overview()}
+                    </p>
+                  )}
+                </Show>
+
+                <Show when={show().genres.length > 0}>
+                  <div class="flex flex-wrap gap-1.5 border-t border-outline-variant/30 pt-3">
+                    <For each={show().genres}>
+                      {(genre) => (
+                        <span class="rounded-full border border-outline-variant px-2.5 py-0.5 text-[11px] font-bold text-on-surface-variant/90">
+                          {genre}
+                        </span>
+                      )}
+                    </For>
+                  </div>
+                </Show>
+
+                {/* Secondary Play next episode shortcut */}
+                <Show when={show().nextEpisode}>
+                  {(nextEpisode) => (
+                    <div class="flex flex-col gap-3 border-t border-outline-variant/30 pt-3">
+                      <p class="text-label-small text-secondary">Up Next</p>
+                      <button
+                        type="button"
+                        class="btn-primary rounded-full w-full"
+                        disabled={playBusy()}
+                        onClick={() => void playShow()}
+                      >
+                        {playBusy() ? 'Starting...' : 'Play Next Episode'}
+                      </button>
+                      <a
+                        href={`/library/items/${nextEpisode().id}`}
+                        class="text-body-small text-center text-on-surface-variant underline-offset-4 hover:underline hover:text-secondary truncate block"
+                      >
+                        Next: {nextEpisode().name}
+                      </a>
+                    </div>
+                  )}
+                </Show>
+              </article>
+            </aside>
           </div>
         )}
+      </Show>
+      <Show when={playError()}>
+        {(message) => <p class="text-body-small text-error">{message()}</p>}
       </Show>
     </div>
   );

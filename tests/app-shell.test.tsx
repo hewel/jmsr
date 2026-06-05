@@ -690,7 +690,7 @@ test('library browse controls reload paged results from the first page', async (
   const cleanup = renderShell('/library/movies/movies');
 
   await screen.findByRole('link', { name: /Paged Movie/ });
-  fireEvent.click(screen.getByRole('combobox', { name: 'Sort' }));
+  fireEvent.click(screen.getByRole('combobox', { name: 'Sort By' }));
   fireEvent.click(screen.getByText('Recently added', { selector: 'span' }));
 
   await waitFor(() =>
@@ -718,7 +718,7 @@ test('library browse controls reload paged results from the first page', async (
     }),
   );
 
-  fireEvent.click(screen.getByRole('checkbox', { name: 'Favorites' }));
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Favorites Only' }));
   await waitFor(() =>
     expect(browseCommand).toHaveBeenLastCalledWith({
       collectionType: 'movies',
@@ -808,9 +808,7 @@ test('library item detail refreshes user data only after mutation success', asyn
   const cleanup = renderShell('/library/items/detail-movie');
 
   await screen.findByRole('heading', { name: 'Detail Movie' });
-  fireEvent.click(
-    screen.getByRole('button', { name: 'Remove movie favorite' }),
-  );
+  fireEvent.click(screen.getByRole('button', { name: 'Unfavorite' }));
 
   await waitFor(() =>
     expect(updateCommand).toHaveBeenCalledWith({
@@ -832,9 +830,7 @@ test('library item detail keeps previous user data visible on mutation failure',
   const cleanup = renderShell('/library/items/detail-movie');
 
   await screen.findByRole('heading', { name: 'Detail Movie' });
-  fireEvent.click(
-    screen.getByRole('button', { name: 'Remove movie favorite' }),
-  );
+  fireEvent.click(screen.getByRole('button', { name: 'Unfavorite' }));
 
   expect(await screen.findByText('Favorite update failed')).toBeVisible();
   expect(screen.getByText('Favorite')).toBeVisible();
@@ -884,7 +880,7 @@ test('library show detail auto-loads next-up season and renders episode rows', a
   expect(screen.getByText('Not favorite')).toBeVisible();
 
   // Series user data controls
-  fireEvent.click(screen.getByRole('button', { name: 'Favorite show' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Favorite' }));
   await waitFor(() =>
     expect(updateCommand).toHaveBeenCalledWith({
       itemId: 'series-1',
@@ -893,7 +889,7 @@ test('library show detail auto-loads next-up season and renders episode rows', a
   );
 
   // Secondary "Play next episode" shortcut
-  fireEvent.click(screen.getByRole('button', { name: 'Play next episode' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Play Next Episode' }));
   await waitFor(() =>
     expect(playCommand).toHaveBeenCalledWith({
       itemId: 'series-1',
