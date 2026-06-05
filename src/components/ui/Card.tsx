@@ -27,11 +27,9 @@ export default function Card(props: CardProps) {
   };
 
   return (
-    <div
-      class={`${variantClasses()} relative overflow-hidden ${props.class ?? ''}`}
-    >
+    <div class={`${variantClasses()} relative ${props.class ?? ''}`}>
       {/* Subtle brand surface tint */}
-      <div class="absolute inset-0 bg-surface-tint/[0.03] pointer-events-none" />
+      <div class="absolute inset-0 bg-surface-tint/[0.03] rounded-[inherit] pointer-events-none" />
       <div class="relative z-10">{props.children}</div>
     </div>
   );

@@ -210,7 +210,7 @@ export default function PlayerBridgeSettingsCard(
           value={ui.selectedSubtitleLanguages}
           inputValue=""
           editable={false}
-          class="rounded-2xl bg-surface-container-high/30 p-5 border border-outline-variant/60 relative overflow-hidden backdrop-blur-sm shadow-inner"
+          class="rounded-2xl bg-surface-container-high/30 p-5 border border-outline-variant/60 relative backdrop-blur-sm shadow-inner"
         >
           <div class="flex flex-wrap items-start justify-between gap-4">
             <div>
