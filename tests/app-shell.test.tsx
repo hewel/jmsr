@@ -397,6 +397,10 @@ function mockShellCommands(state = connectedState) {
     status: 'ok',
     data: null,
   });
+  rstest.spyOn(commands, 'libraryUpdateUserData').mockResolvedValue({
+    status: 'ok',
+    data: { itemId: 'detail-movie', played: false, favorite: false },
+  });
   rstest.spyOn(commands, 'nowPlayingGetState').mockResolvedValue({
     status: 'ok',
     data: nowPlaying,
@@ -769,6 +773,60 @@ test('library item detail renders resume-primary movie metadata', async () => {
   cleanup();
 });
 
+test('library item detail refreshes user data only after mutation success', async () => {
+  mockShellCommands();
+  const updateCommand = rstest.spyOn(commands, 'libraryUpdateUserData');
+  rstest
+    .spyOn(commands, 'libraryItemDetail')
+    .mockResolvedValueOnce({ status: 'ok', data: movieDetail })
+    .mockResolvedValueOnce({
+      status: 'ok',
+      data: { ...movieDetail, favorite: false },
+    });
+  const cleanup = renderShell('library', {
+    kind: 'detail',
+    itemId: 'detail-movie',
+  });
+
+  await screen.findByRole('heading', { name: 'Detail Movie' });
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Remove movie favorite' }),
+  );
+
+  await waitFor(() =>
+    expect(updateCommand).toHaveBeenCalledWith({
+      itemId: 'detail-movie',
+      action: 'unfavorite',
+    }),
+  );
+  expect(await screen.findByText('Not favorite')).toBeVisible();
+
+  cleanup();
+});
+
+test('library item detail keeps previous user data visible on mutation failure', async () => {
+  mockShellCommands();
+  rstest.spyOn(commands, 'libraryUpdateUserData').mockResolvedValue({
+    status: 'error',
+    error: { code: 'network', message: 'Favorite update failed' },
+  });
+  const cleanup = renderShell('library', {
+    kind: 'detail',
+    itemId: 'detail-movie',
+  });
+
+  await screen.findByRole('heading', { name: 'Detail Movie' });
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Remove movie favorite' }),
+  );
+
+  expect(await screen.findByText('Favorite update failed')).toBeVisible();
+  expect(screen.getByText('Favorite')).toBeVisible();
+  expect(screen.queryByText('Not favorite')).toBeNull();
+
+  cleanup();
+});
+
 test('library item detail renders episode metadata and semantic artwork placeholder', async () => {
   mockShellCommands();
   const playCommand = rstest.spyOn(commands, 'libraryPlay');
@@ -801,6 +859,7 @@ test('library show detail renders next episode and loads exact season episodes',
   const showCommand = rstest.spyOn(commands, 'libraryShowDetail');
   const seasonCommand = rstest.spyOn(commands, 'librarySeasonEpisodes');
   const playCommand = rstest.spyOn(commands, 'libraryPlay');
+  const updateCommand = rstest.spyOn(commands, 'libraryUpdateUserData');
   const mpvStart = rstest.spyOn(commands, 'mpvStart');
   const cleanup = renderShell('library', {
     kind: 'show',
@@ -812,6 +871,13 @@ test('library show detail renders next episode and loads exact season episodes',
   expect(screen.getByText('Drama')).toBeVisible();
   expect(screen.getByText('Unplayed')).toBeVisible();
   expect(screen.getByText('Not favorite')).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: 'Favorite show' }));
+  await waitFor(() =>
+    expect(updateCommand).toHaveBeenCalledWith({
+      itemId: 'series-1',
+      action: 'favorite',
+    }),
+  );
   fireEvent.click(screen.getByRole('button', { name: 'Play' }));
   await waitFor(() =>
     expect(playCommand).toHaveBeenCalledWith({
@@ -831,6 +897,13 @@ test('library show detail renders next episode and loads exact season episodes',
   expect(
     await screen.findByRole('link', { name: /Next Episode/ }),
   ).toHaveAttribute('href', '/library/items/episode-2');
+  fireEvent.click(screen.getByRole('button', { name: 'Favorite season 1' }));
+  await waitFor(() =>
+    expect(updateCommand).toHaveBeenLastCalledWith({
+      itemId: 'season-1',
+      action: 'favorite',
+    }),
+  );
   expect(seasonCommand).toHaveBeenCalledWith({
     seriesId: 'series-1',
     seasonId: 'season-1',

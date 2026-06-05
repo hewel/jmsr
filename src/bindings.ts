@@ -45,6 +45,8 @@ export const commands = {
 	librarySeasonEpisodes: (request: VideoSeasonEpisodesRequest) => typedError<VideoSeasonEpisodes, CommandError>(__TAURI_INVOKE("library_season_episodes", { request })),
 	/**  Start explicit Library Browser playback through the active Jellyfin session. */
 	libraryPlay: (request: VideoLibraryPlayRequest) => typedError<null, CommandError>(__TAURI_INVOKE("library_play", { request })),
+	/**  Mutate Jellyfin user data for a Library Browser item. */
+	libraryUpdateUserData: (request: VideoUserDataUpdateRequest) => typedError<VideoUserDataUpdate, CommandError>(__TAURI_INVOKE("library_update_user_data", { request })),
 	/**  Connect to a Jellyfin server. */
 	jellyfinConnect: (credentials: Credentials) => typedError<null, CommandError>(__TAURI_INVOKE("jellyfin_connect", { credentials })),
 	/**  Disconnect from Jellyfin server. */
@@ -402,6 +404,22 @@ export type VideoShowDetail = {
 	artworkUrl: string | null,
 	nextEpisode: VideoLibraryItem | null,
 	seasons: VideoSeason[],
+};
+
+/**  User data action supported by Library Browser detail views. */
+export type VideoUserDataAction = "favorite" | "unfavorite" | "markPlayed" | "markUnplayed";
+
+/**  Updated user data returned by Jellyfin after a mutation succeeds. */
+export type VideoUserDataUpdate = {
+	itemId: string,
+	played: boolean,
+	favorite: boolean,
+};
+
+/**  User-scoped Jellyfin user data mutation request. */
+export type VideoUserDataUpdateRequest = {
+	itemId: string,
+	action: VideoUserDataAction,
 };
 
 /* Tauri Specta runtime */

@@ -1560,6 +1560,69 @@ impl<'a> JellyfinLibrary<'a> {
       .find_map(map_video_playback_target),
     )
   }
+
+  pub async fn update_user_data(
+    &self,
+    request: VideoUserDataUpdateRequest,
+  ) -> Result<VideoUserDataUpdate, JellyfinError> {
+    let item_id = request.item_id.trim().to_string();
+    if item_id.is_empty() {
+      return Err(JellyfinError::HttpError(
+        "Item id is required for user data updates".to_string(),
+      ));
+    }
+
+    let server_url = self.client.server_url()?;
+    let token = self.client.access_token()?;
+    let user_id = self.client.user_id()?;
+    let configuration = self
+      .client
+      .openapi_configuration(&server_url, Some(&token))?;
+
+    let user_data = match request.action {
+      VideoUserDataAction::Favorite => jellyfin_api::apis::user_library_api::mark_favorite_item(
+        &configuration,
+        jellyfin_api::apis::user_library_api::MarkFavoriteItemParams {
+          item_id: item_id.clone(),
+          user_id: Some(user_id),
+        },
+      )
+      .await
+      .map_err(|err| JellyfinClient::openapi_error("Mark favorite", err))?,
+      VideoUserDataAction::Unfavorite => {
+        jellyfin_api::apis::user_library_api::unmark_favorite_item(
+          &configuration,
+          jellyfin_api::apis::user_library_api::UnmarkFavoriteItemParams {
+            item_id: item_id.clone(),
+            user_id: Some(user_id),
+          },
+        )
+        .await
+        .map_err(|err| JellyfinClient::openapi_error("Unmark favorite", err))?
+      }
+      VideoUserDataAction::MarkPlayed => jellyfin_api::apis::playstate_api::mark_played_item(
+        &configuration,
+        jellyfin_api::apis::playstate_api::MarkPlayedItemParams {
+          item_id: item_id.clone(),
+          user_id: Some(user_id),
+          date_played: None,
+        },
+      )
+      .await
+      .map_err(|err| JellyfinClient::openapi_error("Mark played", err))?,
+      VideoUserDataAction::MarkUnplayed => jellyfin_api::apis::playstate_api::mark_unplayed_item(
+        &configuration,
+        jellyfin_api::apis::playstate_api::MarkUnplayedItemParams {
+          item_id: item_id.clone(),
+          user_id: Some(user_id),
+        },
+      )
+      .await
+      .map_err(|err| JellyfinClient::openapi_error("Mark unplayed", err))?,
+    };
+
+    Ok(map_video_user_data_update(item_id, user_data))
+  }
 }
 
 async fn latest_video_items(
@@ -1910,6 +1973,17 @@ fn map_video_playback_target(
     item_id,
     start_position_ticks,
   })
+}
+
+fn map_video_user_data_update(
+  item_id: String,
+  user_data: jellyfin_api::models::UserItemDataDto,
+) -> VideoUserDataUpdate {
+  VideoUserDataUpdate {
+    item_id,
+    played: user_data.played.unwrap_or(false),
+    favorite: user_data.is_favorite.unwrap_or(false),
+  }
 }
 
 fn map_video_item_detail(
@@ -2891,6 +2965,70 @@ mod tests {
     assert!(captured[0].contains("seasonId=00000000-0000-0000-0000-000000000071"));
     assert!(captured[0].contains("enableUserData=true"));
     assert!(captured[0].contains("sortBy=ParentIndexNumber%2CIndexNumber"));
+  }
+
+  #[tokio::test]
+  async fn update_user_data_maps_library_actions_to_jellyfin_userdata_endpoints() {
+    let item_id = "00000000-0000-0000-0000-000000000080";
+    let (server_url, requests) = serve_responses_with_requests(vec![
+      ("200 OK", r#"{"IsFavorite":true,"Played":false}"#),
+      ("200 OK", r#"{"IsFavorite":false,"Played":false}"#),
+      ("200 OK", r#"{"IsFavorite":false,"Played":true}"#),
+      ("200 OK", r#"{"IsFavorite":false,"Played":false}"#),
+    ])
+    .await;
+    let client = JellyfinClient::new();
+    connect_test_client(&client, server_url);
+
+    let favorite = client
+      .library()
+      .update_user_data(VideoUserDataUpdateRequest {
+        item_id: item_id.to_string(),
+        action: VideoUserDataAction::Favorite,
+      })
+      .await
+      .expect("favorite should update user data");
+    let unfavorite = client
+      .library()
+      .update_user_data(VideoUserDataUpdateRequest {
+        item_id: item_id.to_string(),
+        action: VideoUserDataAction::Unfavorite,
+      })
+      .await
+      .expect("unfavorite should update user data");
+    let played = client
+      .library()
+      .update_user_data(VideoUserDataUpdateRequest {
+        item_id: item_id.to_string(),
+        action: VideoUserDataAction::MarkPlayed,
+      })
+      .await
+      .expect("mark played should update user data");
+    let unplayed = client
+      .library()
+      .update_user_data(VideoUserDataUpdateRequest {
+        item_id: item_id.to_string(),
+        action: VideoUserDataAction::MarkUnplayed,
+      })
+      .await
+      .expect("mark unplayed should update user data");
+
+    assert!(favorite.favorite);
+    assert!(!unfavorite.favorite);
+    assert!(played.played);
+    assert!(!unplayed.played);
+
+    let captured = requests.lock();
+    assert!(
+      captured[0].starts_with("POST /UserFavoriteItems/00000000-0000-0000-0000-000000000080?")
+    );
+    assert!(
+      captured[1].starts_with("DELETE /UserFavoriteItems/00000000-0000-0000-0000-000000000080?")
+    );
+    assert!(captured[2].starts_with("POST /UserPlayedItems/00000000-0000-0000-0000-000000000080?"));
+    assert!(
+      captured[3].starts_with("DELETE /UserPlayedItems/00000000-0000-0000-0000-000000000080?")
+    );
   }
 
   #[test]

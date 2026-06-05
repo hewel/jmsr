@@ -12,7 +12,8 @@ use crate::jellyfin::{
   ConnectionState, Credentials, JellyfinClient, JellyfinError, QuickConnectRequest,
   QuickConnectStatus, SavedSession, SessionManager, VideoHome, VideoItemDetail, VideoLibraryPage,
   VideoLibraryPageRequest, VideoLibraryPlayRequest, VideoSearchPage, VideoSearchRequest,
-  VideoSeasonEpisodes, VideoSeasonEpisodesRequest, VideoShowDetail,
+  VideoSeasonEpisodes, VideoSeasonEpisodesRequest, VideoShowDetail, VideoUserDataUpdate,
+  VideoUserDataUpdateRequest,
 };
 use crate::mpv::{write_input_conf, MpvClient, PropertyValue};
 use crate::playback_control;
@@ -711,6 +712,21 @@ pub async fn library_play(
   Ok(())
 }
 
+/// Mutate Jellyfin user data for a Library Browser item.
+#[tauri::command]
+#[specta]
+pub async fn library_update_user_data(
+  state: State<'_, JellyfinState>,
+  request: VideoUserDataUpdateRequest,
+) -> Result<VideoUserDataUpdate, CommandError> {
+  state
+    .client
+    .library()
+    .update_user_data(request)
+    .await
+    .map_err(jellyfin_err)
+}
+
 /// Get the current session data for saving.
 #[tauri::command]
 #[specta]
@@ -960,6 +976,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
       library_show_detail,
       library_season_episodes,
       library_play,
+      library_update_user_data,
       // Jellyfin commands
       jellyfin_connect,
       jellyfin_disconnect,

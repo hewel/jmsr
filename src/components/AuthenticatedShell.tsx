@@ -38,6 +38,8 @@ import {
   type VideoSeasonEpisodes,
   type VideoSeasonEpisodesRequest,
   type VideoShowDetail,
+  type VideoUserDataAction,
+  type VideoUserDataUpdateRequest,
 } from '../bindings';
 import {
   commandFailureMessage,
@@ -373,6 +375,20 @@ async function startLibraryPlayback(
 
   if (!Exit.isSuccess(result)) {
     return commandFailureMessage(result.cause, 'Could not start playback');
+  }
+
+  return null;
+}
+
+async function updateLibraryUserData(
+  request: VideoUserDataUpdateRequest,
+): Promise<string | null> {
+  const result = await Effect.runPromiseExit(
+    runTauriCommand(() => commands.libraryUpdateUserData(request)),
+  );
+
+  if (!Exit.isSuccess(result)) {
+    return commandFailureMessage(result.cause, 'Could not update user data');
   }
 
   return null;
@@ -1176,6 +1192,66 @@ function seasonLabel(season: VideoSeason) {
     : season.name;
 }
 
+function UserDataControls(props: {
+  itemId: string;
+  played: boolean;
+  favorite: boolean;
+  subject: string;
+  onSuccess: () => void;
+}) {
+  const [busy, setBusy] = createSignal<VideoUserDataAction | null>(null);
+  const [error, setError] = createSignal<string | null>(null);
+  const runAction = async (action: VideoUserDataAction) => {
+    if (busy()) return;
+
+    setBusy(action);
+    setError(null);
+    const message = await updateLibraryUserData({
+      itemId: props.itemId,
+      action,
+    });
+    setError(message);
+    setBusy(null);
+    if (!message) props.onSuccess();
+  };
+  const favoriteAction = () => (props.favorite ? 'unfavorite' : 'favorite');
+  const playedAction = () => (props.played ? 'markUnplayed' : 'markPlayed');
+
+  return (
+    <div class="space-y-2">
+      <div class="flex flex-wrap gap-3">
+        <button
+          type="button"
+          class="btn-secondary rounded-full"
+          disabled={busy() !== null}
+          onClick={() => void runAction(favoriteAction())}
+        >
+          {busy() === favoriteAction()
+            ? 'Updating'
+            : props.favorite
+              ? `Remove ${props.subject} favorite`
+              : `Favorite ${props.subject}`}
+        </button>
+        <button
+          type="button"
+          class="btn-secondary rounded-full"
+          disabled={busy() !== null}
+          onClick={() => void runAction(playedAction())}
+        >
+          {busy() === playedAction()
+            ? 'Updating'
+            : props.played
+              ? `Mark ${props.subject} unplayed`
+              : `Mark ${props.subject} played`}
+        </button>
+      </div>
+      <Show when={error()}>
+        {(message) => <p class="text-body-small text-error">{message()}</p>}
+      </Show>
+    </div>
+  );
+}
+
 function LibraryItemDetailView(props: { itemId: string }) {
   const [state, { refetch }] = createResource(() =>
     fetchVideoItemDetail(props.itemId),
@@ -1291,6 +1367,13 @@ function LibraryItemDetailView(props: { itemId: string }) {
                   )}
                 </Show>
               </div>
+              <UserDataControls
+                itemId={item().id}
+                played={item().played}
+                favorite={item().favorite}
+                subject={item().itemType.toLowerCase()}
+                onSuccess={() => void refetch()}
+              />
               <Show when={item().overview}>
                 {(overview) => <p class="text-body-medium">{overview()}</p>}
               </Show>
@@ -1513,6 +1596,13 @@ function LibraryShowDetailView(props: { seriesId: string }) {
                     {show().favorite ? 'Favorite' : 'Not favorite'}
                   </StatusBadge>
                 </div>
+                <UserDataControls
+                  itemId={show().id}
+                  played={show().played}
+                  favorite={show().favorite}
+                  subject="show"
+                  onSuccess={() => void refetch()}
+                />
                 <Show when={show().overview}>
                   {(overview) => <p class="text-body-medium">{overview()}</p>}
                 </Show>
@@ -1612,6 +1702,18 @@ function LibraryShowDetailView(props: { seriesId: string }) {
                     )}
                   </For>
                 </ul>
+
+                <Show when={selectedSeason()}>
+                  {(season) => (
+                    <UserDataControls
+                      itemId={season().id}
+                      played={season().played}
+                      favorite={season().favorite}
+                      subject={seasonLabel(season()).toLowerCase()}
+                      onSuccess={() => void refetch()}
+                    />
+                  )}
+                </Show>
 
                 <Show
                   when={episodes()?.kind === 'ready'}

@@ -276,6 +276,36 @@ pub(crate) struct VideoPlaybackTarget {
   pub start_position_ticks: Option<i64>,
 }
 
+/// User data action supported by Library Browser detail views.
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, Type)]
+pub enum VideoUserDataAction {
+  #[serde(rename = "favorite")]
+  Favorite,
+  #[serde(rename = "unfavorite")]
+  Unfavorite,
+  #[serde(rename = "markPlayed")]
+  MarkPlayed,
+  #[serde(rename = "markUnplayed")]
+  MarkUnplayed,
+}
+
+/// User-scoped Jellyfin user data mutation request.
+#[derive(Debug, Clone, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct VideoUserDataUpdateRequest {
+  pub item_id: String,
+  pub action: VideoUserDataAction,
+}
+
+/// Updated user data returned by Jellyfin after a mutation succeeds.
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct VideoUserDataUpdate {
+  pub item_id: String,
+  pub played: bool,
+  pub favorite: bool,
+}
+
 /// Credentials for authentication.
 #[derive(Debug, Clone, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
