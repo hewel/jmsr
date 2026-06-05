@@ -1,4 +1,5 @@
 import { afterEach, expect, rstest, test } from '@rstest/core';
+import { createMemoryHistory, RouterProvider } from '@tanstack/solid-router';
 import { fireEvent, screen, waitFor } from '@testing-library/dom';
 import { render } from 'solid-js/web';
 import {
@@ -13,13 +14,12 @@ import {
   type VideoSeasonEpisodes,
   type VideoShowDetail,
 } from '../src/bindings';
-import AuthenticatedShell, {
-  type LibraryView,
-} from '../src/components/AuthenticatedShell';
 import { ToastProvider } from '../src/components/ToastProvider';
+import { createJmsrRouter } from '../src/router';
 
 // Mock scrollTo since JSDOM doesn't implement layout/scrolling APIs
 Element.prototype.scrollTo = () => {};
+window.scrollTo = () => {};
 
 const connectedState = {
   connected: true,
@@ -363,6 +363,7 @@ function videoSearchPage(query: string, startIndex: number): VideoSearchPage {
 }
 
 function mockShellCommands(state = connectedState) {
+  rstest.spyOn(commands, 'jellyfinIsConnected').mockResolvedValue(true);
   rstest.spyOn(commands, 'jellyfinGetState').mockResolvedValue(state);
   rstest.spyOn(commands, 'mpvIsConnected').mockResolvedValue(false);
   rstest.spyOn(commands, 'configGet').mockResolvedValue(config);
@@ -413,24 +414,16 @@ function mockShellCommands(state = connectedState) {
     .mockResolvedValue(() => undefined);
 }
 
-function renderShell(
-  activeArea:
-    | 'library'
-    | 'now-playing'
-    | 'settings'
-    | 'diagnostics' = 'library',
-  libraryView?: LibraryView,
-) {
+function renderShell(path = '/library') {
   const root = document.createElement('div');
   document.body.append(root);
+  const router = createJmsrRouter(
+    createMemoryHistory({ initialEntries: [path] }),
+  );
   const dispose = render(
     () => (
       <ToastProvider>
-        <AuthenticatedShell
-          activeArea={activeArea}
-          libraryView={libraryView}
-          onSignedOut={() => undefined}
-        />
+        <RouterProvider router={router} />
       </ToastProvider>
     ),
     root,
@@ -493,7 +486,7 @@ test('library landing renders command-backed rows and compact now playing link',
     videoHome.continueWatching[0]?.artworkUrl ?? '',
   );
   expect(screen.getAllByText('No artwork')).toHaveLength(3);
-  expect(screen.getByText('The Pilot')).toBeVisible();
+  expect(await screen.findByText('The Pilot')).toBeVisible();
   expect(
     screen.getByRole('link', { name: 'Open Now Playing' }),
   ).toHaveAttribute('href', '/now-playing');
@@ -609,11 +602,7 @@ test('library browse loads paged results and opens detail links without playback
   mockShellCommands();
   const browseCommand = rstest.spyOn(commands, 'libraryBrowseVideo');
   const mpvStart = rstest.spyOn(commands, 'mpvStart');
-  const cleanup = renderShell('library', {
-    kind: 'browse',
-    collectionType: 'movies',
-    libraryId: 'movies',
-  });
+  const cleanup = renderShell('/library/movies/movies');
 
   await screen.findByRole('heading', { name: 'Movies' });
   expect(
@@ -656,11 +645,7 @@ test('library browse loads paged results and opens detail links without playback
 test('library browse controls reload paged results from the first page', async () => {
   mockShellCommands();
   const browseCommand = rstest.spyOn(commands, 'libraryBrowseVideo');
-  const cleanup = renderShell('library', {
-    kind: 'browse',
-    collectionType: 'movies',
-    libraryId: 'movies',
-  });
+  const cleanup = renderShell('/library/movies/movies');
 
   await screen.findByRole('link', { name: /Paged Movie/ });
   fireEvent.click(screen.getByRole('combobox', { name: 'Sort' }));
@@ -713,11 +698,7 @@ test('library browse surfaces backend sort and filter errors', async () => {
     status: 'error',
     error: { code: 'invalid_request', message: 'Unsupported library filter' },
   });
-  const cleanup = renderShell('library', {
-    kind: 'browse',
-    collectionType: 'movies',
-    libraryId: 'movies',
-  });
+  const cleanup = renderShell('/library/movies/movies');
 
   await screen.findByText('Unsupported library filter');
   expect(screen.queryByRole('link', { name: /Paged Movie/ })).toBeNull();
@@ -729,10 +710,7 @@ test('library item detail renders resume-primary movie metadata', async () => {
   mockShellCommands();
   const playCommand = rstest.spyOn(commands, 'libraryPlay');
   const mpvStart = rstest.spyOn(commands, 'mpvStart');
-  const cleanup = renderShell('library', {
-    kind: 'detail',
-    itemId: 'detail-movie',
-  });
+  const cleanup = renderShell('/library/items/detail-movie');
 
   await screen.findByRole('heading', { name: 'Detail Movie' });
   expect(screen.getByText('A movie overview.')).toBeVisible();
@@ -785,10 +763,7 @@ test('library item detail refreshes user data only after mutation success', asyn
       status: 'ok',
       data: { ...movieDetail, favorite: false },
     });
-  const cleanup = renderShell('library', {
-    kind: 'detail',
-    itemId: 'detail-movie',
-  });
+  const cleanup = renderShell('/library/items/detail-movie');
 
   await screen.findByRole('heading', { name: 'Detail Movie' });
   fireEvent.click(
@@ -812,10 +787,7 @@ test('library item detail keeps previous user data visible on mutation failure',
     status: 'error',
     error: { code: 'network', message: 'Favorite update failed' },
   });
-  const cleanup = renderShell('library', {
-    kind: 'detail',
-    itemId: 'detail-movie',
-  });
+  const cleanup = renderShell('/library/items/detail-movie');
 
   await screen.findByRole('heading', { name: 'Detail Movie' });
   fireEvent.click(
@@ -832,10 +804,7 @@ test('library item detail keeps previous user data visible on mutation failure',
 test('library item detail renders episode metadata and semantic artwork placeholder', async () => {
   mockShellCommands();
   const playCommand = rstest.spyOn(commands, 'libraryPlay');
-  const cleanup = renderShell('library', {
-    kind: 'detail',
-    itemId: 'detail-episode',
-  });
+  const cleanup = renderShell('/library/items/detail-episode');
 
   await screen.findByRole('heading', { name: 'Detail Episode' });
   expect(screen.getByText('Example Show · S02E03')).toBeVisible();
@@ -863,10 +832,7 @@ test('library show detail renders next episode and loads exact season episodes',
   const playCommand = rstest.spyOn(commands, 'libraryPlay');
   const updateCommand = rstest.spyOn(commands, 'libraryUpdateUserData');
   const mpvStart = rstest.spyOn(commands, 'mpvStart');
-  const cleanup = renderShell('library', {
-    kind: 'show',
-    seriesId: 'series-1',
-  });
+  const cleanup = renderShell('/library/shows/series-1');
 
   await screen.findByRole('heading', { name: 'Example Show' });
   expect(screen.getByText('A show overview.')).toBeVisible();
@@ -918,7 +884,7 @@ test('library show detail renders next episode and loads exact season episodes',
 
 test('settings shell area preserves session and configuration controls', async () => {
   mockShellCommands();
-  const cleanup = renderShell('settings');
+  const cleanup = renderShell('/settings');
 
   await screen.findByRole('heading', { name: 'Connection' });
   expect(screen.getByRole('button', { name: 'Disconnect' })).toBeVisible();
@@ -937,7 +903,7 @@ test('settings shell area preserves session and configuration controls', async (
 
 test('diagnostics shell area preserves diagnostics panel behavior', async () => {
   mockShellCommands();
-  const cleanup = renderShell('diagnostics');
+  const cleanup = renderShell('/diagnostics');
 
   await screen.findByRole('heading', { name: 'Diagnostics' });
   expect(screen.getByText('0 sanitized runtime events')).toBeVisible();
@@ -962,6 +928,7 @@ test('library landing exposes disconnected and retry states', async () => {
 });
 
 test('library landing surfaces command errors without fake content', async () => {
+  rstest.spyOn(commands, 'jellyfinIsConnected').mockResolvedValue(true);
   rstest.spyOn(commands, 'jellyfinGetState').mockResolvedValue(connectedState);
   rstest.spyOn(commands, 'libraryVideoHome').mockResolvedValue({
     status: 'error',
@@ -1005,7 +972,7 @@ test('library landing exposes empty real-data state', async () => {
 
 test('now playing area exposes full playback controls', async () => {
   mockShellCommands();
-  const cleanup = renderShell('now-playing');
+  const cleanup = renderShell('/now-playing');
 
   await waitFor(() => expect(screen.getByText('The Pilot')).toBeVisible());
   expect(screen.getByRole('button', { name: 'Pause' })).toBeVisible();

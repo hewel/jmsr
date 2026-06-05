@@ -1,5 +1,6 @@
 import { createListCollection } from '@ark-ui/solid/collection';
 import { Select } from '@ark-ui/solid/select';
+import { Link, Outlet, useMatch } from '@tanstack/solid-router';
 import { Effect, Exit } from 'effect';
 import {
   Activity,
@@ -50,22 +51,7 @@ import {
   runTauriCommandRaw,
 } from '../effects/commands';
 import DiagnosticsPanel from './DiagnosticsPanel';
-import NowPlayingCard from './NowPlayingCard';
-import OperationsConsole from './OperationsConsole';
 import { StatusBadge } from './ui';
-
-export type ShellArea = 'library' | 'now-playing' | 'settings' | 'diagnostics';
-export type LibraryView =
-  | { kind: 'home' }
-  | { kind: 'browse'; collectionType: VideoLibraryKind; libraryId: string }
-  | { kind: 'detail'; itemId: string }
-  | { kind: 'show'; seriesId: string };
-
-interface AuthenticatedShellProps {
-  activeArea: ShellArea;
-  libraryView?: LibraryView;
-  onSignedOut: () => void;
-}
 
 type LibraryHomeState =
   | { kind: 'ready'; home: VideoHome; connection: ConnectionState }
@@ -104,26 +90,32 @@ const LIBRARY_BROWSE_PAGE_SIZE = 24;
 const LIBRARY_SEARCH_PAGE_SIZE = 24;
 
 const navItems: Array<{
-  area: ShellArea;
-  href: string;
+  href: '/library' | '/now-playing' | '/settings' | '/diagnostics';
   label: string;
   Icon: typeof Library;
 }> = [
-  { area: 'library', href: '/library', label: 'Library', Icon: Library },
+  { href: '/library', label: 'Library', Icon: Library },
   {
-    area: 'now-playing',
     href: '/now-playing',
     label: 'Now Playing',
     Icon: MonitorPlay,
   },
-  { area: 'settings', href: '/settings', label: 'Settings', Icon: Settings },
+  { href: '/settings', label: 'Settings', Icon: Settings },
   {
-    area: 'diagnostics',
     href: '/diagnostics',
     label: 'Diagnostics',
     Icon: Activity,
   },
 ];
+
+const navItemClass =
+  'inline-flex min-h-11 shrink-0 items-center gap-2.5 rounded-lg lg:rounded-xl px-3.5 text-[14px] font-bold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary/70';
+
+const activeNavItemClass =
+  'border border-primary/30 bg-primary-container/45 text-on-primary-container shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_0_12px_rgba(79,70,229,0.15)]';
+
+const inactiveNavItemClass =
+  'border border-transparent text-on-surface-variant hover:border-outline-variant/50 hover:bg-surface-container-high/40 hover:text-on-surface';
 
 function videoHomeIsEmpty(home: VideoHome) {
   return (
@@ -412,10 +404,7 @@ function statusText(status?: NowPlayingState['status']) {
   }
 }
 
-function ShellNav(props: {
-  activeArea: ShellArea;
-  connection: ConnectionState | undefined;
-}) {
+function ShellNav(props: { connection: ConnectionState | undefined }) {
   return (
     <div class="flex flex-col gap-2 rounded-2xl lg:rounded-[1.75rem] border border-outline-variant bg-surface-container-low/60 p-2 shadow-xl backdrop-blur-md lg:gap-4 lg:p-4 lg:h-full lg:min-h-[480px]">
       {/* Brand Header - only visible on desktop lg */}
@@ -444,21 +433,18 @@ function ShellNav(props: {
         aria-label="JMSR areas"
         class="flex gap-2 overflow-x-auto lg:flex-col lg:overflow-visible"
       >
-        {navItems.map(({ area, href, label, Icon }) => {
-          const active = () => props.activeArea === area;
+        {navItems.map(({ href, label, Icon }) => {
           return (
-            <a
-              href={href}
-              aria-current={active() ? 'page' : undefined}
-              class={`inline-flex min-h-11 shrink-0 items-center gap-2.5 rounded-lg lg:rounded-xl px-3.5 text-[14px] font-bold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary/70 ${
-                active()
-                  ? 'border border-primary/30 bg-primary-container/45 text-on-primary-container shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_0_12px_rgba(79,70,229,0.15)]'
-                  : 'border border-transparent text-on-surface-variant hover:border-outline-variant/50 hover:bg-surface-container-high/40 hover:text-on-surface'
-              }`}
+            <Link
+              activeOptions={{ exact: false }}
+              activeProps={{ class: activeNavItemClass }}
+              inactiveProps={{ class: inactiveNavItemClass }}
+              to={href}
+              class={navItemClass}
             >
               <Icon class="h-4.5 w-4.5" />
               <span>{label}</span>
-            </a>
+            </Link>
           );
         })}
       </nav>
@@ -583,7 +569,7 @@ function CompactNowPlayingSummary() {
   );
 }
 
-function LibraryLanding() {
+export function LibraryLanding() {
   const [home, { refetch }] = createResource(fetchLibraryHome);
   const loadedHome = () => {
     const current = home();
@@ -980,7 +966,7 @@ const sortCollection = createListCollection({
   ],
 });
 
-function LibraryBrowseView(props: {
+export function LibraryBrowseView(props: {
   collectionType: VideoLibraryKind;
   libraryId: string;
 }) {
@@ -1358,7 +1344,7 @@ function UserDataControls(props: {
   );
 }
 
-function LibraryItemDetailView(props: { itemId: string }) {
+export function LibraryItemDetailView(props: { itemId: string }) {
   const [state, { refetch }] = createResource(() =>
     fetchVideoItemDetail(props.itemId),
   );
@@ -1547,7 +1533,7 @@ function LibraryItemDetailView(props: { itemId: string }) {
   );
 }
 
-function LibraryShowDetailView(props: { seriesId: string }) {
+export function LibraryShowDetailView(props: { seriesId: string }) {
   const [state, { refetch }] = createResource(() =>
     fetchVideoShowDetail(props.seriesId),
   );
@@ -1851,7 +1837,7 @@ function LibraryShowDetailView(props: { seriesId: string }) {
   );
 }
 
-function DiagnosticsArea() {
+export function DiagnosticsArea() {
   return (
     <section
       class="card-elevated space-y-5"
@@ -1868,51 +1854,27 @@ function DiagnosticsArea() {
   );
 }
 
-export default function AuthenticatedShell(props: AuthenticatedShellProps) {
+export default function AuthenticatedShell() {
   const [connection] = createResource(() => commands.jellyfinGetState());
-
-  const renderArea = () => {
-    switch (props.activeArea) {
-      case 'library':
-        if (props.libraryView?.kind === 'browse') {
-          return (
-            <LibraryBrowseView
-              collectionType={props.libraryView.collectionType}
-              libraryId={props.libraryView.libraryId}
-            />
-          );
-        }
-        if (props.libraryView?.kind === 'detail') {
-          return <LibraryItemDetailView itemId={props.libraryView.itemId} />;
-        }
-        if (props.libraryView?.kind === 'show') {
-          return (
-            <LibraryShowDetailView seriesId={props.libraryView.seriesId} />
-          );
-        }
-        return <LibraryLanding />;
-      case 'now-playing':
-        return <NowPlayingCard jellyfinConnected={true} />;
-      case 'diagnostics':
-        return <DiagnosticsArea />;
-      case 'settings':
-        return <OperationsConsole onSignedOut={props.onSignedOut} />;
-      default:
-        return <LibraryLanding />;
-    }
-  };
+  const nowPlayingMatch = useMatch({
+    from: '/authenticated/now-playing',
+    shouldThrow: false,
+  });
+  const showCompactNowPlaying = () => nowPlayingMatch() === undefined;
 
   return (
     <div class="console-shell">
       <div class="mx-auto grid w-full max-w-7xl gap-5 lg:grid-cols-[240px_minmax(0,1fr)]">
         <div class="lg:sticky lg:top-6 lg:self-start">
-          <ShellNav activeArea={props.activeArea} connection={connection()} />
+          <ShellNav connection={connection()} />
         </div>
         <div class="flex flex-col gap-6 min-w-0">
-          <Show when={props.activeArea !== 'now-playing'}>
+          <Show when={showCompactNowPlaying()}>
             <CompactNowPlayingSummary />
           </Show>
-          <main class="min-w-0 animate-fade-in">{renderArea()}</main>
+          <main class="min-w-0 animate-fade-in">
+            <Outlet />
+          </main>
         </div>
       </div>
     </div>

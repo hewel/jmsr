@@ -3,16 +3,22 @@ import {
   createRoute,
   createRouter,
   Outlet,
+  type RouterHistory,
   redirect,
   useNavigate,
   useParams,
 } from '@tanstack/solid-router';
 import type { VideoLibraryKind } from './bindings';
 import AuthenticatedShell, {
-  type LibraryView,
-  type ShellArea,
+  DiagnosticsArea,
+  LibraryBrowseView,
+  LibraryItemDetailView,
+  LibraryLanding,
+  LibraryShowDetailView,
 } from './components/AuthenticatedShell';
 import LoginPage from './components/LoginPage';
+import NowPlayingCard from './components/NowPlayingCard';
+import OperationsConsole from './components/OperationsConsole';
 import { canAccessConsole, checkAuthWithRestore } from './sessionAccess';
 
 const AUTHENTICATED_HOME_ROUTE = '/library';
@@ -39,50 +45,34 @@ function LoginRouteComponent() {
   return <LoginPage onConnected={handleConnected} />;
 }
 
-function ShellRouteComponent(props: {
-  activeArea: ShellArea;
-  libraryView?: LibraryView;
-}) {
-  const navigate = useNavigate();
-
-  const handleSignedOut = () => {
-    navigate({ to: '/login' });
-  };
-
-  return (
-    <AuthenticatedShell
-      activeArea={props.activeArea}
-      libraryView={props.libraryView}
-      onSignedOut={handleSignedOut}
-    />
-  );
-}
+const authenticatedRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  id: 'authenticated',
+  beforeLoad: requireAuthenticatedShell,
+  component: AuthenticatedShell,
+});
 
 const libraryRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => authenticatedRoute,
   path: '/library',
-  beforeLoad: requireAuthenticatedShell,
-  component: () => <ShellRouteComponent activeArea="library" />,
+  component: LibraryLanding,
 });
 
 const libraryBrowseRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => authenticatedRoute,
   path: '/library/$collectionType/$libraryId',
-  beforeLoad: requireAuthenticatedShell,
   component: LibraryBrowseRouteComponent,
 });
 
 const libraryItemDetailRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => authenticatedRoute,
   path: '/library/items/$itemId',
-  beforeLoad: requireAuthenticatedShell,
   component: LibraryItemDetailRouteComponent,
 });
 
 const libraryShowDetailRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => authenticatedRoute,
   path: '/library/shows/$seriesId',
-  beforeLoad: requireAuthenticatedShell,
   component: LibraryShowDetailRouteComponent,
 });
 
@@ -91,62 +81,57 @@ function libraryKindFromParam(value: string): VideoLibraryKind {
 }
 
 function LibraryBrowseRouteComponent() {
-  const params = useParams({ from: '/library/$collectionType/$libraryId' });
+  const params = useParams({
+    from: '/authenticated/library/$collectionType/$libraryId',
+  });
 
   return (
-    <ShellRouteComponent
-      activeArea="library"
-      libraryView={{
-        kind: 'browse',
-        collectionType: libraryKindFromParam(params().collectionType),
-        libraryId: params().libraryId,
-      }}
+    <LibraryBrowseView
+      collectionType={libraryKindFromParam(params().collectionType)}
+      libraryId={params().libraryId}
     />
   );
 }
 
 function LibraryItemDetailRouteComponent() {
-  const params = useParams({ from: '/library/items/$itemId' });
+  const params = useParams({ from: '/authenticated/library/items/$itemId' });
 
-  return (
-    <ShellRouteComponent
-      activeArea="library"
-      libraryView={{ kind: 'detail', itemId: params().itemId }}
-    />
-  );
+  return <LibraryItemDetailView itemId={params().itemId} />;
 }
 
 function LibraryShowDetailRouteComponent() {
-  const params = useParams({ from: '/library/shows/$seriesId' });
+  const params = useParams({ from: '/authenticated/library/shows/$seriesId' });
 
-  return (
-    <ShellRouteComponent
-      activeArea="library"
-      libraryView={{ kind: 'show', seriesId: params().seriesId }}
-    />
-  );
+  return <LibraryShowDetailView seriesId={params().seriesId} />;
 }
 
 const nowPlayingRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => authenticatedRoute,
   path: '/now-playing',
-  beforeLoad: requireAuthenticatedShell,
-  component: () => <ShellRouteComponent activeArea="now-playing" />,
+  component: () => <NowPlayingCard jellyfinConnected={true} />,
 });
 
 const settingsRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => authenticatedRoute,
   path: '/settings',
-  beforeLoad: requireAuthenticatedShell,
-  component: () => <ShellRouteComponent activeArea="settings" />,
+  component: SettingsRouteComponent,
 });
 
 const diagnosticsRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => authenticatedRoute,
   path: '/diagnostics',
-  beforeLoad: requireAuthenticatedShell,
-  component: () => <ShellRouteComponent activeArea="diagnostics" />,
+  component: DiagnosticsArea,
 });
+
+function SettingsRouteComponent() {
+  const navigate = useNavigate();
+
+  const handleSignedOut = () => {
+    navigate({ to: '/login' });
+  };
+
+  return <OperationsConsole onSignedOut={handleSignedOut} />;
+}
 
 const consoleRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -191,20 +176,27 @@ export async function redirectRootRoute() {
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
-  libraryRoute,
-  libraryBrowseRoute,
-  libraryItemDetailRoute,
-  libraryShowDetailRoute,
-  nowPlayingRoute,
-  settingsRoute,
-  diagnosticsRoute,
+  authenticatedRoute.addChildren([
+    libraryRoute,
+    libraryBrowseRoute,
+    libraryItemDetailRoute,
+    libraryShowDetailRoute,
+    nowPlayingRoute,
+    settingsRoute,
+    diagnosticsRoute,
+  ]),
   consoleRoute,
 ]);
 
-export const router = createRouter({
-  routeTree,
-  defaultPreload: 'intent',
-});
+export function createJmsrRouter(history?: RouterHistory) {
+  return createRouter({
+    routeTree,
+    defaultPreload: 'intent',
+    history,
+  });
+}
+
+export const router = createJmsrRouter();
 
 declare module '@tanstack/solid-router' {
   interface Register {
