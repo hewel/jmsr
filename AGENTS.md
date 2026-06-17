@@ -27,7 +27,7 @@ jmsr/
 |------|----------|-------|
 | Add Tauri command | `src-tauri/src/command.rs` | Decorate with `#[tauri::command]` + `#[specta]` |
 | Register command | `src-tauri/src/lib.rs` | Add to `collect_commands![]` |
-| Frontend component | `src/` | Solid.js (NOT React) |
+| Frontend page/component | `src/routes/**`, `src/components/**` | Page `.tsx` belongs in routes; reusable/non-page component `.tsx` belongs in components |
 | Call Rust from TS | `src/bindings.ts` | Import `commands.*`, auto-generated |
 | Add test | `tests/*.test.ts` | Uses Rstest + testing-library |
 
@@ -54,6 +54,7 @@ bun tauri build     # Production desktop build
 - **Type-safe IPC**: All Rust↔TS via tauri-specta, never raw `invoke()`
 - **NO libmpv embed**: MPV spawned as external process, controlled via JSON IPC
 - **Solid.js reactivity**: Use `createSignal`, `createResource`, NOT React hooks
+- **Frontend file ownership**: Page-level `.tsx` route code belongs in the actual TanStack file-route entry under `src/routes/**`; do not split full route pages into ignored `-*.tsx` page-view modules. Reusable or non-page `.tsx` components belong under `src/components/**`; do not put frontend pages/components under `src/features/**`. Route-owned helper/data modules under `src/routes/**` may use TanStack Router's ignored `-` prefix when they are not route entries. Route-specific `.ts` data/workflow modules stay beside the owning route; reusable `.ts` helpers move to the owning shared/domain folder (`src/effects/**`, `src/components/<feature>/`, or another explicit domain module).
 - **Forms**: Always use `@tanstack/solid-form` with `createForm` for form handling
 - **TypeScript / Effect**: When writing TypeScript, you **must** read and follow [docs/agents/effect.md](docs/agents/effect.md) (strictly avoid raw `try/catch` inside business workflows, use Effect's typed error model)
 

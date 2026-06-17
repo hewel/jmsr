@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/solid-router';
-import { NowPlayingRoute } from '../../features/routes/now-playing';
+import NowPlayingCard from '../../components/NowPlayingCard';
 
 export const Route = createFileRoute('/_authenticated/now-playing')({
-  component: NowPlayingRoute,
+  component: () => <NowPlayingCard jellyfinConnected={true} />,
 });

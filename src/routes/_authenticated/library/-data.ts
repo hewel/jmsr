@@ -15,12 +15,12 @@ import {
   type VideoSeasonEpisodesRequest,
   type VideoShowDetail,
   type VideoUserDataUpdateRequest,
-} from '../../bindings';
+} from '../../../bindings';
 import {
   commandFailureMessage,
   runTauriCommand,
   runTauriCommandRaw,
-} from '../../effects/commands';
+} from '../../../effects/commands';
 
 export type LibraryHomeState =
   | { kind: 'ready'; home: VideoHome; connection: ConnectionState }

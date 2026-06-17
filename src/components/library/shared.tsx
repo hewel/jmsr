@@ -19,9 +19,9 @@ import type {
   VideoSeason,
   VideoShowDetail,
   VideoUserDataAction,
+  VideoUserDataUpdateRequest,
 } from '../../bindings';
-import type { JmsrSelectItem } from '../../components/ui';
-import { updateLibraryUserData } from './data';
+import type { JmsrSelectItem } from '../ui';
 
 export function LibraryStatusPanel(props: {
   title: string;
@@ -283,6 +283,7 @@ export function UserDataControls(props: {
   played: boolean;
   favorite: boolean;
   subject: string;
+  onUpdate: (request: VideoUserDataUpdateRequest) => Promise<string | null>;
   onSuccess: () => void;
 }) {
   const [busy, setBusy] = createSignal<VideoUserDataAction | null>(null);
@@ -292,7 +293,7 @@ export function UserDataControls(props: {
 
     setBusy(action);
     setError(null);
-    const message = await updateLibraryUserData({
+    const message = await props.onUpdate({
       itemId: props.itemId,
       action,
     });

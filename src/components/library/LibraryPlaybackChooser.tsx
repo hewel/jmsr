@@ -5,7 +5,7 @@ import type {
   VideoLibraryPlayMode,
   VideoPlaybackStreamOption,
 } from '../../bindings';
-import { JmsrSelect, type JmsrSelectItem } from '../../components/ui';
+import { JmsrSelect, type JmsrSelectItem } from '../ui';
 
 const SUBTITLE_AUTO = 'auto';
 const SUBTITLE_OFF = 'off';
