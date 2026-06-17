@@ -142,57 +142,36 @@ function LibraryItemDetailRoute() {
       >
         {(item) => {
           const isEpisode = () => item().itemType === 'Episode';
+          const artworkAspectClass = () =>
+            isEpisode() ? 'aspect-video' : 'aspect-[2/3]';
+          const missingArtworkLabel = () =>
+            isEpisode() ? 'No episode artwork' : 'No artwork';
 
           return (
             <article class="grid gap-6 lg:grid-cols-[minmax(240px,360px)_1fr]">
               <div class="card-filled overflow-hidden p-0">
-                <Show
-                  when={isEpisode()}
-                  fallback={
-                    <div class="aspect-[2/3] bg-surface-container-lowest/60">
-                      <Show
-                        when={item().artworkUrl}
-                        fallback={
-                          <div class="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-on-surface-variant">
-                            <Film class="h-8 w-8" />
-                            <p class="text-title-medium">{item().name}</p>
-                            <p class="text-label-small">No artwork</p>
-                          </div>
-                        }
-                      >
-                        {(artworkUrl) => (
-                          <img
-                            src={artworkUrl()}
-                            alt={`${item().name} artwork`}
-                            class="h-full w-full object-cover"
-                          />
-                        )}
-                      </Show>
-                    </div>
-                  }
+                <div
+                  class={`${artworkAspectClass()} bg-surface-container-lowest/60`}
                 >
-                  {/* Episode: landscape thumbnail header */}
-                  <div class="aspect-video bg-surface-container-lowest/60">
-                    <Show
-                      when={item().artworkUrl}
-                      fallback={
-                        <div class="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-on-surface-variant">
-                          <Film class="h-8 w-8" />
-                          <p class="text-title-medium">{item().name}</p>
-                          <p class="text-label-small">No episode artwork</p>
-                        </div>
-                      }
-                    >
-                      {(artworkUrl) => (
-                        <img
-                          src={artworkUrl()}
-                          alt={`${item().name} artwork`}
-                          class="h-full w-full object-cover"
-                        />
-                      )}
-                    </Show>
-                  </div>
-                </Show>
+                  <Show
+                    when={item().artworkUrl}
+                    fallback={
+                      <div class="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-on-surface-variant">
+                        <Film class="h-8 w-8" />
+                        <p class="text-title-medium">{item().name}</p>
+                        <p class="text-label-small">{missingArtworkLabel()}</p>
+                      </div>
+                    }
+                  >
+                    {(artworkUrl) => (
+                      <img
+                        src={artworkUrl()}
+                        alt={`${item().name} artwork`}
+                        class="h-full w-full object-cover"
+                      />
+                    )}
+                  </Show>
+                </div>
               </div>
               <div class="space-y-5">
                 <div>

@@ -77,6 +77,14 @@ export default function LoginPage(props: LoginPageProps) {
   const formValues = form.useStore((state) => state.values);
 
   const isQuickConnectWaiting = () => quickConnectState() === 'waiting';
+  const submitButtonLabel = () => {
+    if (loginMethod() !== 'quickConnect') return 'Connect';
+    return quickConnectState() === 'failed'
+      ? 'Request a new code'
+      : 'Request Quick Connect code';
+  };
+  const submittingButtonLabel = () =>
+    loginMethod() === 'quickConnect' ? 'Requesting...' : 'Connecting...';
 
   const validateServerUrl = (
     value: Pick<LoginValues, 'scheme' | 'host'>,
@@ -597,33 +605,7 @@ export default function LoginPage(props: LoginPageProps) {
               </div>
             </Show>
 
-            <Show
-              when={isQuickConnectWaiting()}
-              fallback={
-                <button
-                  type="button"
-                  disabled={submitting()}
-                  class="btn-primary w-full"
-                  onClick={submit}
-                >
-                  <Show
-                    when={submitting()}
-                    fallback={
-                      loginMethod() === 'quickConnect'
-                        ? quickConnectState() === 'failed'
-                          ? 'Request a new code'
-                          : 'Request Quick Connect code'
-                        : 'Connect'
-                    }
-                  >
-                    <LoaderCircle class="h-5 w-5 animate-spin" />
-                    {loginMethod() === 'quickConnect'
-                      ? 'Requesting...'
-                      : 'Connecting...'}
-                  </Show>
-                </button>
-              }
-            >
+            {isQuickConnectWaiting() ? (
               <button
                 type="button"
                 class="btn-secondary w-full"
@@ -631,7 +613,23 @@ export default function LoginPage(props: LoginPageProps) {
               >
                 Cancel Request
               </button>
-            </Show>
+            ) : (
+              <button
+                type="button"
+                disabled={submitting()}
+                class="btn-primary w-full"
+                onClick={submit}
+              >
+                {submitting() ? (
+                  <>
+                    <LoaderCircle class="h-5 w-5 animate-spin" />
+                    {submittingButtonLabel()}
+                  </>
+                ) : (
+                  submitButtonLabel()
+                )}
+              </button>
+            )}
           </div>
         </Card>
 

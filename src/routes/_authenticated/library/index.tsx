@@ -5,6 +5,7 @@ import {
   VideoLibraryCard,
 } from '@components/library/shared';
 import { createFileRoute } from '@tanstack/solid-router';
+import { Exit } from 'effect';
 import { RefreshCw } from 'lucide-solid';
 import { createResource, createSignal, For, Show } from 'solid-js';
 import {
@@ -21,21 +22,13 @@ function LibraryLanding() {
   const [home, { refetch }] = createResource(fetchLibraryHome);
   const loadedHome = () => {
     const current = home();
-    return current?.kind === 'ready' ? current.home : null;
-  };
-  const statusTitle = () => {
-    const current = home();
-    if (current?.kind === 'empty') return 'Video Home has no video rows yet';
-    if (current?.kind === 'error') return 'Could not load Library state';
-    return 'Library requires a live Jellyfin connection';
-  };
-  const statusDescription = () => {
-    const current = home();
-    if (current?.kind === 'empty') {
-      return 'Jellyfin returned no Continue Watching, Next Up, latest video rows, or video library shortcuts for this user.';
+    if (!current) {
+      return null;
     }
-    if (current?.kind === 'error') return current.message;
-    return 'Reconnect Jellyfin to browse video libraries. Saved Sessions remain available, but Library data is not cached offline.';
+    return Exit.match(current, {
+      onFailure: () => null,
+      onSuccess: (v) => v,
+    });
   };
 
   // Lifted search state
@@ -87,36 +80,85 @@ function LibraryLanding() {
     return current?.kind === 'ready' ? current : null;
   };
 
-  const searchStatusTitle = () => {
-    const current = state();
-    if (!current) return loading() ? 'Searching Library' : null;
-    if (current.kind === 'empty') return 'No video search results';
-    if (current.kind === 'error') return 'Could not search Library';
-    if (current.kind === 'disconnected') {
-      return 'Library requires a live Jellyfin connection';
-    }
-    return null;
-  };
-
-  const searchStatusDescription = () => {
-    const current = state();
-    if (!current) return 'JMSR is searching Movies, Shows, and Episodes.';
-    if (current.kind === 'empty') {
-      return `Jellyfin returned no video results for "${current.page.query}".`;
-    }
-    if (current.kind === 'error') return current.message;
-    if (current.kind === 'disconnected') {
-      return 'Reconnect Jellyfin to search video libraries. Saved Sessions remain available, but Library data is not cached offline.';
-    }
-    return 'JMSR is searching Movies, Shows, and Episodes.';
-  };
-
   const loadMoreStartIndex = () => {
     const current = readyState();
     return current ? current.page.startIndex + current.page.limit : 0;
   };
 
   const isSearchActive = () => state() !== null || loading();
+  const renderHomeContent = () => {
+    if (home.loading) return <LibraryStatusPanel title="Loading Video Home" />;
+    return (
+      <div class="space-y-6">
+        <VideoHomeRow
+          id="continue-watching"
+          title="Continue Watching"
+          items={loadedHome()?.continueWatching ?? []}
+        />
+        <VideoHomeRow
+          id="next-up"
+          title="Next Up"
+          items={loadedHome()?.nextUp ?? []}
+        />
+        <VideoHomeRow
+          id="latest-movies"
+          title="Latest Movies"
+          items={loadedHome()?.latestMovies ?? []}
+        />
+        <VideoHomeRow
+          id="latest-episodes"
+          title="Latest Episodes"
+          items={loadedHome()?.latestEpisodes ?? []}
+        />
+      </div>
+    );
+  };
+
+  const renderSearchContent = () => {
+    return (
+      <section class="space-y-4" aria-labelledby="library-search-results">
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <h2 id="library-search-results" class="text-title-large">
+            Search results
+          </h2>
+          <div class="flex items-center gap-3">
+            <p class="text-body-small">
+              {readyState()?.items.length ?? 0} of{' '}
+              {readyState()?.page.totalRecordCount ?? 0} for "{submittedQuery()}
+              "
+            </p>
+            <button
+              type="button"
+              class="btn-text min-h-0 py-1 px-3 text-[12px] font-bold"
+              onClick={clearSearch}
+            >
+              Clear Search
+            </button>
+          </div>
+        </div>
+        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 animate-fade-in">
+          <For each={readyState()?.items ?? []}>
+            {(item) => <VideoLibraryCard item={item} />}
+          </For>
+        </div>
+        <Show when={readyState()?.page.hasMore}>
+          <div class="flex justify-center pt-2">
+            <button
+              type="button"
+              class="btn-secondary rounded-full"
+              disabled={loading()}
+              onClick={() =>
+                void loadSearchPage(submittedQuery(), loadMoreStartIndex())
+              }
+            >
+              <RefreshCw class="h-4 w-4" />
+              <span>{loading() ? 'Loading more' : 'Load more results'}</span>
+            </button>
+          </div>
+        </Show>
+      </section>
+    );
+  };
 
   return (
     <div class="space-y-6">
@@ -143,129 +185,7 @@ function LibraryLanding() {
       <div class="console-grid">
         {/* Left Column: Media Rows OR Search Results */}
         <div class="space-y-6 min-w-0">
-          <Show
-            when={isSearchActive()}
-            fallback={
-              <Show
-                when={!home.loading}
-                fallback={<LibraryStatusPanel title="Loading Video Home" />}
-              >
-                <Show
-                  when={home()?.kind === 'ready'}
-                  fallback={
-                    <LibraryStatusPanel
-                      title={statusTitle()}
-                      description={statusDescription()}
-                    />
-                  }
-                >
-                  <div class="space-y-6">
-                    <VideoHomeRow
-                      id="continue-watching"
-                      title="Continue Watching"
-                      items={loadedHome()?.continueWatching ?? []}
-                    />
-                    <VideoHomeRow
-                      id="next-up"
-                      title="Next Up"
-                      items={loadedHome()?.nextUp ?? []}
-                    />
-                    <VideoHomeRow
-                      id="latest-movies"
-                      title="Latest Movies"
-                      items={loadedHome()?.latestMovies ?? []}
-                    />
-                    <VideoHomeRow
-                      id="latest-episodes"
-                      title="Latest Episodes"
-                      items={loadedHome()?.latestEpisodes ?? []}
-                    />
-                  </div>
-                </Show>
-              </Show>
-            }
-          >
-            <Show
-              when={state()?.kind === 'ready'}
-              fallback={
-                <div class="space-y-3">
-                  <LibraryStatusPanel
-                    title={searchStatusTitle() ?? 'Searching Library'}
-                    description={searchStatusDescription()}
-                  />
-                  <Show
-                    when={
-                      submittedQuery() &&
-                      (state()?.kind === 'error' ||
-                        state()?.kind === 'disconnected')
-                    }
-                  >
-                    <button
-                      type="button"
-                      class="btn-secondary rounded-full"
-                      disabled={loading()}
-                      onClick={() =>
-                        void loadSearchPage(submittedQuery(), 0, true)
-                      }
-                    >
-                      <RefreshCw class="h-4 w-4" />
-                      <span>Retry Search</span>
-                    </button>
-                  </Show>
-                </div>
-              }
-            >
-              <section
-                class="space-y-4"
-                aria-labelledby="library-search-results"
-              >
-                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <h2 id="library-search-results" class="text-title-large">
-                    Search results
-                  </h2>
-                  <div class="flex items-center gap-3">
-                    <p class="text-body-small">
-                      {readyState()?.items.length ?? 0} of{' '}
-                      {readyState()?.page.totalRecordCount ?? 0} for "
-                      {submittedQuery()}"
-                    </p>
-                    <button
-                      type="button"
-                      class="btn-text min-h-0 py-1 px-3 text-[12px] font-bold"
-                      onClick={clearSearch}
-                    >
-                      Clear Search
-                    </button>
-                  </div>
-                </div>
-                <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 animate-fade-in">
-                  <For each={readyState()?.items ?? []}>
-                    {(item) => <VideoLibraryCard item={item} />}
-                  </For>
-                </div>
-                <Show when={readyState()?.page.hasMore}>
-                  <div class="flex justify-center pt-2">
-                    <button
-                      type="button"
-                      class="btn-secondary rounded-full"
-                      disabled={loading()}
-                      onClick={() =>
-                        void loadSearchPage(
-                          submittedQuery(),
-                          loadMoreStartIndex(),
-                        )
-                      }
-                    >
-                      <RefreshCw class="h-4 w-4" />
-                      <span>
-                        {loading() ? 'Loading more' : 'Load more results'}
-                      </span>
-                    </button>
-                  </div>
-                </Show>
-              </section>
-            </Show>
-          </Show>
+          {isSearchActive() ? renderSearchContent() : renderHomeContent()}
         </div>
 
         {/* Right Column (Sidebar): Search and Shortcuts */}
@@ -276,7 +196,7 @@ function LibraryLanding() {
             loading={loading}
             onSubmit={submitSearch}
           />
-          <Show when={!home.loading && home()?.kind === 'ready'}>
+          <Show when={!home.loading}>
             <LibraryShortcutRow
               shortcuts={loadedHome()?.libraryShortcuts ?? []}
               layout="list"
