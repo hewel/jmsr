@@ -23,7 +23,7 @@ export default defineConfig({
       plugins: [
         tanstackRouter({
           target: 'solid',
-          autoCodeSplitting: true,
+          autoCodeSplitting: false,
         }),
       ],
     },

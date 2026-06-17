@@ -81,9 +81,13 @@ export function VideoHomeCard(props: { item: VideoHomeItem }) {
     return `${props.item.seriesName} · ${number}`;
   };
 
-  const isPoster = () =>
-    props.item.itemType === 'Movie' || props.item.itemType === 'Series';
-  const aspectClass = () => (isPoster() ? 'aspect-[2/3]' : 'aspect-video');
+  // Default ratio before the image loads (and for the no-artwork fallback);
+  // once the image loads we adopt its real aspect ratio.
+  const defaultAspect = () =>
+    props.item.itemType === 'Movie' || props.item.itemType === 'Series'
+      ? '2 / 3'
+      : '16 / 9';
+  const [aspect, setAspect] = createSignal<string | null>(null);
 
   return (
     <a
@@ -91,7 +95,8 @@ export function VideoHomeCard(props: { item: VideoHomeItem }) {
       class="card-filled group block overflow-hidden p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary/70 transition-all duration-300 hover:border-primary/50 hover:shadow-brand-glow-sm"
     >
       <div
-        class={`${aspectClass()} border-b border-outline-variant bg-surface-container-lowest/60 overflow-hidden`}
+        class="border-b border-outline-variant bg-surface-container-lowest/60 overflow-hidden"
+        style={{ 'aspect-ratio': aspect() ?? defaultAspect() }}
       >
         <Show
           when={props.item.artworkUrl}
@@ -105,8 +110,14 @@ export function VideoHomeCard(props: { item: VideoHomeItem }) {
             <img
               src={artworkUrl()}
               alt={`${props.item.name} artwork`}
-              class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+              class="h-full w-full object-cover transition-transform duration-300"
               loading="lazy"
+              onLoad={(e) => {
+                const img = e.currentTarget;
+                if (img.naturalWidth && img.naturalHeight) {
+                  setAspect(`${img.naturalWidth} / ${img.naturalHeight}`);
+                }
+              }}
             />
           )}
         </Show>

@@ -1126,7 +1126,10 @@ impl<'a> JellyfinLibrary<'a> {
         media_types: Some(vec![jellyfin_api::models::MediaType::Video]),
         enable_user_data: Some(true),
         image_type_limit: Some(1),
-        enable_image_types: Some(vec![jellyfin_api::models::ImageType::Primary]),
+        enable_image_types: Some(vec![
+          jellyfin_api::models::ImageType::Thumb,
+          jellyfin_api::models::ImageType::Primary,
+        ]),
         exclude_item_types: None,
         include_item_types: Some(vec![
           jellyfin_api::models::BaseItemKind::Movie,
@@ -1142,7 +1145,7 @@ impl<'a> JellyfinLibrary<'a> {
     .items
     .unwrap_or_default()
     .into_iter()
-    .filter_map(|item| map_video_home_item(&server_url, item))
+    .filter_map(|item| map_continue_watching_item(&server_url, item))
     .collect();
 
     let next_up = jellyfin_api::apis::tv_shows_api::get_next_up(
@@ -1170,7 +1173,9 @@ impl<'a> JellyfinLibrary<'a> {
     .items
     .unwrap_or_default()
     .into_iter()
-    .filter_map(|item| map_video_home_item(&server_url, item))
+    .filter_map(|item| {
+      map_video_home_item(&server_url, item, jellyfin_api::models::ImageType::Primary)
+    })
     .collect();
 
     let latest_movies = latest_video_items(
@@ -1646,7 +1651,9 @@ async fn latest_video_items(
   Ok(
     items
       .into_iter()
-      .filter_map(|item| map_video_home_item(server_url, item))
+      .filter_map(|item| {
+        map_video_home_item(server_url, item, jellyfin_api::models::ImageType::Primary)
+      })
       .collect(),
   )
 }
@@ -1814,14 +1821,29 @@ fn video_home_fields() -> Vec<jellyfin_api::models::ItemFields> {
   ]
 }
 
+fn map_continue_watching_item(
+  server_url: &str,
+  item: jellyfin_api::models::BaseItemDto,
+) -> Option<VideoHomeItem> {
+  let image_type = match item.r#type? {
+    jellyfin_api::models::BaseItemKind::Episode | jellyfin_api::models::BaseItemKind::Series => {
+      jellyfin_api::models::ImageType::Primary
+    }
+    _ => jellyfin_api::models::ImageType::Thumb,
+  };
+
+  map_video_home_item(server_url, item, image_type)
+}
+
 fn map_video_home_item(
   server_url: &str,
   item: jellyfin_api::models::BaseItemDto,
+  image_type: jellyfin_api::models::ImageType,
 ) -> Option<VideoHomeItem> {
   let id = item.id?.to_string();
   let item_type = item.r#type?.to_string();
   let user_data = item.user_data.flatten();
-  let artwork_url = primary_artwork_url(server_url, &id, item.image_tags.flatten());
+  let artwork_url = artwork_url(server_url, &id, item.image_tags.flatten(), image_type);
 
   Some(VideoHomeItem {
     id,
@@ -1862,7 +1884,12 @@ fn map_video_library_item(
   let id = item.id?.to_string();
   let item_type = item.r#type?.to_string();
   let user_data = item.user_data.flatten();
-  let artwork_url = primary_artwork_url(server_url, &id, item.image_tags.flatten());
+  let artwork_url = artwork_url(
+    server_url,
+    &id,
+    item.image_tags.flatten(),
+    jellyfin_api::models::ImageType::Primary,
+  );
 
   let user_data_ref = user_data.as_ref();
   let played = user_data_ref.and_then(|data| data.played).unwrap_or(false);
@@ -1927,7 +1954,12 @@ fn map_video_show_detail(
       .and_then(|data| data.is_favorite)
       .unwrap_or(false),
     can_play: false,
-    artwork_url: primary_artwork_url(server_url, &id, item.image_tags.flatten()),
+    artwork_url: artwork_url(
+      server_url,
+      &id,
+      item.image_tags.flatten(),
+      jellyfin_api::models::ImageType::Primary,
+    ),
     next_episode: None,
     seasons: Vec::new(),
   })
@@ -1955,7 +1987,12 @@ fn map_video_season(
       .as_ref()
       .and_then(|data| data.is_favorite)
       .unwrap_or(false),
-    artwork_url: primary_artwork_url(server_url, &id, item.image_tags.flatten()),
+    artwork_url: artwork_url(
+      server_url,
+      &id,
+      item.image_tags.flatten(),
+      jellyfin_api::models::ImageType::Primary,
+    ),
   })
 }
 
@@ -2042,7 +2079,12 @@ fn map_video_item_detail(
     resume_position_seconds,
     can_resume: resume_position_seconds.unwrap_or(0.0) > 0.0 && !played,
     can_play: true,
-    artwork_url: primary_artwork_url(server_url, &id, item.image_tags.flatten()),
+    artwork_url: artwork_url(
+      server_url,
+      &id,
+      item.image_tags.flatten(),
+      jellyfin_api::models::ImageType::Primary,
+    ),
     audio_streams,
     subtitle_streams,
   })
@@ -2113,7 +2155,12 @@ fn map_video_library_shortcut(
   }
 
   let id = item.id?.to_string();
-  let artwork_url = primary_artwork_url(server_url, &id, item.image_tags.flatten());
+  let artwork_url = artwork_url(
+    server_url,
+    &id,
+    item.image_tags.flatten(),
+    jellyfin_api::models::ImageType::Primary,
+  );
 
   Some(VideoLibraryShortcut {
     id,
@@ -2127,15 +2174,17 @@ fn map_video_library_shortcut(
   })
 }
 
-fn primary_artwork_url(
+fn artwork_url(
   server_url: &str,
   item_id: &str,
   image_tags: Option<std::collections::HashMap<String, String>>,
+  image_type: jellyfin_api::models::ImageType,
 ) -> Option<String> {
-  let tag = image_tags?.get("Primary")?.clone();
+  let image_type = image_type.to_string();
+  let tag = image_tags?.get(&image_type)?.clone();
   Some(format!(
-    "{}/Items/{}/Images/Primary?tag={}",
-    server_url, item_id, tag
+    "{}/Items/{}/Images/{}?tag={}",
+    server_url, item_id, image_type, tag
   ))
 }
 
@@ -2557,12 +2606,13 @@ mod tests {
     let movie_id = "00000000-0000-0000-0000-000000000010";
     let episode_id = "00000000-0000-0000-0000-000000000011";
     let series_id = "00000000-0000-0000-0000-000000000012";
+    let resume_episode_id = "00000000-0000-0000-0000-000000000013";
     let movie_library_id = "00000000-0000-0000-0000-000000000020";
     let shows_library_id = "00000000-0000-0000-0000-000000000021";
     let (server_url, requests) = serve_responses_with_requests(vec![
       (
         "200 OK",
-        r#"{"Items":[{"Id":"00000000-0000-0000-0000-000000000010","Name":"Resume Movie","Type":"Movie","ProductionYear":2024,"RunTimeTicks":72000000000,"ImageTags":{"Primary":"poster-1"},"UserData":{"PlaybackPositionTicks":1200000000,"PlayedPercentage":25.0,"IsFavorite":true,"Played":false}}],"TotalRecordCount":1}"#,
+        r#"{"Items":[{"Id":"00000000-0000-0000-0000-000000000010","Name":"Resume Movie","Type":"Movie","ProductionYear":2024,"RunTimeTicks":72000000000,"ImageTags":{"Thumb":"thumb-1"},"UserData":{"PlaybackPositionTicks":1200000000,"PlayedPercentage":25.0,"IsFavorite":true,"Played":false}},{"Id":"00000000-0000-0000-0000-000000000013","Name":"Resume Episode","Type":"Episode","SeriesName":"Example Show","SeriesId":"00000000-0000-0000-0000-000000000012","ParentIndexNumber":1,"IndexNumber":1,"ImageTags":{"Primary":"episode-primary"},"UserData":{"PlaybackPositionTicks":600000000,"PlayedPercentage":10.0,"IsFavorite":false,"Played":false}}],"TotalRecordCount":2}"#,
       ),
       (
         "200 OK",
@@ -2593,10 +2643,16 @@ mod tests {
 
     assert_eq!(home.continue_watching[0].id, movie_id);
     assert_eq!(home.continue_watching[0].name, "Resume Movie");
-    let expected_artwork = format!("{server_url}/Items/{movie_id}/Images/Primary?tag=poster-1");
+    let expected_artwork = format!("{server_url}/Items/{movie_id}/Images/Thumb?tag=thumb-1");
     assert_eq!(
       home.continue_watching[0].artwork_url.as_deref(),
       Some(expected_artwork.as_str())
+    );
+    let expected_episode_artwork =
+      format!("{server_url}/Items/{resume_episode_id}/Images/Primary?tag=episode-primary");
+    assert_eq!(
+      home.continue_watching[1].artwork_url.as_deref(),
+      Some(expected_episode_artwork.as_str())
     );
     assert_eq!(home.next_up[0].id, episode_id);
     assert_eq!(home.next_up[0].series_id.as_deref(), Some(series_id));
@@ -2613,6 +2669,8 @@ mod tests {
 
     let captured = requests.lock();
     assert!(captured[0].starts_with("GET /UserItems/Resume?"));
+    assert!(captured[0].contains("enableImageTypes=Thumb"));
+    assert!(captured[0].contains("enableImageTypes=Primary"));
     assert!(captured[0].contains("includeItemTypes=Movie"));
     assert!(captured[0].contains("includeItemTypes=Episode"));
     assert!(captured[1].starts_with("GET /Shows/NextUp?"));
