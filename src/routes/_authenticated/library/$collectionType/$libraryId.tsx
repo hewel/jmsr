@@ -10,7 +10,7 @@ import {
   sortItems,
   VideoLibraryCard,
 } from '@components/library/shared';
-import { JmsrSelect } from '@components/ui';
+import { Button, JmsrSelect } from '@components/ui';
 import { createFileRoute } from '@tanstack/solid-router';
 import { Exit } from 'effect';
 import { Library, RefreshCw } from 'lucide-solid';
@@ -122,10 +122,14 @@ function LibraryBrowseRoute() {
             Server-paged video results from Jellyfin.
           </p>
         </div>
-        <a href="/library" class="btn-outlined rounded-full">
-          <Library class="h-4 w-4" />
-          <span>Video Home</span>
-        </a>
+        <Button
+          href="/library"
+          variant="outlined"
+          class="rounded-full"
+          leadingIcon={<Library class="h-4 w-4" />}
+        >
+          Video Home
+        </Button>
       </div>
 
       <div class="console-grid">
@@ -162,15 +166,20 @@ function LibraryBrowseRoute() {
               </div>
               <Show when={readyState()?.page.hasMore}>
                 <div class="flex justify-center pt-2">
-                  <button
+                  <Button
                     type="button"
-                    class="btn-secondary rounded-full"
+                    variant="secondary"
+                    class="rounded-full"
                     disabled={loading()}
                     onClick={() => void loadPage(loadMoreStartIndex())}
+                    leadingIcon={
+                      <RefreshCw
+                        class={`h-4 w-4 ${loading() ? 'animate-spin' : ''}`}
+                      />
+                    }
                   >
-                    <RefreshCw class="h-4 w-4" />
-                    <span>{loading() ? 'Loading more' : 'Load more'}</span>
-                  </button>
+                    {loading() ? 'Loading more' : 'Load more'}
+                  </Button>
                 </div>
               </Show>
             </section>
@@ -204,9 +213,10 @@ function LibraryBrowseRoute() {
                   }
                 >
                   {(filter) => (
-                    <button
+                    <Button
                       type="button"
-                      class={`btn-outlined rounded-full w-full justify-start ${
+                      variant="outlined"
+                      class={`rounded-full w-full justify-start ${
                         playedFilter() === filter
                           ? 'border-secondary bg-secondary-container/45 text-on-secondary-container'
                           : ''
@@ -219,7 +229,7 @@ function LibraryBrowseRoute() {
                       }}
                     >
                       {playedFilterLabel(filter)}
-                    </button>
+                    </Button>
                   )}
                 </For>
               </div>

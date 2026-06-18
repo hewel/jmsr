@@ -8,6 +8,7 @@ import {
   onMount,
   Show,
 } from 'solid-js';
+import { Button } from './ui';
 
 interface BackendLogEntry {
   level: number;
@@ -233,21 +234,25 @@ export default function DiagnosticsPanel(props: DiagnosticsPanelProps) {
             {copyStatus() === 'copied' ? 'Copied' : 'Copy failed'}
           </span>
         </Show>
-        <button
+        <Button
           type="button"
           onClick={copyDiagnostics}
           disabled={diagnostics().length === 0}
-          class="btn-text min-h-9 px-3.5 text-label-small border border-outline-variant hover:border-secondary hover:bg-secondary/5 rounded-xl font-bold"
+          variant="text"
+          size="sm"
+          class="border border-outline-variant hover:border-secondary hover:bg-secondary/5 rounded-xl text-label-small font-bold"
         >
           Copy diagnostics
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
           onClick={clearDiagnostics}
-          class="btn-text min-h-9 px-3.5 text-label-small border border-outline-variant hover:border-error hover:bg-error/5 rounded-xl font-bold hover:text-error"
+          variant="text"
+          size="sm"
+          class="border border-outline-variant hover:border-error hover:bg-error/5 rounded-xl text-label-small font-bold hover:text-error"
         >
           Clear
-        </button>
+        </Button>
       </div>
     </div>
   );

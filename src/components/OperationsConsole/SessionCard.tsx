@@ -1,6 +1,8 @@
 import { Dialog } from '@ark-ui/solid/dialog';
 import { LogOut, ShieldAlert } from 'lucide-solid';
 import { Portal } from 'solid-js/web';
+import { Button } from '../ui';
+import * as buttonStyles from '../ui/Button.css';
 import { useOperationsConsoleStore } from './store';
 
 interface SessionCardProps {
@@ -40,7 +42,9 @@ export default function SessionCard(props: SessionCardProps) {
             </p>
           </div>
         </div>
-        <Dialog.Trigger class="btn-outlined mt-5 w-full cursor-pointer border-error/55 text-error hover:bg-error/10 hover:border-error active:scale-[0.98]">
+        <Dialog.Trigger
+          class={`${buttonStyles.baseButton} ${buttonStyles.variantStyles.outlined} ${buttonStyles.sizeStyles.md} mt-5 w-full border-error/55 text-error hover:bg-error/10 hover:border-error`}
+        >
           <LogOut class="h-4.5 w-4.5" />
           <span>Sign out</span>
         </Dialog.Trigger>
@@ -77,22 +81,23 @@ export default function SessionCard(props: SessionCardProps) {
               again before reconnecting.
             </Dialog.Description>
             <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-              <button
+              <Button
                 type="button"
-                class="btn-secondary"
+                variant="secondary"
                 onClick={() => actions.setSignOutDialogOpen(false)}
                 disabled={ui.signingOut}
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
-                class="btn-outlined border-error/60 text-error hover:bg-error/10"
+                variant="outlined"
+                class="border-error/60 text-error hover:bg-error/10"
                 onClick={props.onSignOut}
                 disabled={ui.signingOut}
               >
                 {ui.signingOut ? 'Signing out...' : 'Sign out'}
-              </button>
+              </Button>
             </div>
           </Dialog.Content>
         </Dialog.Positioner>

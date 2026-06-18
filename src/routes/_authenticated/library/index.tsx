@@ -4,6 +4,7 @@ import {
   VideoHomeRow,
   VideoLibraryCard,
 } from '@components/library/shared';
+import { Button } from '@components/ui';
 import { createFileRoute } from '@tanstack/solid-router';
 import { Exit } from 'effect';
 import { RefreshCw } from 'lucide-solid';
@@ -161,15 +162,16 @@ function LibraryLanding() {
             description={error}
           />
           <Show when={submittedQuery()}>
-            <button
+            <Button
               type="button"
-              class="btn-secondary rounded-full"
+              variant="secondary"
+              class="rounded-full"
               disabled={loading()}
               onClick={() => void loadSearchPage(submittedQuery(), 0, true)}
+              leadingIcon={<RefreshCw class="h-4 w-4" />}
             >
-              <RefreshCw class="h-4 w-4" />
-              <span>Retry Search</span>
-            </button>
+              Retry Search
+            </Button>
           </Show>
         </div>
       );
@@ -193,13 +195,15 @@ function LibraryLanding() {
               {readyState()?.page.totalRecordCount ?? 0} for "{submittedQuery()}
               "
             </p>
-            <button
+            <Button
               type="button"
-              class="btn-text min-h-0 py-1 px-3 text-[12px] font-bold"
+              variant="text"
+              size="sm"
+              class="min-h-0 py-1 px-3 text-[12px] font-bold"
               onClick={clearSearch}
             >
               Clear Search
-            </button>
+            </Button>
           </div>
         </div>
         <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 animate-fade-in">
@@ -209,17 +213,18 @@ function LibraryLanding() {
         </div>
         <Show when={readyState()?.page.hasMore}>
           <div class="flex justify-center pt-2">
-            <button
+            <Button
               type="button"
-              class="btn-secondary rounded-full"
+              variant="secondary"
+              class="rounded-full"
               disabled={loading()}
               onClick={() =>
                 void loadSearchPage(submittedQuery(), loadMoreStartIndex())
               }
+              leadingIcon={<RefreshCw class="h-4 w-4" />}
             >
-              <RefreshCw class="h-4 w-4" />
-              <span>{loading() ? 'Loading more' : 'Load more results'}</span>
-            </button>
+              {loading() ? 'Loading more' : 'Load more results'}
+            </Button>
           </div>
         </Show>
       </section>
@@ -237,15 +242,16 @@ function LibraryLanding() {
             Up, latest video rows, and library shortcuts.
           </p>
         </div>
-        <button
+        <Button
           type="button"
-          class="btn-outlined rounded-full"
+          variant="outlined"
+          class="rounded-full"
           onClick={() => void refetch()}
           disabled={home.loading}
+          leadingIcon={<RefreshCw class="h-4 w-4" />}
         >
-          <RefreshCw class="h-4 w-4" />
-          <span>Retry Library</span>
-        </button>
+          Retry Library
+        </Button>
       </div>
 
       <div class="console-grid">
@@ -299,13 +305,14 @@ function LibrarySearchPanel(props: {
           placeholder="Search movies, shows..."
         />
       </label>
-      <button
+      <Button
         type="submit"
-        class="btn-primary rounded-full w-full"
+        variant="primary"
+        class="rounded-full w-full"
         disabled={props.loading()}
       >
-        <span>{props.loading() ? 'Searching' : 'Search'}</span>
-      </button>
+        {props.loading() ? 'Searching' : 'Search'}
+      </Button>
     </form>
   );
 }

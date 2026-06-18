@@ -25,7 +25,7 @@ import type {
 } from '../../bindings';
 import { commandFailureMessage } from '../../effects/commands';
 import type { CommandError } from '../../effects/errors';
-import type { JmsrSelectItem } from '../ui';
+import { Button, type JmsrSelectItem } from '../ui';
 
 export function LibraryStatusPanel(props: {
   title: string;
@@ -329,54 +329,56 @@ export function UserDataControls(props: {
   return (
     <div class="space-y-2">
       <div class="flex flex-wrap gap-3">
-        <button
+        <Button
           type="button"
-          class={`btn-secondary rounded-full ${props.favorite ? 'border-error/30' : ''}`}
+          variant="secondary"
+          class={`rounded-full ${props.favorite ? 'border-error/30' : ''}`}
           disabled={busy() !== null}
           onClick={() => void runAction(favoriteAction())}
+          leadingIcon={
+            <Show
+              when={busy() === favoriteAction()}
+              fallback={
+                <Heart
+                  class={`h-4 w-4 ${props.favorite ? 'fill-error text-error' : 'text-on-surface-variant'}`}
+                />
+              }
+            >
+              <RefreshCw class="h-4 w-4 animate-spin text-secondary" />
+            </Show>
+          }
         >
-          <Show
-            when={busy() === favoriteAction()}
-            fallback={
-              <Heart
-                class={`h-4 w-4 ${props.favorite ? 'fill-error text-error' : 'text-on-surface-variant'}`}
-              />
-            }
-          >
-            <RefreshCw class="h-4 w-4 animate-spin text-secondary" />
-          </Show>
-          <span>
-            {busy() === favoriteAction()
-              ? 'Updating...'
-              : props.favorite
-                ? 'Unfavorite'
-                : 'Favorite'}
-          </span>
-        </button>
-        <button
+          {busy() === favoriteAction()
+            ? 'Updating...'
+            : props.favorite
+              ? 'Unfavorite'
+              : 'Favorite'}
+        </Button>
+        <Button
           type="button"
-          class={`btn-secondary rounded-full ${props.played ? 'border-tertiary/30' : ''}`}
+          variant="secondary"
+          class={`rounded-full ${props.played ? 'border-tertiary/30' : ''}`}
           disabled={busy() !== null}
           onClick={() => void runAction(playedAction())}
+          leadingIcon={
+            <Show
+              when={busy() === playedAction()}
+              fallback={
+                <Check
+                  class={`h-4 w-4 ${props.played ? 'text-tertiary font-bold' : 'text-on-surface-variant'}`}
+                />
+              }
+            >
+              <RefreshCw class="h-4 w-4 animate-spin text-secondary" />
+            </Show>
+          }
         >
-          <Show
-            when={busy() === playedAction()}
-            fallback={
-              <Check
-                class={`h-4 w-4 ${props.played ? 'text-tertiary font-bold' : 'text-on-surface-variant'}`}
-              />
-            }
-          >
-            <RefreshCw class="h-4 w-4 animate-spin text-secondary" />
-          </Show>
-          <span>
-            {busy() === playedAction()
-              ? 'Updating...'
-              : props.played
-                ? 'Mark Unplayed'
-                : 'Mark Played'}
-          </span>
-        </button>
+          {busy() === playedAction()
+            ? 'Updating...'
+            : props.played
+              ? 'Mark unplayed'
+              : 'Mark played'}
+        </Button>
       </div>
       <Show when={error()}>
         {(message) => <p class="text-body-small text-error">{message()}</p>}

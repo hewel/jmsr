@@ -11,7 +11,7 @@ import {
   showSubtitle,
   UserDataControls,
 } from '@components/library/shared';
-import { StatusBadge } from '@components/ui';
+import { Button, StatusBadge } from '@components/ui';
 import { createFileRoute } from '@tanstack/solid-router';
 import { Exit } from 'effect';
 import { Film, Library, RefreshCw, Tv } from 'lucide-solid';
@@ -215,19 +215,24 @@ function LibraryShowDetailRoute() {
   return (
     <div class="space-y-6">
       <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <a href="/library" class="btn-outlined rounded-full">
-          <Library class="h-4 w-4" />
-          <span>Video Home</span>
-        </a>
-        <button
+        <Button
+          href="/library"
+          variant="outlined"
+          class="rounded-full"
+          leadingIcon={<Library class="h-4 w-4" />}
+        >
+          Video Home
+        </Button>
+        <Button
           type="button"
-          class="btn-outlined rounded-full"
+          variant="outlined"
+          class="rounded-full"
           disabled={state.loading}
           onClick={() => void refetch()}
+          leadingIcon={<RefreshCw class="h-4 w-4" />}
         >
-          <RefreshCw class="h-4 w-4" />
-          <span>Retry Show</span>
-        </button>
+          Retry Show
+        </Button>
       </div>
 
       <Show
@@ -273,9 +278,10 @@ function LibraryShowDetailRoute() {
                   <For each={show().seasons}>
                     {(season) => (
                       <li class="shrink-0">
-                        <button
+                        <Button
                           type="button"
-                          class={`btn-outlined rounded-full ${
+                          variant="outlined"
+                          class={`rounded-full ${
                             selectedSeason()?.id === season.id
                               ? 'border-secondary bg-secondary-container/45 text-on-secondary-container'
                               : ''
@@ -284,8 +290,8 @@ function LibraryShowDetailRoute() {
                           disabled={episodesLoading()}
                           onClick={() => void loadEpisodes(season)}
                         >
-                          <span>{seasonLabel(season)}</span>
-                        </button>
+                          {seasonLabel(season)}
+                        </Button>
                       </li>
                     )}
                   </For>
@@ -397,9 +403,10 @@ function LibraryShowDetailRoute() {
                                   !episode.played
                                 }
                                 fallback={
-                                  <button
+                                  <Button
                                     type="button"
-                                    class="btn-primary rounded-full px-5 py-2 text-label-large"
+                                    variant="primary"
+                                    class="rounded-full px-5 py-2 text-label-large"
                                     disabled={
                                       episodePlayBusy() !== null ||
                                       confirmBusy()
@@ -409,12 +416,13 @@ function LibraryShowDetailRoute() {
                                     {episodePlayBusy() === episode.id
                                       ? 'Loading...'
                                       : 'Play'}
-                                  </button>
+                                  </Button>
                                 }
                               >
-                                <button
+                                <Button
                                   type="button"
-                                  class="btn-primary rounded-full px-5 py-2 text-label-large"
+                                  variant="primary"
+                                  class="rounded-full px-5 py-2 text-label-large"
                                   disabled={
                                     episodePlayBusy() !== null || confirmBusy()
                                   }
@@ -423,7 +431,7 @@ function LibraryShowDetailRoute() {
                                   {episodePlayBusy() === episode.id
                                     ? 'Loading...'
                                     : 'Resume'}
-                                </button>
+                                </Button>
                               </Show>
                             </div>
                           </div>
@@ -508,14 +516,15 @@ function LibraryShowDetailRoute() {
                   {(nextEpisode) => (
                     <div class="flex flex-col gap-3 border-t border-outline-variant/30 pt-3">
                       <p class="text-label-small text-secondary">Up Next</p>
-                      <button
+                      <Button
                         type="button"
-                        class="btn-primary rounded-full w-full"
+                        variant="primary"
+                        class="rounded-full w-full"
                         disabled={playBusy() || confirmBusy()}
                         onClick={() => void playShow()}
                       >
                         {playBusy() ? 'Loading...' : 'Play Next Episode'}
-                      </button>
+                      </Button>
                       <a
                         href={`/library/items/${nextEpisode().id}`}
                         class="text-body-small text-center text-on-surface-variant underline-offset-4 hover:underline hover:text-secondary truncate block"

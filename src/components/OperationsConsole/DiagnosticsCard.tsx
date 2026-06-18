@@ -1,6 +1,6 @@
 import { ClipboardList } from 'lucide-solid';
 import DiagnosticsPanel from '../DiagnosticsPanel';
-import { SectionCard } from '../ui';
+import { Button, SectionCard } from '../ui';
 import { useOperationsConsoleStore } from './store';
 
 export default function DiagnosticsCard() {
@@ -11,15 +11,16 @@ export default function DiagnosticsCard() {
       icon={<ClipboardList class="h-6 w-6" />}
       title="Diagnostics"
       trailing={
-        <button
+        <Button
           type="button"
-          class="btn-text min-w-0 px-3"
+          variant="text"
+          class="min-w-0 px-3"
           onClick={actions.toggleDiagnostics}
           aria-expanded={ui.diagnosticsExpanded}
           aria-label="Toggle diagnostics"
         >
           {ui.diagnosticsExpanded ? 'Collapse' : 'Expand'}
-        </button>
+        </Button>
       }
     >
       <DiagnosticsPanel compact={!ui.diagnosticsExpanded} />

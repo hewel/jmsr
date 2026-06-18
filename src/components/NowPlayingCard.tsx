@@ -18,7 +18,7 @@ import {
 } from '../bindings';
 import { commandFailureMessage, runTauriCommand } from '../effects/commands';
 import { useToast } from './ToastProvider';
-import { StatusBadge } from './ui';
+import { Button, StatusBadge } from './ui';
 
 function formatTime(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds <= 0) return '0:00';
@@ -257,9 +257,10 @@ export default function NowPlayingCard(props: {
       </div>
 
       <div class="flex flex-wrap items-center gap-4 relative z-10">
-        <button
+        <Button
           type="button"
-          class="btn-icon rounded-full border border-outline-variant/60 bg-surface-container-high/30 hover:border-secondary hover:text-secondary hover:bg-secondary/5"
+          variant="icon"
+          class="rounded-full border border-outline-variant/60 bg-surface-container-high/30 hover:border-secondary hover:text-secondary hover:bg-secondary/5"
           aria-label="Previous episode"
           title={
             current()?.canPlayPrevious
@@ -276,10 +277,11 @@ export default function NowPlayingCard(props: {
           }
         >
           <SkipBack class="h-5 w-5" />
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
-          class="btn-primary min-w-32 rounded-full relative overflow-hidden"
+          variant="primary"
+          class="min-w-32 rounded-full relative overflow-hidden"
           disabled={!canControlPlayback() || busy() !== null}
           onClick={() =>
             void runCommand(
@@ -300,10 +302,11 @@ export default function NowPlayingCard(props: {
           <span class="font-bold tracking-wide">
             {player()?.paused ? 'Play' : 'Pause'}
           </span>
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
-          class="btn-icon rounded-full border border-outline-variant/60 bg-surface-container-high/30 hover:border-error hover:text-error hover:bg-error/5"
+          variant="icon"
+          class="rounded-full border border-outline-variant/60 bg-surface-container-high/30 hover:border-error hover:text-error hover:bg-error/5"
           aria-label="Stop playback"
           disabled={!canControlPlayback() || busy() !== null}
           onClick={() =>
@@ -311,10 +314,11 @@ export default function NowPlayingCard(props: {
           }
         >
           <Square class="h-4 w-4 fill-current" />
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
-          class="btn-icon rounded-full border border-outline-variant/60 bg-surface-container-high/30 hover:border-secondary hover:text-secondary hover:bg-secondary/5"
+          variant="icon"
+          class="rounded-full border border-outline-variant/60 bg-surface-container-high/30 hover:border-secondary hover:text-secondary hover:bg-secondary/5"
           aria-label="Next episode"
           title={
             current()?.canPlayNext
@@ -331,11 +335,12 @@ export default function NowPlayingCard(props: {
           }
         >
           <SkipForward class="h-5 w-5" />
-        </button>
+        </Button>
         <Show when={current()?.status === 'offline' && !connected()}>
-          <button
+          <Button
             type="button"
-            class="btn-secondary rounded-full"
+            variant="secondary"
+            class="rounded-full"
             disabled={!props.jellyfinConnected || busy() !== null}
             onClick={() =>
               void runCommand(
@@ -344,21 +349,18 @@ export default function NowPlayingCard(props: {
                 'Could not start MPV',
               ).then(() => props.onPlayerStarted?.())
             }
+            leadingIcon={<Play class="h-4.5 w-4.5 fill-current" />}
           >
-            <Play class="h-4.5 w-4.5 fill-current" />
-            <span>
-              {props.jellyfinConnected
-                ? 'Start MPV'
-                : 'Reconnect Jellyfin first'}
-            </span>
-          </button>
+            {props.jellyfinConnected ? 'Start MPV' : 'Reconnect Jellyfin first'}
+          </Button>
         </Show>
       </div>
 
       <div class="flex flex-col gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest/50 p-4 sm:flex-row sm:items-center relative z-10 backdrop-blur-sm shadow-inner">
-        <button
+        <Button
           type="button"
-          class="btn-icon shrink-0 rounded-xl hover:bg-secondary/15 hover:text-secondary border border-transparent hover:border-secondary/20"
+          variant="icon"
+          class="shrink-0 rounded-xl hover:bg-secondary/15 hover:text-secondary border border-transparent hover:border-secondary/20"
           aria-label={muted() ? 'Unmute' : 'Mute'}
           disabled={!connected() || busy() !== null}
           onClick={() =>
@@ -375,7 +377,7 @@ export default function NowPlayingCard(props: {
           >
             <Volume2 class="h-5 w-5 text-secondary" />
           </Show>
-        </button>
+        </Button>
         <Slider.Root
           aria-label={['Volume']}
           min={0}

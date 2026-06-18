@@ -8,7 +8,12 @@ import {
   LibraryStatusPanel,
   UserDataControls,
 } from '@components/library/shared';
-import { JmsrSelect, type JmsrSelectItem, StatusBadge } from '@components/ui';
+import {
+  Button,
+  JmsrSelect,
+  type JmsrSelectItem,
+  StatusBadge,
+} from '@components/ui';
 import { createFileRoute } from '@tanstack/solid-router';
 import { Exit } from 'effect';
 import { Film, Library, Play, RefreshCw, RotateCcw } from 'lucide-solid';
@@ -121,19 +126,24 @@ function LibraryItemDetailRoute() {
   return (
     <div class="space-y-6">
       <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <a href="/library" class="btn-outlined rounded-full">
-          <Library class="h-4 w-4" />
-          <span>Video Home</span>
-        </a>
-        <button
+        <Button
+          href="/library"
+          variant="outlined"
+          class="rounded-full"
+          leadingIcon={<Library class="h-4 w-4" />}
+        >
+          Video Home
+        </Button>
+        <Button
           type="button"
-          class="btn-outlined rounded-full"
+          variant="outlined"
+          class="rounded-full"
           disabled={state.loading}
           onClick={() => void refetch()}
+          leadingIcon={<RefreshCw class="h-4 w-4" />}
         >
-          <RefreshCw class="h-4 w-4" />
-          <span>Retry Detail</span>
-        </button>
+          Retry Detail
+        </Button>
       </div>
 
       <Show
@@ -262,58 +272,61 @@ function LibraryItemDetailRoute() {
                   <Show
                     when={item().canResume}
                     fallback={
-                      <button
+                      <Button
                         type="button"
-                        class="btn-primary rounded-full"
+                        variant="primary"
+                        class="rounded-full"
                         disabled={playBusy() !== null}
                         onClick={() => void playItem('start')}
+                        leadingIcon={
+                          <Show
+                            when={playBusy() === 'start'}
+                            fallback={<Play class="h-4 w-4 fill-current" />}
+                          >
+                            <RefreshCw class="h-4 w-4 animate-spin" />
+                          </Show>
+                        }
                       >
+                        {playBusy() === 'start' ? 'Starting...' : 'Play'}
+                      </Button>
+                    }
+                  >
+                    <Button
+                      type="button"
+                      variant="primary"
+                      class="rounded-full"
+                      disabled={playBusy() !== null}
+                      onClick={() => void playItem('resume')}
+                      leadingIcon={
                         <Show
-                          when={playBusy() === 'start'}
+                          when={playBusy() === 'resume'}
                           fallback={<Play class="h-4 w-4 fill-current" />}
                         >
                           <RefreshCw class="h-4 w-4 animate-spin" />
                         </Show>
-                        <span>
-                          {playBusy() === 'start' ? 'Starting...' : 'Play'}
-                        </span>
-                      </button>
-                    }
-                  >
-                    <button
-                      type="button"
-                      class="btn-primary rounded-full"
-                      disabled={playBusy() !== null}
-                      onClick={() => void playItem('resume')}
+                      }
                     >
-                      <Show
-                        when={playBusy() === 'resume'}
-                        fallback={<Play class="h-4 w-4 fill-current" />}
-                      >
-                        <RefreshCw class="h-4 w-4 animate-spin" />
-                      </Show>
-                      <span>
-                        {playBusy() === 'resume' ? 'Starting...' : 'Resume'}
-                      </span>
-                    </button>
-                    <button
+                      {playBusy() === 'resume' ? 'Starting...' : 'Resume'}
+                    </Button>
+                    <Button
                       type="button"
-                      class="btn-secondary rounded-full"
+                      variant="secondary"
+                      class="rounded-full"
                       disabled={playBusy() !== null}
                       onClick={() => void playItem('start')}
+                      leadingIcon={
+                        <Show
+                          when={playBusy() === 'start'}
+                          fallback={<RotateCcw class="h-4 w-4" />}
+                        >
+                          <RefreshCw class="h-4 w-4 animate-spin" />
+                        </Show>
+                      }
                     >
-                      <Show
-                        when={playBusy() === 'start'}
-                        fallback={<RotateCcw class="h-4 w-4" />}
-                      >
-                        <RefreshCw class="h-4 w-4 animate-spin" />
-                      </Show>
-                      <span>
-                        {playBusy() === 'start'
-                          ? 'Starting...'
-                          : 'Play from beginning'}
-                      </span>
-                    </button>
+                      {playBusy() === 'start'
+                        ? 'Starting...'
+                        : 'Play from beginning'}
+                    </Button>
                   </Show>
                 </div>
                 <Show when={playError()}>

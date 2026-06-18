@@ -892,7 +892,7 @@ test('settings and session actions keep shared visual semantics', async () => {
   expect(mpvPath.className).not.toMatch(/mpv/);
 
   const disconnect = screen.getByRole('button', { name: 'Disconnect' });
-  expect(disconnect).toHaveClass('btn-outlined');
+  expect(disconnect.className).toContain('variantStyles_outlined');
   expect(disconnect.className).not.toContain('border-error');
 
   const signOut = screen.getByRole('button', { name: 'Sign out' });

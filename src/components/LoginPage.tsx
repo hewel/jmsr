@@ -23,7 +23,7 @@ import {
   stripServerScheme,
 } from '../serverUrl';
 import { saveCurrentSession } from '../sessionAccess';
-import { Card, PageFooter } from './ui';
+import { Button, Card, PageFooter } from './ui';
 
 interface LoginPageProps {
   onConnected: () => void;
@@ -606,18 +606,20 @@ export default function LoginPage(props: LoginPageProps) {
             </Show>
 
             {isQuickConnectWaiting() ? (
-              <button
+              <Button
                 type="button"
-                class="btn-secondary w-full"
+                variant="secondary"
+                class="w-full"
                 onClick={resetQuickConnect}
               >
                 Cancel Request
-              </button>
+              </Button>
             ) : (
-              <button
+              <Button
                 type="button"
                 disabled={submitting()}
-                class="btn-primary w-full"
+                variant="primary"
+                class="w-full"
                 onClick={submit}
               >
                 {submitting() ? (
@@ -628,7 +630,7 @@ export default function LoginPage(props: LoginPageProps) {
                 ) : (
                   submitButtonLabel()
                 )}
-              </button>
+              </Button>
             )}
           </div>
         </Card>

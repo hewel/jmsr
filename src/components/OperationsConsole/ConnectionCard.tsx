@@ -1,7 +1,7 @@
 import { Activity, Link, Power, RefreshCw, Server, User } from 'lucide-solid';
 import { Show } from 'solid-js';
 import type { ConnectionState } from '../../bindings';
-import { SectionCard } from '../ui';
+import { Button, SectionCard } from '../ui';
 import { useOperationsConsoleStore } from './store';
 
 interface ConnectionCardProps {
@@ -67,34 +67,36 @@ export default function ConnectionCard(props: ConnectionCardProps) {
       </div>
 
       <div class="mt-6 flex flex-wrap items-center gap-3">
-        <button
+        <Button
           type="button"
-          class="btn-outlined text-on-surface-variant hover:border-primary/50 hover:text-on-surface"
+          variant="outlined"
+          class="text-on-surface-variant hover:border-primary/50 hover:text-on-surface"
           disabled={ui.disconnecting || !props.state?.connected}
           onClick={props.onDisconnect}
+          leadingIcon={<Power class="h-4.5 w-4.5" />}
         >
-          <Power class="h-4.5 w-4.5" />
-          <span>{ui.disconnecting ? 'Disconnecting...' : 'Disconnect'}</span>
-        </button>
+          {ui.disconnecting ? 'Disconnecting...' : 'Disconnect'}
+        </Button>
         <Show when={!props.state?.connected && props.canReconnect}>
-          <button
+          <Button
             type="button"
-            class="btn-primary"
+            variant="primary"
             disabled={ui.reconnecting}
             onClick={props.onReconnect}
           >
-            <span>{ui.reconnecting ? 'Reconnecting...' : 'Reconnect'}</span>
-          </button>
+            {ui.reconnecting ? 'Reconnecting...' : 'Reconnect'}
+          </Button>
         </Show>
-        <button
+        <Button
           type="button"
+          variant="icon"
           onClick={props.onRefresh}
-          class="btn-icon ml-auto rounded-xl border border-outline-variant bg-surface-container-high/20 hover:border-secondary hover:text-secondary"
+          class="ml-auto rounded-xl border border-outline-variant bg-surface-container-high/20 hover:border-secondary hover:text-secondary"
           aria-label="Refresh status"
           title="Refresh status"
         >
           <RefreshCw class="h-4.5 w-4.5" />
-        </button>
+        </Button>
       </div>
       <p class="mt-4 text-body-small text-on-surface-variant/80">
         Disconnect ends the active Jellyfin connection but keeps the Saved

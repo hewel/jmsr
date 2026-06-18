@@ -5,7 +5,7 @@ import type {
   VideoLibraryPlayMode,
   VideoPlaybackStreamOption,
 } from '../../bindings';
-import { JmsrSelect, type JmsrSelectItem } from '../ui';
+import { Button, JmsrSelect, type JmsrSelectItem } from '../ui';
 
 const SUBTITLE_AUTO = 'auto';
 const SUBTITLE_OFF = 'off';
@@ -110,18 +110,20 @@ export function LibraryPlaybackChooser(props: {
       </div>
 
       <div class="flex flex-wrap justify-end gap-3">
-        <button
+        <Button
           type="button"
-          class="btn-outlined rounded-full"
+          variant="outlined"
+          class="rounded-full"
           disabled={props.busy}
           onClick={props.onCancel}
+          leadingIcon={<X class="h-4 w-4" />}
         >
-          <X class="h-4 w-4" />
-          <span>Cancel</span>
-        </button>
-        <button
+          Cancel
+        </Button>
+        <Button
           type="button"
-          class="btn-primary rounded-full"
+          variant="primary"
+          class="rounded-full"
           disabled={props.busy}
           onClick={() =>
             props.onConfirm({
@@ -129,10 +131,10 @@ export function LibraryPlaybackChooser(props: {
               subtitleStreamIndex: subtitleStreamIndex(),
             })
           }
+          leadingIcon={<Play class="h-4 w-4 fill-current" />}
         >
-          <Play class="h-4 w-4 fill-current" />
-          <span>{props.busy ? 'Starting...' : confirmLabel()}</span>
-        </button>
+          {props.busy ? 'Starting...' : confirmLabel()}
+        </Button>
       </div>
     </section>
   );

@@ -11,7 +11,7 @@ import {
   Trash2,
 } from 'lucide-solid';
 import { For, Show } from 'solid-js';
-import { JmsrSelect, type JmsrSelectItem, SectionCard } from '../ui';
+import { Button, JmsrSelect, type JmsrSelectItem, SectionCard } from '../ui';
 import { useOperationsConsoleStore } from './store';
 import {
   getSubtitleLanguageLabel,
@@ -130,14 +130,15 @@ export default function PlayerBridgeSettingsCard(
                   placeholder="Path to mpv executable"
                   class="input-filled min-w-0 flex-1"
                 />
-                <button
+                <Button
                   type="button"
                   onClick={props.onDetectMpv}
                   disabled={ui.detectingMpv}
-                  class="btn-secondary min-h-14 sm:min-h-0"
+                  variant="secondary"
+                  class="min-h-14 sm:min-h-0"
                 >
                   {ui.detectingMpv ? 'Detecting...' : 'Detect MPV'}
-                </button>
+                </Button>
               </div>
             </ArkField.Root>
           )}
@@ -216,13 +217,15 @@ export default function PlayerBridgeSettingsCard(
               </p>
             </div>
             <Show when={ui.selectedSubtitleLanguages.length > 0}>
-              <button
+              <Button
                 type="button"
-                class="btn-text min-w-0 px-3 py-1 font-bold text-[13px] border border-outline-variant hover:border-secondary hover:bg-secondary/5 rounded-xl"
+                variant="text"
+                size="sm"
+                class="min-w-0 px-3 py-1 font-bold text-[13px] border border-outline-variant hover:border-secondary hover:bg-secondary/5 rounded-xl"
                 onClick={props.onClearSubtitleLanguages}
               >
                 Clear all
-              </button>
+              </Button>
               <TagsInput.ClearTrigger class="hidden" />
             </Show>
           </div>
@@ -307,9 +310,11 @@ export default function PlayerBridgeSettingsCard(
                       </span>
                     </TagsInput.ItemPreview>
                     <div class="flex items-center gap-1.5 shrink-0">
-                      <button
+                      <Button
                         type="button"
-                        class="btn-icon h-8 w-8 rounded-lg border border-outline-variant/60 bg-surface-container-high/30 hover:border-secondary hover:text-secondary"
+                        variant="icon"
+                        size="sm"
+                        class="h-8 w-8 rounded-lg border border-outline-variant/60 bg-surface-container-high/30 hover:border-secondary hover:text-secondary"
                         disabled={index() === 0}
                         aria-label={`Move ${language} up`}
                         onClick={() =>
@@ -317,10 +322,12 @@ export default function PlayerBridgeSettingsCard(
                         }
                       >
                         <ArrowUp class="h-4 w-4" />
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
-                        class="btn-icon h-8 w-8 rounded-lg border border-outline-variant/60 bg-surface-container-high/30 hover:border-secondary hover:text-secondary"
+                        variant="icon"
+                        size="sm"
+                        class="h-8 w-8 rounded-lg border border-outline-variant/60 bg-surface-container-high/30 hover:border-secondary hover:text-secondary"
                         disabled={
                           index() === ui.selectedSubtitleLanguages.length - 1
                         }
@@ -328,7 +335,7 @@ export default function PlayerBridgeSettingsCard(
                         onClick={() => props.onMoveSubtitleLanguage(index(), 1)}
                       >
                         <ArrowDown class="h-4 w-4" />
-                      </button>
+                      </Button>
                       <TagsInput.ItemDeleteTrigger
                         class="btn-icon h-8 w-8 rounded-lg border border-outline-variant/60 bg-surface-container-high/30 hover:border-error hover:text-error"
                         aria-label={`Remove ${language}`}

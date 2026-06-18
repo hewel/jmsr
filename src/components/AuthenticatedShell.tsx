@@ -13,7 +13,7 @@ import {
   events,
   type NowPlayingState,
 } from '../bindings';
-import { StatusBadge } from './ui';
+import { Button, StatusBadge } from './ui';
 
 const navItems: Array<{
   href: '/library' | '/now-playing' | '/settings' | '/diagnostics';
@@ -207,10 +207,14 @@ function CompactNowPlayingSummary() {
         >
           {statusText(state()?.status)}
         </StatusBadge>
-        <a href="/now-playing" class="btn-secondary rounded-full">
-          <MonitorPlay class="h-4 w-4" />
-          <span>Open Now Playing</span>
-        </a>
+        <Button
+          href="/now-playing"
+          variant="secondary"
+          class="rounded-full"
+          leadingIcon={<MonitorPlay class="h-4 w-4" />}
+        >
+          Open Now Playing
+        </Button>
       </div>
     </aside>
   );
