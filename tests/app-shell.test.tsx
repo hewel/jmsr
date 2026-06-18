@@ -822,7 +822,7 @@ test('library browse surfaces backend sort and filter errors', async () => {
   mockShellCommands();
   rstest.spyOn(commands, 'libraryBrowseVideo').mockResolvedValue({
     status: 'error',
-    error: { code: 'invalid_request', message: 'Unsupported library filter' },
+    error: { code: 'internal', message: 'Unsupported library filter' },
   });
   const cleanup = renderShell('/library/movies/movies');
 
