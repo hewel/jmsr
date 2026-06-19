@@ -8,11 +8,11 @@ import { Button } from '@components/ui';
 import { createFileRoute } from '@tanstack/solid-router';
 import { Exit } from 'effect';
 import { Library, RefreshCw, Search, X } from 'lucide-solid';
-import { For, Show, createSignal, createResource, Suspense } from 'solid-js';
+import { For, Show, Suspense, createEffect, createResource, createSignal } from 'solid-js';
 import { commandFailureMessage } from '~effects/commands';
 import { defaultTo } from '~effects/helper';
 import { fetchLibraryHome, fetchLibraryShortcuts, fetchVideoSearchPage } from '~effects/library';
-import type { LibraryExit, LibrarySearchState } from '~effects/library';
+import type { LibraryExit, LibraryHomeState, LibrarySearchState } from '~effects/library';
 
 const homeSkeletonRows = [
   { id: 'continue-watching-skeleton', aspectClass: 'aspect-video' },
@@ -33,8 +33,19 @@ export const Route = createFileRoute('/_authenticated/library/')({
 
 function LibraryLanding() {
   const loaderData = Route.useLoaderData();
-  const [home] = createResource(() => loaderData().home);
+  const [homePromise, setHomePromise] = createSignal<Promise<LibraryHomeState | null>>(
+    loaderData().home,
+  );
+  const [home] = createResource(homePromise, (promise) => promise);
   const libraryShortcuts = () => loaderData().shortcuts;
+
+  createEffect(() => {
+    setHomePromise(loaderData().home);
+  });
+
+  const retryLibrary = () => {
+    setHomePromise(fetchLibraryHome().then(defaultTo(null)));
+  };
 
   // Lifted search state
   const [query, setQuery] = createSignal('');
@@ -250,6 +261,18 @@ function LibraryLanding() {
               {loading() ? 'Searching' : 'Search'}
             </Button>
           </form>
+
+          <Button
+            type="button"
+            variant="outlined"
+            size="sm"
+            class="h-10 shrink-0 rounded-xl px-4"
+            onClick={retryLibrary}
+            disabled={home.loading}
+            leadingIcon={<RefreshCw class={`h-4 w-4 ${home.loading ? 'animate-spin' : ''}`} />}
+          >
+            Retry Library
+          </Button>
         </div>
       </header>
 

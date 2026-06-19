@@ -10,31 +10,56 @@ import type { JmsrSelectItem } from '@components/ui';
 import { createFileRoute } from '@tanstack/solid-router';
 import { Exit } from 'effect';
 import { Film, Library, Play, RefreshCw, RotateCcw } from 'lucide-solid';
-import { For, Show, createEffect, createMemo, createResource, createSignal } from 'solid-js';
+import {
+  For,
+  Show,
+  Suspense,
+  createEffect,
+  createMemo,
+  createResource,
+  createSignal,
+} from 'solid-js';
 import { commandFailureMessage } from '~effects/commands';
 import {
   fetchVideoItemDetail,
   startLibraryPlayback,
   updateLibraryUserData,
 } from '~effects/library';
+import type { LibraryDetailState, LibraryExit } from '~effects/library';
 
 const AUDIO_AUTO = 'auto';
 const SUBTITLE_AUTO = 'auto';
 const SUBTITLE_OFF = 'off';
 
 export const Route = createFileRoute('/_authenticated/library/items/$itemId')({
+  loader: ({ params }) => ({
+    detail: fetchVideoItemDetail(params.itemId),
+  }),
   component: LibraryItemDetailRoute,
 });
 
 function LibraryItemDetailRoute() {
   const params = Route.useParams();
-  const [state, { refetch }] = createResource(() => fetchVideoItemDetail(params().itemId));
+  const loaderData = Route.useLoaderData();
+  const [detailPromise, setDetailPromise] = createSignal<Promise<LibraryExit<LibraryDetailState>>>(
+    loaderData().detail,
+  );
+  const [state] = createResource(detailPromise, (promise) => promise);
   const [playBusy, setPlayBusy] = createSignal<VideoLibraryPlayMode | null>(null);
   const [audioValue, setAudioValue] = createSignal(AUDIO_AUTO);
   const [subtitleValue, setSubtitleValue] = createSignal(SUBTITLE_AUTO);
   const [playError, setPlayError] = createSignal<string | null>(null);
+
+  createEffect(() => {
+    setDetailPromise(loaderData().detail);
+  });
+
+  const reloadDetail = () => {
+    setDetailPromise(fetchVideoItemDetail(params().itemId));
+  };
+
   const detail = () => {
-    const current = state();
+    const current = state.latest ?? state();
     return current && Exit.isSuccess(current) ? current.value : null;
   };
   const audioItems = createMemo<JmsrSelectItem[]>(() => [
@@ -99,14 +124,14 @@ function LibraryItemDetailRoute() {
     setPlayBusy(null);
   };
   const statusTitle = () => {
-    const current = state();
+    const current = state.latest ?? state();
     if (current && !Exit.isSuccess(current)) {
       return 'Could not load item detail';
     }
     return 'Loading item detail';
   };
   const statusDescription = () => {
-    const current = state();
+    const current = state.latest ?? state();
     if (current && !Exit.isSuccess(current)) {
       return commandFailureMessage(current.cause, 'Could not load item detail');
     }
@@ -129,188 +154,229 @@ function LibraryItemDetailRoute() {
           variant="outlined"
           class="rounded-full"
           disabled={state.loading}
-          onClick={() => void refetch()}
-          leadingIcon={<RefreshCw class="h-4 w-4" />}
+          onClick={reloadDetail}
+          leadingIcon={<RefreshCw class={`h-4 w-4 ${state.loading ? 'animate-spin' : ''}`} />}
         >
           Retry Detail
         </Button>
       </div>
 
-      <Show
-        when={detail()}
-        fallback={<LibraryStatusPanel title={statusTitle()} description={statusDescription()} />}
-      >
-        {(item) => {
-          const isEpisode = () => item().itemType === 'Episode';
-          const artworkAspectClass = () => (isEpisode() ? 'aspect-video' : 'aspect-[2/3]');
-          const missingArtworkLabel = () => (isEpisode() ? 'No episode artwork' : 'No artwork');
+      <Suspense fallback={<ItemDetailSkeleton />}>
+        <Show
+          when={detail()}
+          fallback={<LibraryStatusPanel title={statusTitle()} description={statusDescription()} />}
+        >
+          {(item) => {
+            const isEpisode = () => item().itemType === 'Episode';
+            const artworkAspectClass = () => (isEpisode() ? 'aspect-video' : 'aspect-[2/3]');
+            const missingArtworkLabel = () => (isEpisode() ? 'No episode artwork' : 'No artwork');
 
-          return (
-            <article class="grid gap-6 lg:grid-cols-[minmax(240px,360px)_1fr]">
-              <div class="card-filled overflow-hidden p-0">
-                <div class={`${artworkAspectClass()} bg-surface-container-lowest/60`}>
-                  <Show
-                    when={item().artworkUrl}
-                    fallback={
-                      <div class="text-on-surface-variant flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
-                        <Film class="h-8 w-8" />
-                        <p class="text-title-medium">{item().name}</p>
-                        <p class="text-label-small">{missingArtworkLabel()}</p>
-                      </div>
-                    }
-                  >
-                    {(artworkUrl) => (
-                      <img
-                        src={artworkUrl()}
-                        alt={`${item().name} artwork`}
-                        class="h-full w-full object-cover"
-                      />
-                    )}
-                  </Show>
-                </div>
-              </div>
-              <div class="space-y-5">
-                <div>
-                  <p class="text-label-small text-secondary">{item().itemType}</p>
-                  <h1 class="text-headline-large">{item().name}</h1>
-                  <p class="text-body-large mt-2">{detailSubtitle(item())}</p>
-                  <Show when={isEpisode() && item().seriesId}>
-                    <a
-                      href={`/library/shows/${item().seriesId}`}
-                      class="text-body-small text-secondary mt-1 inline-block underline-offset-4 hover:underline"
+            return (
+              <article class="grid gap-6 lg:grid-cols-[minmax(240px,360px)_1fr]">
+                <div class="card-filled overflow-hidden p-0">
+                  <div class={`${artworkAspectClass()} bg-surface-container-lowest/60`}>
+                    <Show
+                      when={item().artworkUrl}
+                      fallback={
+                        <div class="text-on-surface-variant flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+                          <Film class="h-8 w-8" />
+                          <p class="text-title-medium">{item().name}</p>
+                          <p class="text-label-small">{missingArtworkLabel()}</p>
+                        </div>
+                      }
                     >
-                      View series
-                    </a>
-                  </Show>
-                </div>
-                <div class="flex flex-wrap gap-2">
-                  <StatusBadge variant={item().played ? 'success' : 'neutral'}>
-                    {item().played ? 'Played' : 'Unplayed'}
-                  </StatusBadge>
-                  <StatusBadge variant={item().favorite ? 'success' : 'neutral'}>
-                    {item().favorite ? 'Favorite' : 'Not favorite'}
-                  </StatusBadge>
-                  <Show when={formatRuntime(item().runtimeSeconds)}>
-                    {(runtime) => <StatusBadge variant="neutral">{runtime()}</StatusBadge>}
-                  </Show>
-                </div>
-                <UserDataControls
-                  itemId={item().id}
-                  played={item().played}
-                  favorite={item().favorite}
-                  subject={item().itemType.toLowerCase()}
-                  onUpdate={updateLibraryUserData}
-                  onSuccess={() => void refetch()}
-                />
-                <Show when={item().overview}>
-                  {(overview) => <p class="text-body-medium">{overview()}</p>}
-                </Show>
-                <Show when={item().genres.length > 0}>
-                  <div class="flex flex-wrap gap-2">
-                    <For each={item().genres}>
-                      {(genre) => (
-                        <span class="border-outline-variant text-label-small rounded-full border px-3 py-1">
-                          {genre}
-                        </span>
+                      {(artworkUrl) => (
+                        <img
+                          src={artworkUrl()}
+                          alt={`${item().name} artwork`}
+                          class="h-full w-full object-cover"
+                        />
                       )}
-                    </For>
+                    </Show>
                   </div>
-                </Show>
-                <Show when={item().resumePositionSeconds !== null}>
-                  <p class="text-body-small text-secondary">
-                    Resume at {Math.floor(item().resumePositionSeconds ?? 0)}s
-                    {item().playedPercentage !== null
-                      ? ` · ${Math.round(item().playedPercentage ?? 0)}% watched`
-                      : ''}
-                  </p>
-                </Show>
-                <div class="grid gap-4 sm:grid-cols-2">
-                  <JmsrSelect
-                    label="Audio track"
-                    items={audioItems()}
-                    disabled={playBusy() !== null}
-                    value={audioValue()}
-                    size="compact"
-                    onValueChange={setAudioValue}
-                  />
-
-                  <JmsrSelect
-                    label="Subtitle track"
-                    items={subtitleItems()}
-                    disabled={playBusy() !== null}
-                    value={subtitleValue()}
-                    size="compact"
-                    onValueChange={setSubtitleValue}
-                  />
                 </div>
-                <div class="flex flex-wrap gap-3">
-                  <Show
-                    when={item().canResume}
-                    fallback={
+                <div class="space-y-5">
+                  <div>
+                    <p class="text-label-small text-secondary">{item().itemType}</p>
+                    <h1 class="text-headline-large">{item().name}</h1>
+                    <p class="text-body-large mt-2">{detailSubtitle(item())}</p>
+                    <Show when={isEpisode() && item().seriesId}>
+                      <a
+                        href={`/library/shows/${item().seriesId}`}
+                        class="text-body-small text-secondary mt-1 inline-block underline-offset-4 hover:underline"
+                      >
+                        View series
+                      </a>
+                    </Show>
+                  </div>
+                  <div class="flex flex-wrap gap-2">
+                    <StatusBadge variant={item().played ? 'success' : 'neutral'}>
+                      {item().played ? 'Played' : 'Unplayed'}
+                    </StatusBadge>
+                    <StatusBadge variant={item().favorite ? 'success' : 'neutral'}>
+                      {item().favorite ? 'Favorite' : 'Not favorite'}
+                    </StatusBadge>
+                    <Show when={formatRuntime(item().runtimeSeconds)}>
+                      {(runtime) => <StatusBadge variant="neutral">{runtime()}</StatusBadge>}
+                    </Show>
+                  </div>
+                  <UserDataControls
+                    itemId={item().id}
+                    played={item().played}
+                    favorite={item().favorite}
+                    subject={item().itemType.toLowerCase()}
+                    onUpdate={updateLibraryUserData}
+                    onSuccess={reloadDetail}
+                  />
+                  <Show when={item().overview}>
+                    {(overview) => <p class="text-body-medium">{overview()}</p>}
+                  </Show>
+                  <Show when={item().genres.length > 0}>
+                    <div class="flex flex-wrap gap-2">
+                      <For each={item().genres}>
+                        {(genre) => (
+                          <span class="border-outline-variant text-label-small rounded-full border px-3 py-1">
+                            {genre}
+                          </span>
+                        )}
+                      </For>
+                    </div>
+                  </Show>
+                  <Show when={item().resumePositionSeconds !== null}>
+                    <p class="text-body-small text-secondary">
+                      Resume at {Math.floor(item().resumePositionSeconds ?? 0)}s
+                      {item().playedPercentage !== null
+                        ? ` · ${Math.round(item().playedPercentage ?? 0)}% watched`
+                        : ''}
+                    </p>
+                  </Show>
+                  <div class="grid gap-4 sm:grid-cols-2">
+                    <JmsrSelect
+                      label="Audio track"
+                      items={audioItems()}
+                      disabled={playBusy() !== null}
+                      value={audioValue()}
+                      size="compact"
+                      onValueChange={setAudioValue}
+                    />
+
+                    <JmsrSelect
+                      label="Subtitle track"
+                      items={subtitleItems()}
+                      disabled={playBusy() !== null}
+                      value={subtitleValue()}
+                      size="compact"
+                      onValueChange={setSubtitleValue}
+                    />
+                  </div>
+                  <div class="flex flex-wrap gap-3">
+                    <Show
+                      when={item().canResume}
+                      fallback={
+                        <Button
+                          type="button"
+                          variant="primary"
+                          class="rounded-full"
+                          disabled={playBusy() !== null}
+                          onClick={() => void playItem('start')}
+                          leadingIcon={
+                            <Show
+                              when={playBusy() === 'start'}
+                              fallback={<Play class="h-4 w-4 fill-current" />}
+                            >
+                              <RefreshCw class="h-4 w-4 animate-spin" />
+                            </Show>
+                          }
+                        >
+                          {playBusy() === 'start' ? 'Starting...' : 'Play'}
+                        </Button>
+                      }
+                    >
                       <Button
                         type="button"
                         variant="primary"
                         class="rounded-full"
                         disabled={playBusy() !== null}
-                        onClick={() => void playItem('start')}
+                        onClick={() => void playItem('resume')}
                         leadingIcon={
                           <Show
-                            when={playBusy() === 'start'}
+                            when={playBusy() === 'resume'}
                             fallback={<Play class="h-4 w-4 fill-current" />}
                           >
                             <RefreshCw class="h-4 w-4 animate-spin" />
                           </Show>
                         }
                       >
-                        {playBusy() === 'start' ? 'Starting...' : 'Play'}
+                        {playBusy() === 'resume' ? 'Starting...' : 'Resume'}
                       </Button>
-                    }
-                  >
-                    <Button
-                      type="button"
-                      variant="primary"
-                      class="rounded-full"
-                      disabled={playBusy() !== null}
-                      onClick={() => void playItem('resume')}
-                      leadingIcon={
-                        <Show
-                          when={playBusy() === 'resume'}
-                          fallback={<Play class="h-4 w-4 fill-current" />}
-                        >
-                          <RefreshCw class="h-4 w-4 animate-spin" />
-                        </Show>
-                      }
-                    >
-                      {playBusy() === 'resume' ? 'Starting...' : 'Resume'}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      class="rounded-full"
-                      disabled={playBusy() !== null}
-                      onClick={() => void playItem('start')}
-                      leadingIcon={
-                        <Show
-                          when={playBusy() === 'start'}
-                          fallback={<RotateCcw class="h-4 w-4" />}
-                        >
-                          <RefreshCw class="h-4 w-4 animate-spin" />
-                        </Show>
-                      }
-                    >
-                      {playBusy() === 'start' ? 'Starting...' : 'Play from beginning'}
-                    </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        class="rounded-full"
+                        disabled={playBusy() !== null}
+                        onClick={() => void playItem('start')}
+                        leadingIcon={
+                          <Show
+                            when={playBusy() === 'start'}
+                            fallback={<RotateCcw class="h-4 w-4" />}
+                          >
+                            <RefreshCw class="h-4 w-4 animate-spin" />
+                          </Show>
+                        }
+                      >
+                        {playBusy() === 'start' ? 'Starting...' : 'Play from beginning'}
+                      </Button>
+                    </Show>
+                  </div>
+                  <Show when={playError()}>
+                    {(message) => <p class="text-body-small text-error">{message()}</p>}
                   </Show>
                 </div>
-                <Show when={playError()}>
-                  {(message) => <p class="text-body-small text-error">{message()}</p>}
-                </Show>
-              </div>
-            </article>
-          );
-        }}
-      </Show>
+              </article>
+            );
+          }}
+        </Show>
+      </Suspense>
     </div>
+  );
+}
+
+function ItemDetailSkeleton() {
+  return (
+    <article class="grid gap-6 lg:grid-cols-[minmax(240px,360px)_1fr]" aria-hidden="true">
+      <div class="card-filled overflow-hidden p-0">
+        <div class="bg-surface-container-lowest/60 aspect-[2/3] animate-pulse" />
+      </div>
+      <div class="space-y-5">
+        <div class="space-y-3">
+          <div class="bg-surface-container-high/60 h-3 w-20 animate-pulse rounded" />
+          <div class="bg-surface-container-high/80 h-9 w-4/5 max-w-lg animate-pulse rounded-md" />
+          <div class="bg-surface-container-high/60 h-5 w-2/3 max-w-md animate-pulse rounded" />
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <For each={[0, 1, 2]}>
+            {() => <div class="bg-surface-container-high/70 h-7 w-24 animate-pulse rounded-full" />}
+          </For>
+        </div>
+        <div class="flex flex-wrap gap-3">
+          <div class="bg-surface-container-high/70 h-10 w-32 animate-pulse rounded-full" />
+          <div class="bg-surface-container-high/60 h-10 w-36 animate-pulse rounded-full" />
+        </div>
+        <div class="space-y-2">
+          <div class="bg-surface-container-high/60 h-4 w-full animate-pulse rounded" />
+          <div class="bg-surface-container-high/60 h-4 w-11/12 animate-pulse rounded" />
+          <div class="bg-surface-container-high/50 h-4 w-3/5 animate-pulse rounded" />
+        </div>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div class="bg-surface-container-high/60 h-14 animate-pulse rounded-xl" />
+          <div class="bg-surface-container-high/60 h-14 animate-pulse rounded-xl" />
+        </div>
+        <div class="flex flex-wrap gap-3">
+          <div class="bg-primary-container/40 h-11 w-28 animate-pulse rounded-full" />
+          <div class="bg-surface-container-high/60 h-11 w-44 animate-pulse rounded-full" />
+        </div>
+      </div>
+    </article>
   );
 }
 
