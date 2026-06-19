@@ -2,6 +2,13 @@
 
 Tauri v2 desktop app: Jellyfin MPV Shim rewrite. External MPV player controller via JSON IPC.
 
+## Role: Task Router
+Route incoming requests to the correct agent using these strict criteria:
+
+- @quick_task: Git operations (commit, push, branch, etc.)
+- @designer  : Client/Frontend styling, CSS, UI/UX.
+- @oracle    : Backend code, APIs, and reviewing **major changes** only (skip for small ones).
+
 ## Stack
 
 - **Frontend**: Solid.js + TypeScript + Rsbuild + TanStack Query + TanStack Form
@@ -96,9 +103,4 @@ Single-context repo using root `CONTEXT.md` and root `docs/adr/`. See `docs/agen
 - Rust backend exports bindings to `src/bindings.ts` on debug builds only
 - Test setup extends expect with jest-dom matchers (rstest.setup.ts)
 - See `docs/todos.md` for current tasks and priorities
-- When major changes are completed, use @oracle to review changes. Small changes are not necessary.
-- Use @quick_task to git commit the changes
-- Use @explore to search and explore the code
-- Use @designer to style the client
-- Use @oracle to code rust
 - Design system at `docs/design-system.md` with predefined CSS classes based on Tailwind + JMSR Control Room
