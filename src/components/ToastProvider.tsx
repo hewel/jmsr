@@ -1,14 +1,10 @@
-import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-import {
-  createContext,
-  createSignal,
-  For,
-  onCleanup,
-  onMount,
-  type ParentProps,
-  useContext,
-} from 'solid-js';
-import Toast, { type NotificationLevel } from './Toast';
+import { listen } from '@tauri-apps/api/event';
+import type { UnlistenFn } from '@tauri-apps/api/event';
+import { createContext, createSignal, For, onCleanup, onMount, useContext } from 'solid-js';
+import type { ParentProps } from 'solid-js';
+
+import Toast from './Toast';
+import type { NotificationLevel } from './Toast';
 
 export interface ToastMessage {
   id: string;
@@ -34,7 +30,7 @@ export function ToastProvider(props: ParentProps) {
   let unlisten: UnlistenFn | undefined;
 
   const showToast = (level: NotificationLevel, message: string) => {
-    const id = Math.random().toString(36).substring(2, 9);
+    const id = Math.random().toString(36).slice(2, 9);
     setToasts((prev) => [...prev, { id, level, message }]);
   };
 
@@ -45,14 +41,11 @@ export function ToastProvider(props: ParentProps) {
   // Listen for backend AppNotification events
   onMount(async () => {
     try {
-      unlisten = await listen<AppNotificationPayload>(
-        'app-notification',
-        (event) => {
-          showToast(event.payload.level, event.payload.message);
-        },
-      );
-    } catch (e) {
-      console.error('Failed to listen for app notifications:', e);
+      unlisten = await listen<AppNotificationPayload>('app-notification', (event) => {
+        showToast(event.payload.level, event.payload.message);
+      });
+    } catch (error) {
+      console.error('Failed to listen for app notifications:', error);
     }
   });
 
@@ -61,9 +54,9 @@ export function ToastProvider(props: ParentProps) {
   });
 
   return (
-    <ToastContext.Provider value={{ showToast, removeToast }}>
+    <ToastContext.Provider value={{ removeToast, showToast }}>
       {props.children}
-      <div class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
+      <div class="pointer-events-none fixed right-4 bottom-4 z-50 flex flex-col gap-2">
         <For each={toasts()}>
           {(toast) => (
             <Toast

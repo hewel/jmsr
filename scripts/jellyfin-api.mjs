@@ -1,8 +1,7 @@
 import { spawn } from 'node:child_process';
 import { readFile, rm, writeFile } from 'node:fs/promises';
 
-const STABLE_SPEC_URL =
-  'https://api.jellyfin.org/openapi/jellyfin-openapi-stable.json';
+const STABLE_SPEC_URL = 'https://api.jellyfin.org/openapi/jellyfin-openapi-stable.json';
 const SNAPSHOT_PATH = 'src-tauri/openapi/jellyfin-openapi-stable.json';
 const CONFIG_PATH = 'src-tauri/openapi/jellyfin-api-generator.json';
 const OUTPUT_DIR = 'src-tauri/jellyfin-api';

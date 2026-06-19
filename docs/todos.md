@@ -5,7 +5,7 @@
 ### v1.0.0 Release Prep ✅
 - [x] Version bumped to 1.0.0 across all manifests (package.json, Cargo.toml, tauri.conf.json)
 - [x] CI/CD workflows created:
-  - `.github/workflows/ci.yml` - Runs on push/PR: Biome lint, Clippy, tests
+  - `.github/workflows/ci.yml` - Runs on push/PR: Oxc lint/format, Clippy, tests
   - `.github/workflows/release.yml` - Runs on `v*` tags: cross-platform builds, GitHub Release
 - [x] MPV spawning fixes (Windows):
   - `ensure_mpv_exe()` swaps `mpv.com` → `mpv.exe` to prevent black console window

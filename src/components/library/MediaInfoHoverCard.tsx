@@ -1,15 +1,20 @@
 import { HoverCard } from '@ark-ui/solid/hover-card';
 import { Exit } from 'effect';
 import { Check, Heart, LoaderCircle } from 'lucide-solid';
-import { createResource, createSignal, For, type JSX, Show } from 'solid-js';
+import { createResource, createSignal, For, Show } from 'solid-js';
+import type { JSX } from 'solid-js';
 import { Portal } from 'solid-js/web';
+
 import { commandFailureMessage } from '../../effects/commands';
-import { fetchMediaDetail, type MediaDetail } from '../../effects/library';
+import { fetchMediaDetail } from '../../effects/library';
+import type { MediaDetail } from '../../effects/library';
 
 // Inlined (instead of importing from ./shared) to avoid a shared.tsx <-> card
-// import cycle. Matches the formatRuntime shape used elsewhere.
+// Import cycle. Matches the formatRuntime shape used elsewhere.
 function formatRuntime(seconds: number | null): string | null {
-  if (seconds === null) return null;
+  if (seconds === null) {
+    return null;
+  }
   const totalMinutes = Math.round(seconds / 60);
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
@@ -34,9 +39,7 @@ export function MediaInfoContent(props: { detail: MediaDetail }) {
 
   return (
     <div class="space-y-2">
-      <p class="line-clamp-2 text-title-small font-semibold text-on-surface">
-        {props.detail.name}
-      </p>
+      <p class="text-title-small text-on-surface line-clamp-2 font-semibold">{props.detail.name}</p>
       <Show when={meta()}>
         <p class="text-label-medium text-on-surface-variant">{meta()}</p>
       </Show>
@@ -44,7 +47,7 @@ export function MediaInfoContent(props: { detail: MediaDetail }) {
         <div class="flex flex-wrap gap-1">
           <For each={props.detail.genres}>
             {(genre) => (
-              <span class="rounded-full bg-surface-container-highest/70 px-2 py-0.5 text-label-small text-on-surface-variant">
+              <span class="bg-surface-container-highest/70 text-label-small text-on-surface-variant rounded-full px-2 py-0.5">
                 {genre}
               </span>
             )}
@@ -53,33 +56,28 @@ export function MediaInfoContent(props: { detail: MediaDetail }) {
       </Show>
       <Show when={props.detail.overview}>
         {(overview) => (
-          <p class="line-clamp-3 text-body-small text-on-surface-variant/90">
-            {overview()}
-          </p>
+          <p class="text-body-small text-on-surface-variant/90 line-clamp-3">{overview()}</p>
         )}
       </Show>
       <Show when={props.detail.playedPercentage !== null}>
         <div>
-          <div class="h-1 w-full overflow-hidden rounded-full bg-surface-container-highest/70">
-            <div
-              class="h-full bg-secondary"
-              style={{ width: `${resumePct()}%` }}
-            />
+          <div class="bg-surface-container-highest/70 h-1 w-full overflow-hidden rounded-full">
+            <div class="bg-secondary h-full" style={{ width: `${resumePct()}%` }} />
           </div>
-          <p class="mt-1 text-label-small text-on-surface-variant">
+          <p class="text-label-small text-on-surface-variant mt-1">
             {Math.round(resumePct())}% watched
           </p>
         </div>
       </Show>
       <Show when={props.detail.played || props.detail.favorite}>
-        <div class="flex flex-wrap gap-3 pt-0.5 text-label-medium">
+        <div class="text-label-medium flex flex-wrap gap-3 pt-0.5">
           <Show when={props.detail.played}>
-            <span class="flex items-center gap-1 text-tertiary">
+            <span class="text-tertiary flex items-center gap-1">
               <Check class="h-3.5 w-3.5" /> Played
             </span>
           </Show>
           <Show when={props.detail.favorite}>
-            <span class="flex items-center gap-1 text-secondary">
+            <span class="text-secondary flex items-center gap-1">
               <Heart class="h-3.5 w-3.5" /> Favorite
             </span>
           </Show>
@@ -95,11 +93,7 @@ export function MediaInfoContent(props: { detail: MediaDetail }) {
  * rendered untouched inside the hover-card trigger; detail is fetched on first
  * open and cached per item id.
  */
-export function MediaInfoHoverCard(props: {
-  id: string;
-  itemType: string;
-  children: JSX.Element;
-}) {
+export function MediaInfoHoverCard(props: { id: string; itemType: string; children: JSX.Element }) {
   const [open, setOpen] = createSignal(false);
   const [detail] = createResource(
     () => (open() ? props.id : null),
@@ -111,21 +105,19 @@ export function MediaInfoHoverCard(props: {
       openDelay={500}
       closeDelay={150}
       unmountOnExit
-      positioning={{ placement: 'top', gutter: 10 }}
+      positioning={{ gutter: 10, placement: 'top' }}
       onOpenChange={(details) => setOpen(details.open)}
     >
       <HoverCard.Trigger
-        asChild={(triggerProps) => (
-          <div {...triggerProps()}>{props.children}</div>
-        )}
+        asChild={(triggerProps) => <div {...triggerProps()}>{props.children}</div>}
       />
       <Portal>
         <HoverCard.Positioner>
-          <HoverCard.Content class="z-100 w-80 max-w-[min(90vw,24rem)] rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 shadow-2xl backdrop-blur-md">
+          <HoverCard.Content class="border-outline-variant bg-surface-container-lowest z-100 w-80 max-w-[min(90vw,24rem)] rounded-2xl border p-4 shadow-2xl backdrop-blur-md">
             <Show
               when={detail.state !== 'pending' && detail()}
               fallback={
-                <div class="flex items-center justify-center gap-2 py-3 text-label-medium text-on-surface-variant">
+                <div class="text-label-medium text-on-surface-variant flex items-center justify-center gap-2 py-3">
                   <LoaderCircle class="h-4 w-4 animate-spin" />
                   <span>Loading…</span>
                 </div>
@@ -134,7 +126,7 @@ export function MediaInfoHoverCard(props: {
               {(exit) =>
                 Exit.match(exit(), {
                   onFailure: (cause) => (
-                    <p class="py-2 text-center text-label-medium text-error/90">
+                    <p class="text-label-medium text-error/90 py-2 text-center">
                       {commandFailureMessage(cause, 'Could not load detail')}
                     </p>
                   ),

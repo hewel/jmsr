@@ -1,11 +1,10 @@
 import { afterEach, beforeEach, expect, rstest, test } from '@rstest/core';
 import { fireEvent, screen, waitFor } from '@testing-library/dom';
 import { render } from 'solid-js/web';
+
 import DiagnosticsPanel from '../src/components/DiagnosticsPanel';
 
-type LogHandler = (event: {
-  payload: { level: number; message: string };
-}) => void;
+type LogHandler = (event: { payload: { level: number; message: string } }) => void;
 
 declare global {
   interface Window {
@@ -24,7 +23,7 @@ beforeEach(() => {
     logHandler = callback;
     return 1;
   };
-  clipboardWriteText = rstest.fn().mockResolvedValue(undefined);
+  clipboardWriteText = rstest.fn().mockResolvedValue();
   Object.assign(navigator, {
     clipboard: {
       writeText: clipboardWriteText,
@@ -58,11 +57,7 @@ test('diagnostics panel shows backend log entries with timestamps', async () => 
 
   await emitLog(3, 'WebSocket reconnected successfully');
 
-  await waitFor(() =>
-    expect(
-      screen.getByText('WebSocket reconnected successfully'),
-    ).toBeVisible(),
-  );
+  await waitFor(() => expect(screen.getByText('WebSocket reconnected successfully')).toBeVisible());
   expect(screen.getByText('INFO')).toBeVisible();
   expect(screen.getByText(/\d{2}:\d{2}:\d{2}/)).toBeVisible();
 
@@ -76,9 +71,7 @@ test('diagnostics panel keeps the latest 200 entries', async () => {
     await emitLog(3, `event ${i}`);
   }
 
-  await waitFor(() =>
-    expect(screen.getByText('200 sanitized runtime events')).toBeVisible(),
-  );
+  await waitFor(() => expect(screen.getByText('200 sanitized runtime events')).toBeVisible());
   expect(screen.queryByText('event 0')).toBeNull();
   expect(screen.getByText('event 200')).toBeVisible();
 
@@ -109,16 +102,10 @@ test('diagnostics panel redacts secret-bearing values', async () => {
   );
   fireEvent.click(screen.getByRole('button', { name: 'Copy diagnostics' }));
 
-  await waitFor(() =>
-    expect(screen.getByText(/api_key=\[REDACTED\]/)).toBeVisible(),
-  );
+  await waitFor(() => expect(screen.getByText(/api_key=\[REDACTED\]/)).toBeVisible());
   expect(screen.queryByText(/secret-token/)).toBeNull();
-  expect(clipboardWriteText).toHaveBeenCalledWith(
-    expect.stringContaining('api_key=[REDACTED]'),
-  );
-  expect(clipboardWriteText).not.toHaveBeenCalledWith(
-    expect.stringContaining('secret-token'),
-  );
+  expect(clipboardWriteText).toHaveBeenCalledWith(expect.stringContaining('api_key=[REDACTED]'));
+  expect(clipboardWriteText).not.toHaveBeenCalledWith(expect.stringContaining('secret-token'));
 
   cleanup();
 });
@@ -128,9 +115,7 @@ test('diagnostics auto-scroll uses Ark checkbox semantics', () => {
   const checkbox = screen.getByRole('checkbox', { name: 'Auto-scroll' });
   expect(checkbox).toBeChecked();
   expect(checkbox.closest('[data-scope="checkbox"]')).not.toBeNull();
-  expect(
-    document.querySelector('[data-scope="checkbox"][data-part="control"]'),
-  ).not.toBeNull();
+  expect(document.querySelector('[data-scope="checkbox"][data-part="control"]')).not.toBeNull();
 
   fireEvent.click(checkbox);
   expect(checkbox).not.toBeChecked();

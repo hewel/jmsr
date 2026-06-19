@@ -1,21 +1,22 @@
-import {
-  commands,
-  type VideoHome,
-  type VideoItemDetail,
-  type VideoLibraryItem,
-  type VideoLibraryKind,
-  type VideoLibraryPage,
-  type VideoLibraryPlayedFilter,
-  type VideoLibraryPlayRequest,
-  type VideoLibrarySort,
-  type VideoSearchPage,
-  type VideoSeasonEpisodes,
-  type VideoSeasonEpisodesRequest,
-  type VideoShowDetail,
-  type VideoUserDataUpdate,
-  type VideoUserDataUpdateRequest,
+import { commands } from '@bindings';
+import type {
+  VideoHome,
+  VideoItemDetail,
+  VideoLibraryItem,
+  VideoLibraryKind,
+  VideoLibraryPage,
+  VideoLibraryPlayedFilter,
+  VideoLibraryPlayRequest,
+  VideoLibrarySort,
+  VideoSearchPage,
+  VideoSeasonEpisodes,
+  VideoSeasonEpisodesRequest,
+  VideoShowDetail,
+  VideoUserDataUpdate,
+  VideoUserDataUpdateRequest,
 } from '@bindings';
 import { Effect, String as EffectString, Exit, Option } from 'effect';
+
 import { connection } from './auth';
 import { runTauriCommand } from './commands';
 import { CommandError } from './errors';
@@ -53,15 +54,11 @@ const requireConnection = connection.pipe(
   Effect.filterOrFail(({ connected }) => connected, disconnectedError),
 );
 
-function withConnection<T>(
-  effect: Effect.Effect<T, CommandError>,
-): Effect.Effect<T, CommandError> {
+function withConnection<T>(effect: Effect.Effect<T, CommandError>): Effect.Effect<T, CommandError> {
   return requireConnection.pipe(Effect.flatMap(() => effect));
 }
 
-function requiredSearchQuery(
-  query: string,
-): Effect.Effect<string, CommandError> {
+function requiredSearchQuery(query: string): Effect.Effect<string, CommandError> {
   return Effect.fromOption(
     Option.fromNullishOr(query).pipe(
       Option.map(EffectString.trim),
@@ -78,9 +75,9 @@ function requiredSearchQuery(
 }
 
 export function fetchLibraryHome(): Promise<LibraryExit<LibraryHomeState>> {
-  return withConnection(
-    runTauriCommand(() => commands.libraryVideoHome()),
-  ).pipe(Effect.runPromiseExit);
+  return withConnection(runTauriCommand(() => commands.libraryVideoHome())).pipe(
+    Effect.runPromiseExit,
+  );
 }
 
 export function fetchVideoLibraryPage(
@@ -95,14 +92,14 @@ export function fetchVideoLibraryPage(
     runTauriCommand(() =>
       commands.libraryBrowseVideo({
         collectionType,
-        libraryId,
-        startIndex,
-        limit: LIBRARY_BROWSE_PAGE_SIZE,
-        sort,
-        playedFilter,
         favoritesOnly,
+        libraryId,
+        limit: LIBRARY_BROWSE_PAGE_SIZE,
+        playedFilter,
+        sort,
+        startIndex,
       }),
-    ).pipe(Effect.map((page) => ({ page, items: page.items }))),
+    ).pipe(Effect.map((page) => ({ items: page.items, page }))),
   ).pipe(Effect.runPromiseExit);
 }
 
@@ -115,31 +112,27 @@ export function fetchVideoSearchPage(
       withConnection(
         runTauriCommand(() =>
           commands.librarySearchVideo({
+            limit: LIBRARY_SEARCH_PAGE_SIZE,
             query: trimmedQuery,
             startIndex,
-            limit: LIBRARY_SEARCH_PAGE_SIZE,
           }),
-        ).pipe(Effect.map((page) => ({ page, items: page.items }))),
+        ).pipe(Effect.map((page) => ({ items: page.items, page }))),
       ),
     ),
     Effect.runPromiseExit,
   );
 }
 
-export function fetchVideoItemDetail(
-  itemId: string,
-): Promise<LibraryExit<LibraryDetailState>> {
-  return withConnection(
-    runTauriCommand(() => commands.libraryItemDetail(itemId)),
-  ).pipe(Effect.runPromiseExit);
+export function fetchVideoItemDetail(itemId: string): Promise<LibraryExit<LibraryDetailState>> {
+  return withConnection(runTauriCommand(() => commands.libraryItemDetail(itemId))).pipe(
+    Effect.runPromiseExit,
+  );
 }
 
-export function fetchVideoShowDetail(
-  seriesId: string,
-): Promise<LibraryExit<LibraryShowState>> {
-  return withConnection(
-    runTauriCommand(() => commands.libraryShowDetail(seriesId)),
-  ).pipe(Effect.runPromiseExit);
+export function fetchVideoShowDetail(seriesId: string): Promise<LibraryExit<LibraryShowState>> {
+  return withConnection(runTauriCommand(() => commands.libraryShowDetail(seriesId))).pipe(
+    Effect.runPromiseExit,
+  );
 }
 
 export function fetchSeasonEpisodes(
@@ -152,9 +145,7 @@ export function fetchSeasonEpisodes(
   ).pipe(Effect.runPromiseExit);
 }
 
-export function startLibraryPlayback(
-  request: VideoLibraryPlayRequest,
-): Promise<LibraryExit<void>> {
+export function startLibraryPlayback(request: VideoLibraryPlayRequest): Promise<LibraryExit<void>> {
   return withConnection(
     runTauriCommand(() => commands.libraryPlay(request)).pipe(Effect.asVoid),
   ).pipe(Effect.runPromiseExit);
@@ -163,9 +154,9 @@ export function startLibraryPlayback(
 export function updateLibraryUserData(
   request: VideoUserDataUpdateRequest,
 ): Promise<LibraryExit<VideoUserDataUpdate>> {
-  return withConnection(
-    runTauriCommand(() => commands.libraryUpdateUserData(request)),
-  ).pipe(Effect.runPromiseExit);
+  return withConnection(runTauriCommand(() => commands.libraryUpdateUserData(request))).pipe(
+    Effect.runPromiseExit,
+  );
 }
 
 /**
@@ -188,8 +179,8 @@ export interface MediaDetail {
   artworkUrl: string | null;
 }
 
-// ponytail: session-scoped cache; no invalidation. Detail rarely changes, and
-// re-fetch on disconnect/reconnect is acceptable if staleness ever matters.
+// Ponytail: session-scoped cache; no invalidation. Detail rarely changes, and
+// Re-fetch on disconnect/reconnect is acceptable if staleness ever matters.
 const mediaDetailCache = new Map<string, MediaDetail>();
 
 /** Clear the hover-card detail cache. Intended for tests and later invalidation. */
@@ -197,25 +188,20 @@ export function clearMediaDetailCache(): void {
   mediaDetailCache.clear();
 }
 
-function toMediaDetail(
-  detail: VideoItemDetail | VideoShowDetail,
-  itemType: string,
-): MediaDetail {
+function toMediaDetail(detail: VideoItemDetail | VideoShowDetail, itemType: string): MediaDetail {
   return {
-    id: detail.id,
-    name: detail.name,
-    itemType,
-    overview: detail.overview,
-    productionYear: detail.productionYear,
-    runtimeSeconds: 'runtimeSeconds' in detail ? detail.runtimeSeconds : null,
-    genres: detail.genres,
-    played: detail.played,
-    favorite: detail.favorite,
-    playedPercentage:
-      'playedPercentage' in detail ? detail.playedPercentage : null,
-    resumePositionSeconds:
-      'resumePositionSeconds' in detail ? detail.resumePositionSeconds : null,
     artworkUrl: detail.artworkUrl,
+    favorite: detail.favorite,
+    genres: detail.genres,
+    id: detail.id,
+    itemType,
+    name: detail.name,
+    overview: detail.overview,
+    played: detail.played,
+    playedPercentage: 'playedPercentage' in detail ? detail.playedPercentage : null,
+    productionYear: detail.productionYear,
+    resumePositionSeconds: 'resumePositionSeconds' in detail ? detail.resumePositionSeconds : null,
+    runtimeSeconds: 'runtimeSeconds' in detail ? detail.runtimeSeconds : null,
   };
 }
 
@@ -229,12 +215,12 @@ export async function fetchMediaDetail(
   itemType: string,
 ): Promise<LibraryExit<MediaDetail>> {
   const cached = mediaDetailCache.get(id);
-  if (cached) return Exit.succeed(cached);
+  if (cached) {
+    return Exit.succeed(cached);
+  }
 
   const exit =
-    itemType === 'Series'
-      ? await fetchVideoShowDetail(id)
-      : await fetchVideoItemDetail(id);
+    itemType === 'Series' ? await fetchVideoShowDetail(id) : await fetchVideoItemDetail(id);
 
   return Exit.map(exit, (detail: VideoItemDetail | VideoShowDetail) => {
     const media = toMediaDetail(detail, itemType);

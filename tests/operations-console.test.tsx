@@ -1,60 +1,56 @@
 import { afterEach, expect, rstest, test } from '@rstest/core';
 import { fireEvent, screen, waitFor, within } from '@testing-library/dom';
 import { render } from 'solid-js/web';
-import {
-  type AppConfig,
-  commands,
-  events,
-  type NowPlayingState,
-  type SavedSession,
-} from '../src/bindings';
+
+import { commands, events } from '../src/bindings';
+import type { AppConfig, NowPlayingState, SavedSession } from '../src/bindings';
 import OperationsConsole from '../src/components/OperationsConsole';
 import { ToastProvider } from '../src/components/ToastProvider';
 
 const connectedState = {
   connected: true,
-  serverUrl: 'https://jellyfin.example.com',
   serverName: 'Jellyfin Home',
+  serverUrl: 'https://jellyfin.example.com',
   userName: 'Ada',
 };
 
 const config: AppConfig = {
   deviceName: 'JMSR Test',
-  mpvPath: null,
-  mpvArgs: [],
-  progressInterval: 5,
-  startMinimized: false,
   introSkipperMode: 'automatic',
+  keybindIntroSkip: 'g',
   keybindNext: 'Shift+>',
   keybindPrev: 'Shift+<',
-  keybindIntroSkip: 'g',
+  mpvArgs: [],
+  mpvPath: null,
   preferredSubtitleLanguages: [],
+  progressInterval: 5,
+  startMinimized: false,
 };
 
 const validSavedSession: SavedSession = {
-  serverUrl: 'https://jellyfin.example.com',
   accessToken: 'token-1',
+  deviceId: 'device-1',
+  serverName: 'Jellyfin Home',
+  serverUrl: 'https://jellyfin.example.com',
   userId: 'user-1',
   userName: 'Ada',
-  serverName: 'Jellyfin Home',
-  deviceId: 'device-1',
 };
 
 const nowPlaying: NowPlayingState = {
-  status: 'offline',
-  player: {
-    connected: false,
-    paused: true,
-    muted: false,
-    timePos: 0,
-    duration: 0,
-    volume: 100,
-  },
-  media: null,
   canPlayNext: false,
   canPlayPrevious: false,
+  media: null,
   nextUnavailableReason: 'noCurrentItem',
+  player: {
+    connected: false,
+    duration: 0,
+    muted: false,
+    paused: true,
+    timePos: 0,
+    volume: 100,
+  },
   previousUnavailableReason: 'noCurrentItem',
+  status: 'offline',
 };
 
 function mockCommon(appConfig = config, state = connectedState) {
@@ -62,19 +58,13 @@ function mockCommon(appConfig = config, state = connectedState) {
   rstest.spyOn(commands, 'mpvIsConnected').mockResolvedValue(false);
   rstest.spyOn(commands, 'configGet').mockResolvedValue(appConfig);
   rstest.spyOn(commands, 'nowPlayingGetState').mockResolvedValue({
-    status: 'ok',
     data: nowPlaying,
+    status: 'ok',
   });
-  rstest
-    .spyOn(events.nowPlayingChanged, 'listen')
-    .mockResolvedValue(() => undefined);
+  rstest.spyOn(events.nowPlayingChanged, 'listen').mockResolvedValue(() => {});
 }
 
-function renderConsole(
-  onSignedOut = () => undefined,
-  appConfig = config,
-  state = connectedState,
-) {
+function renderConsole(onSignedOut = () => {}, appConfig = config, state = connectedState) {
   mockCommon(appConfig, state);
   const root = document.createElement('div');
   document.body.append(root);
@@ -100,28 +90,21 @@ afterEach(() => {
 });
 test('operations console reports config load command failures', async () => {
   mockCommon();
-  rstest
-    .spyOn(commands, 'configGet')
-    .mockRejectedValue(new Error('Config unavailable'));
-  const consoleError = rstest
-    .spyOn(console, 'error')
-    .mockImplementation(() => undefined);
+  rstest.spyOn(commands, 'configGet').mockRejectedValue(new Error('Config unavailable'));
+  const consoleError = rstest.spyOn(console, 'error').mockImplementation(() => {});
   const root = document.createElement('div');
   document.body.append(root);
   const dispose = render(
     () => (
       <ToastProvider>
-        <OperationsConsole onSignedOut={() => undefined} />
+        <OperationsConsole onSignedOut={() => {}} />
       </ToastProvider>
     ),
     root,
   );
 
   await waitFor(() =>
-    expect(consoleError).toHaveBeenCalledWith(
-      'Failed to load config:',
-      'Config unavailable',
-    ),
+    expect(consoleError).toHaveBeenCalledWith('Failed to load config:', 'Config unavailable'),
   );
 
   dispose();
@@ -132,38 +115,31 @@ test('operations console loads intro skipper mode from config', async () => {
   const cleanup = renderConsole();
 
   await screen.findByRole('heading', { name: 'Connection' });
-  expect(screen.getByRole('button', { name: /Automatic/ })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
+  expect(screen.getByRole('button', { name: /Automatic/ })).toHaveAttribute('aria-pressed', 'true');
 
   cleanup();
 });
 
 test('operations console autosaves changed intro skipper mode', async () => {
   const configSet = rstest.spyOn(commands, 'configSet').mockResolvedValue({
-    status: 'ok',
     data: null,
+    status: 'ok',
   });
   const cleanup = renderConsole();
 
-  await waitFor(() =>
-    expect(screen.getByDisplayValue('JMSR Test')).toBeVisible(),
-  );
+  await waitFor(() => expect(screen.getByDisplayValue('JMSR Test')).toBeVisible());
   fireEvent.click(screen.getByRole('button', { name: /Manual/ }));
 
   await waitFor(() => expect(configSet).toHaveBeenCalledTimes(1));
-  expect(configSet).toHaveBeenCalledWith(
-    expect.objectContaining({ introSkipperMode: 'manual' }),
-  );
+  expect(configSet).toHaveBeenCalledWith(expect.objectContaining({ introSkipperMode: 'manual' }));
 
   cleanup();
 });
 
 test('intro skip mode toggles optimistically', async () => {
   const configSet = rstest.spyOn(commands, 'configSet').mockResolvedValue({
-    status: 'ok',
     data: null,
+    status: 'ok',
   });
   const cleanup = renderConsole();
 
@@ -180,9 +156,7 @@ test('intro skip mode toggles optimistically', async () => {
   expect(manual).toHaveAttribute('aria-pressed', 'true');
   expect(screen.getAllByText('Saving preference…').length).toBeGreaterThan(0);
   await waitFor(() =>
-    expect(configSet).toHaveBeenCalledWith(
-      expect.objectContaining({ introSkipperMode: 'manual' }),
-    ),
+    expect(configSet).toHaveBeenCalledWith(expect.objectContaining({ introSkipperMode: 'manual' })),
   );
 
   cleanup();
@@ -190,8 +164,8 @@ test('intro skip mode toggles optimistically', async () => {
 
 test('intro skip mode rolls back and shows inline error on save failure', async () => {
   rstest.spyOn(commands, 'configSet').mockResolvedValue({
-    status: 'error',
     error: { code: 'internal', message: 'Config write failed' },
+    status: 'error',
   });
   const cleanup = renderConsole();
 
@@ -202,36 +176,28 @@ test('intro skip mode rolls back and shows inline error on save failure', async 
   fireEvent.click(manual);
 
   expect(manual).toHaveAttribute('aria-pressed', 'true');
-  await waitFor(() =>
-    expect(screen.getAllByText('Config write failed').length).toBeGreaterThan(
-      0,
-    ),
-  );
+  await waitFor(() => expect(screen.getAllByText('Config write failed').length).toBeGreaterThan(0));
   expect(automatic).toHaveAttribute('aria-pressed', 'true');
   expect(manual).toHaveAttribute('aria-pressed', 'false');
 
   cleanup();
 });
 test('intro skip mode reports rejected save commands through status and toast', async () => {
-  rstest
-    .spyOn(commands, 'configSet')
-    .mockRejectedValue(new Error('Disk unavailable'));
+  rstest.spyOn(commands, 'configSet').mockRejectedValue(new Error('Disk unavailable'));
   const cleanup = renderConsole();
 
   await screen.findByDisplayValue('JMSR Test');
   fireEvent.click(screen.getByRole('button', { name: /Manual/ }));
 
-  await waitFor(() =>
-    expect(screen.getAllByText('Disk unavailable').length).toBeGreaterThan(0),
-  );
+  await waitFor(() => expect(screen.getAllByText('Disk unavailable').length).toBeGreaterThan(0));
 
   cleanup();
 });
 
 test('operations console autosaves changed intro skip key', async () => {
   const configSet = rstest.spyOn(commands, 'configSet').mockResolvedValue({
-    status: 'ok',
     data: null,
+    status: 'ok',
   });
   const cleanup = renderConsole();
 
@@ -242,9 +208,7 @@ test('operations console autosaves changed intro skip key', async () => {
   fireEvent.blur(key);
 
   await waitFor(() =>
-    expect(configSet).toHaveBeenCalledWith(
-      expect.objectContaining({ keybindIntroSkip: 'i' }),
-    ),
+    expect(configSet).toHaveBeenCalledWith(expect.objectContaining({ keybindIntroSkip: 'i' })),
   );
 
   cleanup();
@@ -252,10 +216,10 @@ test('operations console autosaves changed intro skip key', async () => {
 
 test('operations console autosaves compact preferred subtitle language chips', async () => {
   const configSet = rstest.spyOn(commands, 'configSet').mockResolvedValue({
-    status: 'ok',
     data: null,
+    status: 'ok',
   });
-  const cleanup = renderConsole(() => undefined, {
+  const cleanup = renderConsole(() => {}, {
     ...config,
     preferredSubtitleLanguages: ['jpn', 'eng'],
   });
@@ -277,9 +241,7 @@ test('operations console autosaves compact preferred subtitle language chips', a
   ).toEqual(['jpn', 'eng']);
 
   fireEvent.click(screen.getByRole('button', { name: 'Move jpn down' }));
-  const input = screen.getByLabelText(
-    'Custom subtitle language code',
-  ) as HTMLInputElement;
+  const input = screen.getByLabelText('Custom subtitle language code') as HTMLInputElement;
   fireEvent.input(input, { target: { value: ' SWE ' } });
   fireEvent.keyDown(input, { key: 'Enter' });
   fireEvent.click(screen.getByRole('button', { name: 'Move swe up' }));
@@ -295,24 +257,20 @@ test('operations console autosaves compact preferred subtitle language chips', a
     ),
   );
   expect(within(list).getByText('1')).toBeVisible();
-  expect(
-    within(list).getByRole('button', { name: 'Remove eng' }),
-  ).toBeVisible();
+  expect(within(list).getByRole('button', { name: 'Remove eng' })).toBeVisible();
 
   cleanup();
 });
 test('preferred subtitle language editor uses Ark tags input and select', async () => {
   const configSet = rstest.spyOn(commands, 'configSet').mockResolvedValue({
-    status: 'ok',
     data: null,
+    status: 'ok',
   });
   const cleanup = renderConsole();
   await screen.findByDisplayValue('JMSR Test');
 
   // The custom code input lives inside the tags-input scope
-  const customInput = await screen.findByLabelText(
-    'Custom subtitle language code',
-  );
+  const customInput = await screen.findByLabelText('Custom subtitle language code');
   expect(customInput.closest('[data-scope="tags-input"]')).not.toBeNull();
 
   // The Ark Select trigger is rendered with a combobox role
@@ -363,17 +321,15 @@ test('preferred subtitle language editor uses Ark tags input and select', async 
 
 test('operations console autosaves clearing preferred subtitle languages', async () => {
   const configSet = rstest.spyOn(commands, 'configSet').mockResolvedValue({
-    status: 'ok',
     data: null,
+    status: 'ok',
   });
-  const cleanup = renderConsole(() => undefined, {
+  const cleanup = renderConsole(() => {}, {
     ...config,
     preferredSubtitleLanguages: ['jpn'],
   });
 
-  await waitFor(() =>
-    expect(screen.getByRole('button', { name: 'Clear all' })).toBeVisible(),
-  );
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Clear all' })).toBeVisible());
   fireEvent.click(screen.getByRole('button', { name: 'Clear all' }));
   expect(
     screen.getByText(
@@ -394,23 +350,19 @@ test('operations console autosaves clearing preferred subtitle languages', async
 
 test('player bridge text fields autosave on valid blur and keep invalid drafts local', async () => {
   const configSet = rstest.spyOn(commands, 'configSet').mockResolvedValue({
-    status: 'ok',
     data: null,
+    status: 'ok',
   });
   const cleanup = renderConsole();
 
-  const deviceName = (await screen.findByDisplayValue(
-    'JMSR Test',
-  )) as HTMLInputElement;
+  const deviceName = (await screen.findByDisplayValue('JMSR Test')) as HTMLInputElement;
   fireEvent.input(deviceName, { target: { value: '' } });
   fireEvent.blur(deviceName);
 
   await new Promise((resolve) => setTimeout(resolve, 0));
   expect(configSet).not.toHaveBeenCalled();
 
-  const mpvPath = screen.getByPlaceholderText(
-    'Path to mpv executable',
-  ) as HTMLInputElement;
+  const mpvPath = screen.getByPlaceholderText('Path to mpv executable') as HTMLInputElement;
   fireEvent.input(mpvPath, { target: { value: '/usr/bin/mpv' } });
   fireEvent.blur(mpvPath);
 
@@ -430,8 +382,8 @@ test('player bridge text fields autosave on valid blur and keep invalid drafts l
 test('detect mpv autosaves detected path', async () => {
   rstest.spyOn(commands, 'configDetectMpv').mockResolvedValue('/opt/bin/mpv');
   const configSet = rstest.spyOn(commands, 'configSet').mockResolvedValue({
-    status: 'ok',
     data: null,
+    status: 'ok',
   });
   const cleanup = renderConsole();
 
@@ -439,9 +391,7 @@ test('detect mpv autosaves detected path', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Detect MPV' }));
 
   await waitFor(() =>
-    expect(configSet).toHaveBeenCalledWith(
-      expect.objectContaining({ mpvPath: '/opt/bin/mpv' }),
-    ),
+    expect(configSet).toHaveBeenCalledWith(expect.objectContaining({ mpvPath: '/opt/bin/mpv' })),
   );
 
   cleanup();
@@ -452,7 +402,7 @@ test('autosaves are serialized without overwriting newer drafts', async () => {
   const configSet = rstest.spyOn(commands, 'configSet').mockImplementation(
     () =>
       new Promise((resolve) => {
-        resolveFirstSave = () => resolve({ status: 'ok' as const, data: null });
+        resolveFirstSave = () => resolve({ data: null, status: 'ok' as const });
       }),
   );
 
@@ -490,22 +440,18 @@ test('player bridge autosave failure recovers on later save', async () => {
   const configSet = rstest
     .spyOn(commands, 'configSet')
     .mockResolvedValueOnce({
-      status: 'error',
       error: { code: 'internal', message: 'Disk unavailable' },
+      status: 'error',
     })
-    .mockResolvedValueOnce({ status: 'ok', data: null });
+    .mockResolvedValueOnce({ data: null, status: 'ok' });
   const cleanup = renderConsole();
 
   await screen.findByDisplayValue('JMSR Test');
-  const mpvPath = screen.getByPlaceholderText(
-    'Path to mpv executable',
-  ) as HTMLInputElement;
+  const mpvPath = screen.getByPlaceholderText('Path to mpv executable') as HTMLInputElement;
   fireEvent.input(mpvPath, { target: { value: '/broken/mpv' } });
   fireEvent.blur(mpvPath);
 
-  await waitFor(() =>
-    expect(screen.getAllByText('Disk unavailable').length).toBeGreaterThan(0),
-  );
+  await waitFor(() => expect(screen.getAllByText('Disk unavailable').length).toBeGreaterThan(0));
 
   const deviceName = screen.getByDisplayValue('JMSR Test') as HTMLInputElement;
   fireEvent.input(deviceName, { target: { value: 'JMSR Recovery' } });
@@ -532,12 +478,8 @@ test('connection comes before now playing and hero keeps only refresh', async ()
     text: heading.textContent,
     top: heading.getBoundingClientRect().top,
   }));
-  expect(
-    headings.findIndex((heading) => heading.text === 'Connection'),
-  ).toBeLessThan(
-    headings.findIndex(
-      (heading) => heading.text === 'No active playback metadata',
-    ),
+  expect(headings.findIndex((heading) => heading.text === 'Connection')).toBeLessThan(
+    headings.findIndex((heading) => heading.text === 'No active playback metadata'),
   );
   expect(screen.getByRole('button', { name: 'Refresh status' })).toBeVisible();
   expect(screen.queryByRole('button', { name: 'Start MPV' })).toBeNull();
@@ -550,9 +492,7 @@ test('final console structure covers all operational areas in order', async () =
   const cleanup = renderConsole();
 
   await screen.findByDisplayValue('JMSR Test');
-  const headings = screen
-    .getAllByRole('heading')
-    .map((heading) => heading.textContent);
+  const headings = screen.getAllByRole('heading').map((heading) => heading.textContent);
   expect(headings).toEqual(
     expect.arrayContaining([
       'Connection',
@@ -566,31 +506,26 @@ test('final console structure covers all operational areas in order', async () =
   expect(headings.indexOf('Connection')).toBeLessThan(
     headings.indexOf('No active playback metadata'),
   );
-  expect(headings.indexOf('Diagnostics')).toBeLessThan(
-    headings.indexOf('Intro Skip'),
+  expect(headings.indexOf('Diagnostics')).toBeLessThan(headings.indexOf('Intro Skip'));
+  expect(screen.getByRole('button', { name: 'Toggle diagnostics' })).toHaveAttribute(
+    'aria-expanded',
+    'false',
   );
-  expect(
-    screen.getByRole('button', { name: 'Toggle diagnostics' }),
-  ).toHaveAttribute('aria-expanded', 'false');
 
   cleanup();
 });
 
 test('disconnect keeps saved session and stays on console', async () => {
   localStorage.setItem('jmsr_auth_session', JSON.stringify({ serverUrl: 'x' }));
-  const disconnect = rstest
-    .spyOn(commands, 'jellyfinDisconnect')
-    .mockResolvedValue({
-      status: 'ok',
-      data: null,
-    });
+  const disconnect = rstest.spyOn(commands, 'jellyfinDisconnect').mockResolvedValue({
+    data: null,
+    status: 'ok',
+  });
   const cleanup = renderConsole();
 
   await screen.findByRole('heading', { name: 'Connection' });
   await waitFor(() =>
-    expect(
-      screen.getByRole('button', { name: 'Disconnect' }),
-    ).not.toBeDisabled(),
+    expect(screen.getByRole('button', { name: 'Disconnect' })).not.toBeDisabled(),
   );
   fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
 
@@ -607,21 +542,17 @@ test('disconnect keeps saved session and stays on console', async () => {
 });
 test('disconnect failure stays on console and unlocks the action', async () => {
   rstest.spyOn(commands, 'jellyfinDisconnect').mockResolvedValue({
-    status: 'error',
     error: { code: 'network', message: 'disconnect offline' },
+    status: 'error',
   });
   const cleanup = renderConsole();
 
   await waitFor(() =>
-    expect(
-      screen.getByRole('button', { name: 'Disconnect' }),
-    ).not.toBeDisabled(),
+    expect(screen.getByRole('button', { name: 'Disconnect' })).not.toBeDisabled(),
   );
   fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
 
-  await waitFor(() =>
-    expect(screen.getByText('disconnect offline')).toBeVisible(),
-  );
+  await waitFor(() => expect(screen.getByText('disconnect offline')).toBeVisible());
   expect(screen.getByRole('button', { name: 'Disconnect' })).not.toBeDisabled();
   expect(screen.getByRole('heading', { name: 'Connection' })).toBeVisible();
 
@@ -635,15 +566,11 @@ test('disconnect rejected commands stay on console and unlock the action', async
   const cleanup = renderConsole();
 
   await waitFor(() =>
-    expect(
-      screen.getByRole('button', { name: 'Disconnect' }),
-    ).not.toBeDisabled(),
+    expect(screen.getByRole('button', { name: 'Disconnect' })).not.toBeDisabled(),
   );
   fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
 
-  await waitFor(() =>
-    expect(screen.getByText('disconnect ipc unavailable')).toBeVisible(),
-  );
+  await waitFor(() => expect(screen.getByText('disconnect ipc unavailable')).toBeVisible());
   expect(screen.getByRole('button', { name: 'Disconnect' })).not.toBeDisabled();
   expect(screen.getByRole('heading', { name: 'Connection' })).toBeVisible();
 
@@ -652,22 +579,18 @@ test('disconnect rejected commands stay on console and unlock the action', async
 
 test('reconnect restores a live Jellyfin connection from a Saved Session', async () => {
   localStorage.setItem('jmsr_auth_session', JSON.stringify(validSavedSession));
-  const restore = rstest
-    .spyOn(commands, 'jellyfinRestoreSession')
-    .mockResolvedValue({
-      status: 'ok',
-      data: null,
-    });
-  const cleanup = renderConsole(() => undefined, config, {
+  const restore = rstest.spyOn(commands, 'jellyfinRestoreSession').mockResolvedValue({
+    data: null,
+    status: 'ok',
+  });
+  const cleanup = renderConsole(() => {}, config, {
     connected: false,
-    serverUrl: null,
     serverName: null,
+    serverUrl: null,
     userName: null,
   });
 
-  await waitFor(() =>
-    expect(screen.getByRole('button', { name: 'Reconnect' })).toBeVisible(),
-  );
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Reconnect' })).toBeVisible());
   fireEvent.click(screen.getByRole('button', { name: 'Reconnect' }));
 
   await waitFor(() => expect(restore).toHaveBeenCalledWith(validSavedSession));
@@ -679,20 +602,18 @@ test('reconnect restores a live Jellyfin connection from a Saved Session', async
 test('reconnect failure clears the Saved Session and signs out', async () => {
   localStorage.setItem('jmsr_auth_session', JSON.stringify(validSavedSession));
   rstest.spyOn(commands, 'jellyfinRestoreSession').mockResolvedValue({
-    status: 'error',
     error: { code: 'authFailed', message: 'expired' },
+    status: 'error',
   });
   const onSignedOut = rstest.fn();
   const cleanup = renderConsole(onSignedOut, config, {
     connected: false,
-    serverUrl: null,
     serverName: null,
+    serverUrl: null,
     userName: null,
   });
 
-  await waitFor(() =>
-    expect(screen.getByRole('button', { name: 'Reconnect' })).toBeVisible(),
-  );
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Reconnect' })).toBeVisible());
   fireEvent.click(screen.getByRole('button', { name: 'Reconnect' }));
 
   await waitFor(() => expect(onSignedOut).toHaveBeenCalledTimes(1));
@@ -703,12 +624,10 @@ test('reconnect failure clears the Saved Session and signs out', async () => {
 
 test('sign out confirms and clears saved session', async () => {
   localStorage.setItem('jmsr_auth_session', JSON.stringify({ serverUrl: 'x' }));
-  const clearSession = rstest
-    .spyOn(commands, 'jellyfinClearSession')
-    .mockResolvedValue({
-      status: 'ok',
-      data: null,
-    });
+  const clearSession = rstest.spyOn(commands, 'jellyfinClearSession').mockResolvedValue({
+    data: null,
+    status: 'ok',
+  });
   const onSignedOut = rstest.fn();
   const cleanup = renderConsole(onSignedOut);
 
@@ -716,7 +635,7 @@ test('sign out confirms and clears saved session', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
   await waitFor(() => expect(screen.getByRole('dialog')).toBeVisible());
   const signOutButtons = screen.getAllByRole('button', { name: 'Sign out' });
-  fireEvent.click(signOutButtons[signOutButtons.length - 1]);
+  fireEvent.click(signOutButtons.at(-1));
 
   await waitFor(() => {
     expect(clearSession).toHaveBeenCalledTimes(1);
@@ -729,12 +648,10 @@ test('sign out confirms and clears saved session', async () => {
 
 test('sign out failure preserves the Saved Session and stays on console', async () => {
   localStorage.setItem('jmsr_auth_session', JSON.stringify(validSavedSession));
-  const clearSession = rstest
-    .spyOn(commands, 'jellyfinClearSession')
-    .mockResolvedValue({
-      status: 'error',
-      error: { code: 'network', message: 'offline' },
-    });
+  const clearSession = rstest.spyOn(commands, 'jellyfinClearSession').mockResolvedValue({
+    error: { code: 'network', message: 'offline' },
+    status: 'error',
+  });
   const onSignedOut = rstest.fn();
   const cleanup = renderConsole(onSignedOut);
 
@@ -742,7 +659,7 @@ test('sign out failure preserves the Saved Session and stays on console', async 
   fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
   await waitFor(() => expect(screen.getByRole('dialog')).toBeVisible());
   const signOutButtons = screen.getAllByRole('button', { name: 'Sign out' });
-  fireEvent.click(signOutButtons[signOutButtons.length - 1]);
+  fireEvent.click(signOutButtons.at(-1));
 
   await waitFor(() => expect(clearSession).toHaveBeenCalledTimes(1));
   expect(localStorage.getItem('jmsr_auth_session')).not.toBeNull();
@@ -763,11 +680,9 @@ test('sign out rejected commands preserve the Saved Session and close the dialog
   fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
   await waitFor(() => expect(screen.getByRole('dialog')).toBeVisible());
   const signOutButtons = screen.getAllByRole('button', { name: 'Sign out' });
-  fireEvent.click(signOutButtons[signOutButtons.length - 1]);
+  fireEvent.click(signOutButtons.at(-1));
 
-  await waitFor(() =>
-    expect(screen.getByText('sign out ipc unavailable')).toBeVisible(),
-  );
+  await waitFor(() => expect(screen.getByText('sign out ipc unavailable')).toBeVisible());
   expect(localStorage.getItem('jmsr_auth_session')).not.toBeNull();
   expect(onSignedOut).not.toHaveBeenCalled();
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
@@ -789,14 +704,12 @@ test('sign out dialog uses Ark dialog dismissal semantics', async () => {
 
   fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
   const escapeDialog = await screen.findByRole('dialog');
-  fireEvent.keyDown(escapeDialog, { key: 'Escape', code: 'Escape' });
+  fireEvent.keyDown(escapeDialog, { code: 'Escape', key: 'Escape' });
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 
   fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
   await screen.findByRole('dialog');
-  const backdrop = document.querySelector(
-    '[data-scope="dialog"][data-part="backdrop"]',
-  );
+  const backdrop = document.querySelector('[data-scope="dialog"][data-part="backdrop"]');
   expect(backdrop).not.toBeNull();
   fireEvent.pointerDown(backdrop as Element);
   fireEvent.click(backdrop as Element);
@@ -807,9 +720,7 @@ test('sign out dialog uses Ark dialog dismissal semantics', async () => {
 
 test('sign out dialog locks dismissal while signing out', async () => {
   let resolveClearSession:
-    | ((
-        result: Awaited<ReturnType<typeof commands.jellyfinClearSession>>,
-      ) => void)
+    | ((result: Awaited<ReturnType<typeof commands.jellyfinClearSession>>) => void)
     | undefined;
   rstest.spyOn(commands, 'jellyfinClearSession').mockImplementation(
     () =>
@@ -824,15 +735,13 @@ test('sign out dialog locks dismissal while signing out', async () => {
   await screen.findByRole('dialog');
 
   const signOutButtons = screen.getAllByRole('button', { name: 'Sign out' });
-  fireEvent.click(signOutButtons[signOutButtons.length - 1]);
+  fireEvent.click(signOutButtons.at(-1));
 
-  await waitFor(() =>
-    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled(),
-  );
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled());
   fireEvent.keyDown(document, { key: 'Escape' });
   expect(screen.getByRole('dialog')).toBeVisible();
 
-  resolveClearSession?.({ status: 'ok', data: null });
+  resolveClearSession?.({ data: null, status: 'ok' });
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 
   cleanup();
@@ -843,9 +752,7 @@ test('player bridge settings use Ark fields and intro skip mode buttons', async 
   const mpvPath = await screen.findByPlaceholderText('Path to mpv executable');
   expect(mpvPath.closest('[data-scope="field"]')).not.toBeNull();
 
-  expect(
-    screen.queryByPlaceholderText('--fullscreen&#10;--force-window'),
-  ).toBeNull();
+  expect(screen.queryByPlaceholderText('--fullscreen&#10;--force-window')).toBeNull();
 
   const advancedTrigger = screen.getByRole('button', {
     name: 'Advanced MPV options',
@@ -853,9 +760,7 @@ test('player bridge settings use Ark fields and intro skip mode buttons', async 
   expect(advancedTrigger.closest('[data-scope="collapsible"]')).not.toBeNull();
 
   fireEvent.click(advancedTrigger);
-  await waitFor(() =>
-    expect(advancedTrigger).toHaveAttribute('aria-expanded', 'true'),
-  );
+  await waitFor(() => expect(advancedTrigger).toHaveAttribute('aria-expanded', 'true'));
   const mpvArgs = await screen.findByLabelText('Extra arguments');
   expect(mpvArgs.closest('[data-scope="field"]')).not.toBeNull();
   expect(mpvArgs.closest('[data-scope="collapsible"]')).not.toBeNull();
@@ -902,6 +807,7 @@ test('settings and session actions keep shared visual semantics', async () => {
 });
 
 import { Cause, Effect, Exit } from 'effect';
+
 import {
   clearSavedSession,
   loadSavedSession,
@@ -911,12 +817,12 @@ import {
 import { StorageParseError } from '../src/effects/errors';
 
 const sampleSession = {
-  serverUrl: 'https://jellyfin.example.com',
   accessToken: 'token-1',
+  deviceId: 'device-1',
+  serverName: 'Jellyfin Home',
+  serverUrl: 'https://jellyfin.example.com',
   userId: 'user-1',
   userName: 'Ada',
-  serverName: 'Jellyfin Home',
-  deviceId: 'device-1',
 };
 
 test('session save and load round-trips through Effect', () => {
@@ -947,7 +853,7 @@ test('loadSavedSession returns StorageParseError for malformed JSON', () => {
     if (!reason || !Cause.isFailReason(reason)) {
       throw new Error('Expected typed StorageParseError failure');
     }
-    const error = reason.error;
+    const { error } = reason;
     expect(error).toBeInstanceOf(StorageParseError);
     expect(error.key).toBe(SESSION_STORAGE_KEY);
   }

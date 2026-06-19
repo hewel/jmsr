@@ -1,4 +1,5 @@
 import { Cause, Effect } from 'effect';
+
 import type { CommandError } from '../bindings';
 import { CommandError as CommandErrorTag } from './errors';
 
@@ -7,11 +8,15 @@ import { CommandError as CommandErrorTag } from './errors';
  * Converts `{ status: 'error' }` into a typed `CommandError` failure.
  */
 export function runTauriCommand<T>(
-  command: () => Promise<
-    { status: 'ok'; data: T } | { status: 'error'; error: CommandError }
-  >,
+  command: () => Promise<{ status: 'ok'; data: T } | { status: 'error'; error: CommandError }>,
 ): Effect.Effect<T, CommandErrorTag> {
   return Effect.tryPromise({
+    catch: (error) => {
+      if (error instanceof CommandErrorTag) return error;
+      return new CommandErrorTag({
+        message: error instanceof Error ? error.message : 'Command failed',
+      });
+    },
     try: async () => {
       const result = await command();
       if (result.status === 'error') {
@@ -22,17 +27,9 @@ export function runTauriCommand<T>(
       }
       return result.data;
     },
-    catch: (error) => {
-      if (error instanceof CommandErrorTag) return error;
-      return new CommandErrorTag({
-        message: error instanceof Error ? error.message : 'Command failed',
-      });
-    },
   });
 }
-export function commandFailure(
-  cause: Cause.Cause<CommandErrorTag>,
-): CommandErrorTag | null {
+export function commandFailure(cause: Cause.Cause<CommandErrorTag>): CommandErrorTag | null {
   for (const reason of cause.reasons) {
     if (Cause.isFailReason(reason)) {
       return reason.error;
@@ -55,10 +52,10 @@ export function runTauriCommandRaw<T>(
   command: () => Promise<T>,
 ): Effect.Effect<T, CommandErrorTag> {
   return Effect.tryPromise({
-    try: () => command(),
     catch: (error) =>
       new CommandErrorTag({
         message: error instanceof Error ? error.message : 'Command failed',
       }),
+    try: () => command(),
   });
 }

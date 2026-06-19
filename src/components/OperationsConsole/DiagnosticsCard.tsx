@@ -1,4 +1,5 @@
 import { ClipboardList } from 'lucide-solid';
+
 import DiagnosticsPanel from '../DiagnosticsPanel';
 import { Button, SectionCard } from '../ui';
 import { useOperationsConsoleStore } from './store';

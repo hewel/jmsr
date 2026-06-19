@@ -11,6 +11,7 @@ export interface ServerUrlResult {
 }
 
 import { Effect } from 'effect';
+
 import { buildServerUrlEffect } from './effects/serverUrl';
 
 const LOCAL_HOSTS = new Set(['localhost']);
@@ -21,19 +22,21 @@ export function stripServerScheme(input: string): string {
 
 export function explicitSchemeFromInput(input: string): ServerScheme | null {
   const match = input.trim().match(/^(https?):\/\//i);
-  if (!match) return null;
+  if (!match) {
+    return null;
+  }
   return match[1].toLowerCase() === 'http' ? 'http' : 'https';
 }
 
 function authorityFromHostInput(host: string): string {
   const slash = host.indexOf('/');
-  return slash >= 0 ? host.slice(0, slash) : host;
+  return slash !== -1 ? host.slice(0, slash) : host;
 }
 export function hasExplicitPort(host: string): boolean {
   const authority = authorityFromHostInput(host);
   if (authority.startsWith('[')) {
     const end = authority.indexOf(']');
-    return end >= 0 && authority.slice(end + 1).startsWith(':');
+    return end !== -1 && authority.slice(end + 1).startsWith(':');
   }
   return authority.includes(':');
 }
@@ -41,18 +44,26 @@ export function hasExplicitPort(host: string): boolean {
 function hostWithoutPort(hostname: string): string {
   if (hostname.startsWith('[')) {
     const end = hostname.indexOf(']');
-    return end >= 0 ? hostname.slice(1, end) : hostname;
+    return end !== -1 ? hostname.slice(1, end) : hostname;
   }
   const colon = hostname.indexOf(':');
-  return colon >= 0 ? hostname.slice(0, colon) : hostname;
+  return colon !== -1 ? hostname.slice(0, colon) : hostname;
 }
 
 export function isLocalServerHost(hostname: string): boolean {
   const host = hostWithoutPort(hostname).toLowerCase();
-  if (LOCAL_HOSTS.has(host) || host.endsWith('.local')) return true;
-  if (host.startsWith('127.')) return true;
-  if (host.startsWith('10.')) return true;
-  if (host.startsWith('192.168.')) return true;
+  if (LOCAL_HOSTS.has(host) || host.endsWith('.local')) {
+    return true;
+  }
+  if (host.startsWith('127.')) {
+    return true;
+  }
+  if (host.startsWith('10.')) {
+    return true;
+  }
+  if (host.startsWith('192.168.')) {
+    return true;
+  }
 
   const parts = host.split('.');
   if (parts.length === 4 && parts[0] === '172') {
@@ -71,17 +82,17 @@ export function buildServerUrl(fields: ServerUrlFields): ServerUrlResult {
   return Effect.runSync(buildServerUrlEffect(fields));
 }
 
-export function parseServerUrl(
-  url: string | null | undefined,
-): ServerUrlFields {
-  if (!url) return { scheme: 'https', host: '' };
+export function parseServerUrl(url: string | null | undefined): ServerUrlFields {
+  if (!url) {
+    return { scheme: 'https', host: '' };
+  }
 
   try {
     const parsed = new URL(url);
     const scheme: ServerScheme = parsed.protocol === 'http:' ? 'http' : 'https';
     const host = `${parsed.host}${parsed.pathname === '/' ? '' : parsed.pathname}`;
-    return { scheme, host };
+    return { host, scheme };
   } catch {
-    return { scheme: 'https', host: '' };
+    return { host: '', scheme: 'https' };
   }
 }

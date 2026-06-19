@@ -1,30 +1,16 @@
-import type {
-  VideoLibraryPlayMode,
-  VideoPlaybackStreamOption,
-} from '@bindings';
+import type { VideoLibraryPlayMode, VideoPlaybackStreamOption } from '@bindings';
 import {
-  detailSubtitle,
-  formatRuntime,
   LibraryStatusPanel,
   UserDataControls,
+  detailSubtitle,
+  formatRuntime,
 } from '@components/library/shared';
-import {
-  Button,
-  JmsrSelect,
-  type JmsrSelectItem,
-  StatusBadge,
-} from '@components/ui';
+import { Button, JmsrSelect, StatusBadge } from '@components/ui';
+import type { JmsrSelectItem } from '@components/ui';
 import { createFileRoute } from '@tanstack/solid-router';
 import { Exit } from 'effect';
 import { Film, Library, Play, RefreshCw, RotateCcw } from 'lucide-solid';
-import {
-  createEffect,
-  createMemo,
-  createResource,
-  createSignal,
-  For,
-  Show,
-} from 'solid-js';
+import { For, Show, createEffect, createMemo, createResource, createSignal } from 'solid-js';
 import { commandFailureMessage } from '~effects/commands';
 import {
   fetchVideoItemDetail,
@@ -42,12 +28,8 @@ export const Route = createFileRoute('/_authenticated/library/items/$itemId')({
 
 function LibraryItemDetailRoute() {
   const params = Route.useParams();
-  const [state, { refetch }] = createResource(() =>
-    fetchVideoItemDetail(params().itemId),
-  );
-  const [playBusy, setPlayBusy] = createSignal<VideoLibraryPlayMode | null>(
-    null,
-  );
+  const [state, { refetch }] = createResource(() => fetchVideoItemDetail(params().itemId));
+  const [playBusy, setPlayBusy] = createSignal<VideoLibraryPlayMode | null>(null);
   const [audioValue, setAudioValue] = createSignal(AUDIO_AUTO);
   const [subtitleValue, setSubtitleValue] = createSignal(SUBTITLE_AUTO);
   const [playError, setPlayError] = createSignal<string | null>(null);
@@ -56,24 +38,26 @@ function LibraryItemDetailRoute() {
     return current && Exit.isSuccess(current) ? current.value : null;
   };
   const audioItems = createMemo<JmsrSelectItem[]>(() => [
-    { value: AUDIO_AUTO, label: 'Auto (series preference)' },
+    { label: 'Auto (series preference)', value: AUDIO_AUTO },
     ...(detail()?.audioStreams ?? []).map((stream) => ({
-      value: String(stream.index),
       label: streamLabel(stream),
+      value: String(stream.index),
     })),
   ]);
   const subtitleItems = createMemo<JmsrSelectItem[]>(() => [
-    { value: SUBTITLE_AUTO, label: 'Auto (preferred subtitles)' },
-    { value: SUBTITLE_OFF, label: 'Off' },
+    { label: 'Auto (preferred subtitles)', value: SUBTITLE_AUTO },
+    { label: 'Off', value: SUBTITLE_OFF },
     ...(detail()?.subtitleStreams ?? []).map((stream) => ({
-      value: String(stream.index),
       label: streamLabel(stream),
+      value: String(stream.index),
     })),
   ]);
 
   createEffect(() => {
     const itemId = detail()?.id;
-    if (!itemId) return;
+    if (!itemId) {
+      return;
+    }
 
     setAudioValue(AUDIO_AUTO);
     setSubtitleValue(SUBTITLE_AUTO);
@@ -83,27 +67,32 @@ function LibraryItemDetailRoute() {
     audioValue() === AUDIO_AUTO ? null : Number(audioValue());
   const selectedSubtitleStreamIndex = () => {
     const value = subtitleValue();
-    if (value === SUBTITLE_AUTO) return null;
-    if (value === SUBTITLE_OFF) return -1;
+    if (value === SUBTITLE_AUTO) {
+      return null;
+    }
+    if (value === SUBTITLE_OFF) {
+      return -1;
+    }
     return Number(value);
   };
   const playItem = async (mode: VideoLibraryPlayMode) => {
     const item = detail();
-    if (!item || playBusy()) return;
+    if (!item || playBusy()) {
+      return;
+    }
 
     setPlayBusy(mode);
     setPlayError(null);
     const result = await startLibraryPlayback({
+      audioStreamIndex: selectedAudioStreamIndex(),
       itemId: item.id,
       mode,
       startPositionSeconds: mode === 'resume' ? item.resumePositionSeconds : 0,
-      audioStreamIndex: selectedAudioStreamIndex(),
       subtitleStreamIndex: selectedSubtitleStreamIndex(),
     });
     setPlayError(
       Exit.match(result, {
-        onFailure: (cause) =>
-          commandFailureMessage(cause, 'Could not start playback'),
+        onFailure: (cause) => commandFailureMessage(cause, 'Could not start playback'),
         onSuccess: () => null,
       }),
     );
@@ -111,8 +100,9 @@ function LibraryItemDetailRoute() {
   };
   const statusTitle = () => {
     const current = state();
-    if (current && !Exit.isSuccess(current))
+    if (current && !Exit.isSuccess(current)) {
       return 'Could not load item detail';
+    }
     return 'Loading item detail';
   };
   const statusDescription = () => {
@@ -148,30 +138,21 @@ function LibraryItemDetailRoute() {
 
       <Show
         when={detail()}
-        fallback={
-          <LibraryStatusPanel
-            title={statusTitle()}
-            description={statusDescription()}
-          />
-        }
+        fallback={<LibraryStatusPanel title={statusTitle()} description={statusDescription()} />}
       >
         {(item) => {
           const isEpisode = () => item().itemType === 'Episode';
-          const artworkAspectClass = () =>
-            isEpisode() ? 'aspect-video' : 'aspect-[2/3]';
-          const missingArtworkLabel = () =>
-            isEpisode() ? 'No episode artwork' : 'No artwork';
+          const artworkAspectClass = () => (isEpisode() ? 'aspect-video' : 'aspect-[2/3]');
+          const missingArtworkLabel = () => (isEpisode() ? 'No episode artwork' : 'No artwork');
 
           return (
             <article class="grid gap-6 lg:grid-cols-[minmax(240px,360px)_1fr]">
               <div class="card-filled overflow-hidden p-0">
-                <div
-                  class={`${artworkAspectClass()} bg-surface-container-lowest/60`}
-                >
+                <div class={`${artworkAspectClass()} bg-surface-container-lowest/60`}>
                   <Show
                     when={item().artworkUrl}
                     fallback={
-                      <div class="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-on-surface-variant">
+                      <div class="text-on-surface-variant flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
                         <Film class="h-8 w-8" />
                         <p class="text-title-medium">{item().name}</p>
                         <p class="text-label-small">{missingArtworkLabel()}</p>
@@ -190,15 +171,13 @@ function LibraryItemDetailRoute() {
               </div>
               <div class="space-y-5">
                 <div>
-                  <p class="text-label-small text-secondary">
-                    {item().itemType}
-                  </p>
+                  <p class="text-label-small text-secondary">{item().itemType}</p>
                   <h1 class="text-headline-large">{item().name}</h1>
-                  <p class="mt-2 text-body-large">{detailSubtitle(item())}</p>
+                  <p class="text-body-large mt-2">{detailSubtitle(item())}</p>
                   <Show when={isEpisode() && item().seriesId}>
                     <a
                       href={`/library/shows/${item().seriesId}`}
-                      class="mt-1 inline-block text-body-small text-secondary underline-offset-4 hover:underline"
+                      class="text-body-small text-secondary mt-1 inline-block underline-offset-4 hover:underline"
                     >
                       View series
                     </a>
@@ -208,15 +187,11 @@ function LibraryItemDetailRoute() {
                   <StatusBadge variant={item().played ? 'success' : 'neutral'}>
                     {item().played ? 'Played' : 'Unplayed'}
                   </StatusBadge>
-                  <StatusBadge
-                    variant={item().favorite ? 'success' : 'neutral'}
-                  >
+                  <StatusBadge variant={item().favorite ? 'success' : 'neutral'}>
                     {item().favorite ? 'Favorite' : 'Not favorite'}
                   </StatusBadge>
                   <Show when={formatRuntime(item().runtimeSeconds)}>
-                    {(runtime) => (
-                      <StatusBadge variant="neutral">{runtime()}</StatusBadge>
-                    )}
+                    {(runtime) => <StatusBadge variant="neutral">{runtime()}</StatusBadge>}
                   </Show>
                 </div>
                 <UserDataControls
@@ -234,7 +209,7 @@ function LibraryItemDetailRoute() {
                   <div class="flex flex-wrap gap-2">
                     <For each={item().genres}>
                       {(genre) => (
-                        <span class="rounded-full border border-outline-variant px-3 py-1 text-label-small">
+                        <span class="border-outline-variant text-label-small rounded-full border px-3 py-1">
                           {genre}
                         </span>
                       )}
@@ -323,16 +298,12 @@ function LibraryItemDetailRoute() {
                         </Show>
                       }
                     >
-                      {playBusy() === 'start'
-                        ? 'Starting...'
-                        : 'Play from beginning'}
+                      {playBusy() === 'start' ? 'Starting...' : 'Play from beginning'}
                     </Button>
                   </Show>
                 </div>
                 <Show when={playError()}>
-                  {(message) => (
-                    <p class="text-body-small text-error">{message()}</p>
-                  )}
+                  {(message) => <p class="text-body-small text-error">{message()}</p>}
                 </Show>
               </div>
             </article>
@@ -351,7 +322,5 @@ function streamLabel(stream: VideoPlaybackStreamOption) {
     stream.isDefault ? 'Default' : null,
   ].filter((tag) => tag !== null);
 
-  return tags.length > 0
-    ? `${stream.label} (${tags.join(', ')})`
-    : stream.label;
+  return tags.length > 0 ? `${stream.label} (${tags.join(', ')})` : stream.label;
 }

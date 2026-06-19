@@ -4,24 +4,21 @@ import { Tabs } from '@ark-ui/solid/tabs';
 import { createForm } from '@tanstack/solid-form';
 import { Effect, Exit } from 'effect';
 import { Check, CircleAlert, LoaderCircle, RadioTower } from 'lucide-solid';
-import { createSignal, onCleanup, onMount, Show } from 'solid-js';
-import { type Credentials, commands } from '../bindings';
+import { Show, createSignal, onCleanup, onMount } from 'solid-js';
+
+import { commands } from '../bindings';
+import type { Credentials } from '../bindings';
 import { commandFailureMessage, runTauriCommand } from '../effects/commands';
 import { CommandError } from '../effects/errors';
 import { buildServerUrlEffect } from '../effects/serverUrl';
-import {
-  clearSavedCredentials,
-  loadSavedCredentials,
-  saveCredentials,
-} from '../effects/session';
+import { clearSavedCredentials, loadSavedCredentials, saveCredentials } from '../effects/session';
 import {
   defaultSchemeForHost,
   explicitSchemeFromInput,
   parseServerUrl,
-  type ServerScheme,
-  type ServerUrlResult,
   stripServerScheme,
 } from '../serverUrl';
+import type { ServerScheme, ServerUrlResult } from '../serverUrl';
 import { saveCurrentSession } from '../sessionAccess';
 import { Button, Card, PageFooter } from './ui';
 
@@ -44,13 +41,9 @@ type ServerUrlValidation =
   | { status: 'error'; message: string };
 
 export default function LoginPage(props: LoginPageProps) {
-  const [loginMethod, setLoginMethod] =
-    createSignal<LoginMethod>('quickConnect');
-  const [quickConnectState, setQuickConnectState] =
-    createSignal<QuickConnectState>('idle');
-  const [quickConnectCode, setQuickConnectCode] = createSignal<string | null>(
-    null,
-  );
+  const [loginMethod, setLoginMethod] = createSignal<LoginMethod>('quickConnect');
+  const [quickConnectState, setQuickConnectState] = createSignal<QuickConnectState>('idle');
+  const [quickConnectCode, setQuickConnectCode] = createSignal<string | null>(null);
   const [error, setError] = createSignal<string | null>(null);
   const [submitting, setSubmitting] = createSignal(false);
   let pollInterval: ReturnType<typeof setInterval> | undefined;
@@ -60,11 +53,11 @@ export default function LoginPage(props: LoginPageProps) {
 
   const form = createForm(() => ({
     defaultValues: {
-      scheme: 'https' as ServerScheme,
       host: '',
-      username: '',
       password: '',
       rememberMe: false,
+      scheme: 'https' as ServerScheme,
+      username: '',
     },
     onSubmit: async ({ value }) => {
       if (loginMethod() === 'quickConnect') {
@@ -78,33 +71,31 @@ export default function LoginPage(props: LoginPageProps) {
 
   const isQuickConnectWaiting = () => quickConnectState() === 'waiting';
   const submitButtonLabel = () => {
-    if (loginMethod() !== 'quickConnect') return 'Connect';
-    return quickConnectState() === 'failed'
-      ? 'Request a new code'
-      : 'Request Quick Connect code';
+    if (loginMethod() !== 'quickConnect') {
+      return 'Connect';
+    }
+    return quickConnectState() === 'failed' ? 'Request a new code' : 'Request Quick Connect code';
   };
   const submittingButtonLabel = () =>
     loginMethod() === 'quickConnect' ? 'Requesting...' : 'Connecting...';
 
-  const validateServerUrl = (
-    value: Pick<LoginValues, 'scheme' | 'host'>,
-  ): ServerUrlValidation =>
+  const validateServerUrl = (value: Pick<LoginValues, 'scheme' | 'host'>): ServerUrlValidation =>
     Effect.runSync(
       buildServerUrlEffect({
-        scheme: value.scheme,
         host: value.host,
+        scheme: value.scheme,
       }).pipe(
         Effect.match({
-          onFailure: (err) => ({ status: 'error', message: err.message }),
-          onSuccess: (result) => ({ status: 'ok', result }),
+          onFailure: (err) => ({ message: err.message, status: 'error' }),
+          onSuccess: (result) => ({ result, status: 'ok' }),
         }),
       ),
     );
 
   const serverUrlResult = () => {
     const validation = validateServerUrl({
-      scheme: formValues().scheme,
       host: formValues().host,
+      scheme: formValues().scheme,
     });
     return validation.status === 'ok' ? validation.result : null;
   };
@@ -142,69 +133,65 @@ export default function LoginPage(props: LoginPageProps) {
     secret: string,
     requestId: number,
   ) => {
-    if (
-      requestId !== quickConnectRequestId ||
-      quickConnectPollingRequestId !== null
-    )
+    if (requestId !== quickConnectRequestId || quickConnectPollingRequestId !== null) {
       return;
+    }
     quickConnectPollingRequestId = requestId;
     const check = await Effect.runPromiseExit(
-      runTauriCommand(() =>
-        commands.jellyfinQuickConnectCheck(serverUrlValue, secret),
-      ),
+      runTauriCommand(() => commands.jellyfinQuickConnectCheck(serverUrlValue, secret)),
     );
-    if (quickConnectPollingRequestId === requestId)
+    if (quickConnectPollingRequestId === requestId) {
       quickConnectPollingRequestId = null;
-    if (requestId !== quickConnectRequestId) return;
+    }
+    if (requestId !== quickConnectRequestId) {
+      return;
+    }
     if (Exit.isFailure(check)) {
       quickConnectRequestId += 1;
       stopQuickConnectPolling();
       setQuickConnectState('failed');
-      setError(
-        commandFailureMessage(check.cause, 'Quick Connect approval failed'),
-      );
+      setError(commandFailureMessage(check.cause, 'Quick Connect approval failed'));
       return;
     }
 
-    if (quickConnectPollingRequestId === requestId)
+    if (quickConnectPollingRequestId === requestId) {
       quickConnectPollingRequestId = null;
-    if (check.value !== 'approved') return;
+    }
+    if (check.value !== 'approved') {
+      return;
+    }
 
     stopQuickConnectPolling();
     quickConnectRequestId += 1;
     const authRequestId = quickConnectRequestId;
     setSubmitting(true);
     const auth = await Effect.runPromiseExit(
-      runTauriCommand(() =>
-        commands.jellyfinQuickConnectAuthenticate(serverUrlValue, secret),
-      ),
+      runTauriCommand(() => commands.jellyfinQuickConnectAuthenticate(serverUrlValue, secret)),
     );
-    if (authRequestId !== quickConnectRequestId) return;
+    if (authRequestId !== quickConnectRequestId) {
+      return;
+    }
 
     if (Exit.isFailure(auth)) {
       quickConnectRequestId += 1;
       setSubmitting(false);
       setQuickConnectState('failed');
-      setError(
-        commandFailureMessage(
-          auth.cause,
-          'Quick Connect authentication failed',
-        ),
-      );
+      setError(commandFailureMessage(auth.cause, 'Quick Connect authentication failed'));
       return;
     }
 
     const completion = await Effect.runPromiseExit(
       Effect.tryPromise({
-        try: finishConnected,
         catch: (error) =>
           new CommandError({
-            message:
-              error instanceof Error ? error.message : 'Connection failed',
+            message: error instanceof Error ? error.message : 'Connection failed',
           }),
+        try: finishConnected,
       }),
     );
-    if (authRequestId !== quickConnectRequestId) return;
+    if (authRequestId !== quickConnectRequestId) {
+      return;
+    }
     if (Exit.isFailure(completion)) {
       quickConnectRequestId += 1;
       setSubmitting(false);
@@ -228,7 +215,9 @@ export default function LoginPage(props: LoginPageProps) {
     const start = await Effect.runPromiseExit(
       runTauriCommand(() => commands.jellyfinQuickConnectStart(serverUrlValue)),
     );
-    if (requestId !== quickConnectRequestId) return;
+    if (requestId !== quickConnectRequestId) {
+      return;
+    }
     setSubmitting(false);
 
     if (Exit.isFailure(start)) {
@@ -246,14 +235,14 @@ export default function LoginPage(props: LoginPageProps) {
     }, 5000);
     timeoutHandle = setTimeout(
       () => {
-        if (requestId !== quickConnectRequestId) return;
+        if (requestId !== quickConnectRequestId) {
+          return;
+        }
         quickConnectRequestId += 1;
         quickConnectPollingRequestId = null;
         stopQuickConnectPolling();
         setQuickConnectState('failed');
-        setError(
-          'Quick Connect code expired. Request a new code to try again.',
-        );
+        setError('Quick Connect code expired. Request a new code to try again.');
       },
       5 * 60 * 1000,
     );
@@ -273,9 +262,9 @@ export default function LoginPage(props: LoginPageProps) {
 
     const finalServerUrl = validation.result.url;
     const credentials: Credentials = {
+      password: value.password,
       serverUrl: finalServerUrl,
       username: value.username,
-      password: value.password,
     };
 
     setSubmitting(true);
@@ -286,17 +275,15 @@ export default function LoginPage(props: LoginPageProps) {
     if (Exit.isSuccess(exit)) {
       const completion = await Effect.runPromiseExit(
         Effect.tryPromise({
+          catch: (error) =>
+            new CommandError({
+              message: error instanceof Error ? error.message : 'Connection failed',
+            }),
           try: async () => {
-            if (value.rememberMe)
-              Effect.runSync(saveCredentials(finalServerUrl, value.username));
+            if (value.rememberMe) Effect.runSync(saveCredentials(finalServerUrl, value.username));
             else Effect.runSync(clearSavedCredentials());
             await finishConnected();
           },
-          catch: (error) =>
-            new CommandError({
-              message:
-                error instanceof Error ? error.message : 'Connection failed',
-            }),
         }),
       );
 
@@ -317,16 +304,20 @@ export default function LoginPage(props: LoginPageProps) {
 
   onMount(() => {
     const exit = Effect.runSyncExit(loadSavedCredentials());
-    if (!Exit.isSuccess(exit)) return;
+    if (!Exit.isSuccess(exit)) {
+      return;
+    }
     const saved = exit.value;
-    if (!saved) return;
+    if (!saved) {
+      return;
+    }
     const parsed = parseServerUrl(saved.serverUrl);
     form.reset({
-      scheme: parsed.scheme,
       host: parsed.host,
-      username: saved.username,
       password: '',
       rememberMe: saved.rememberMe,
+      scheme: parsed.scheme,
+      username: saved.username,
     });
   });
 
@@ -337,44 +328,41 @@ export default function LoginPage(props: LoginPageProps) {
   });
 
   return (
-    <div class="console-shell flex items-center justify-center py-10 relative overflow-y-auto">
-      <main class="w-full max-w-3xl relative z-10">
-        <div class="mb-8 text-center relative">
+    <div class="console-shell relative flex items-center justify-center overflow-y-auto py-10">
+      <main class="relative z-10 w-full max-w-3xl">
+        <div class="relative mb-8 text-center">
           {/* Glowing HUD hologram decoration */}
-          <div class="relative mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full border border-primary/20 bg-primary/5 shadow-brand-glow">
-            <div class="absolute inset-0 rounded-full border border-primary/30 animate-ping opacity-25" />
-            <div class="absolute inset-2 rounded-full border border-secondary/25 animate-pulse" />
-            <div class="absolute inset-4 rounded-full border border-dashed border-primary/10 animate-[spin_60s_linear_infinite]" />
-            <RadioTower class="h-10 w-10 text-primary drop-shadow-brand-glow" />
+          <div class="border-primary/20 bg-primary/5 shadow-brand-glow relative mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full border">
+            <div class="border-primary/30 absolute inset-0 animate-ping rounded-full border opacity-25" />
+            <div class="border-secondary/25 absolute inset-2 animate-pulse rounded-full border" />
+            <div class="border-primary/10 absolute inset-4 animate-[spin_60s_linear_infinite] rounded-full border border-dashed" />
+            <RadioTower class="text-primary drop-shadow-brand-glow h-10 w-10" />
           </div>
 
-          <div class="inline-flex items-center gap-2.5 px-3.5 py-1 rounded-full border border-secondary/20 bg-secondary/5 mb-3.5">
-            <span class="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse shadow-[0_0_8px_#818cf8]" />
-            <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-secondary">
+          <div class="border-secondary/20 bg-secondary/5 mb-3.5 inline-flex items-center gap-2.5 rounded-full border px-3.5 py-1">
+            <span class="bg-secondary h-1.5 w-1.5 animate-pulse rounded-full shadow-[0_0_8px_#818cf8]" />
+            <p class="text-secondary text-[10px] font-bold tracking-[0.18em] uppercase">
               Docking Sequence
             </p>
           </div>
 
           <h1 class="brand-type text-display-medium text-on-surface">JMSR</h1>
-          <p class="mt-2 text-body-large text-on-surface-variant max-w-md mx-auto">
+          <p class="text-body-large text-on-surface-variant mx-auto mt-2 max-w-md">
             Connect this Playback Target to a known Jellyfin server.
           </p>
         </div>
 
-        <Card
-          variant="elevated"
-          class="mx-auto shadow-2xl relative overflow-hidden"
-        >
-          <div class="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-primary/55 to-transparent" />
+        <Card variant="elevated" class="relative mx-auto overflow-hidden shadow-2xl">
+          <div class="via-primary/55 absolute top-0 left-0 h-[2px] w-full bg-gradient-to-r from-transparent to-transparent" />
           <div class="space-y-7">
             <div>
               <h2 class="text-headline-small text-on-surface flex items-center gap-2.5">
-                <span class="w-1.5 h-5 rounded bg-primary" />
+                <span class="bg-primary h-5 w-1.5 rounded" />
                 Server coordinates
               </h2>
-              <p class="mt-1.5 text-body-medium text-on-surface-variant">
-                Choose the protocol and host. JMSR shows the final Server URL
-                before any Login Method starts.
+              <p class="text-body-medium text-on-surface-variant mt-1.5">
+                Choose the protocol and host. JMSR shows the final Server URL before any Login
+                Method starts.
               </p>
             </div>
 
@@ -382,12 +370,12 @@ export default function LoginPage(props: LoginPageProps) {
               <form.Field name="scheme">
                 {(field) => (
                   <fieldset
-                    class="grid grid-cols-2 rounded-2xl border border-outline-variant bg-surface-container-high/40 p-1"
+                    class="border-outline-variant bg-surface-container-high/40 grid grid-cols-2 rounded-2xl border p-1"
                     aria-label="Server protocol"
                   >
                     <button
                       type="button"
-                      class={`rounded-xl px-4 py-3 text-label-large cursor-pointer transition-all duration-300 ${field().state.value === 'https' ? 'bg-primary bg-brand-gradient text-on-primary shadow-md shadow-primary/20 font-bold' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest/40'}`}
+                      class={`text-label-large cursor-pointer rounded-xl px-4 py-3 transition-all duration-300 ${field().state.value === 'https' ? 'bg-primary bg-brand-gradient text-on-primary shadow-primary/20 font-bold shadow-md' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest/40'}`}
                       disabled={isQuickConnectWaiting()}
                       onClick={() => field().handleChange('https')}
                     >
@@ -395,7 +383,7 @@ export default function LoginPage(props: LoginPageProps) {
                     </button>
                     <button
                       type="button"
-                      class={`rounded-xl px-4 py-3 text-label-large cursor-pointer transition-all duration-300 ${field().state.value === 'http' ? 'bg-primary bg-brand-gradient text-on-primary shadow-md shadow-primary/20 font-bold' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest/40'}`}
+                      class={`text-label-large cursor-pointer rounded-xl px-4 py-3 transition-all duration-300 ${field().state.value === 'http' ? 'bg-primary bg-brand-gradient text-on-primary shadow-primary/20 font-bold shadow-md' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest/40'}`}
                       disabled={isQuickConnectWaiting()}
                       onClick={() => field().handleChange('http')}
                     >
@@ -406,25 +394,17 @@ export default function LoginPage(props: LoginPageProps) {
               </form.Field>
               <form.Field name="host">
                 {(field) => (
-                  <ArkField.Root
-                    class="block"
-                    disabled={isQuickConnectWaiting()}
-                  >
-                    <ArkField.Label class="sr-only">
-                      Jellyfin host
-                    </ArkField.Label>
+                  <ArkField.Root class="block" disabled={isQuickConnectWaiting()}>
+                    <ArkField.Label class="sr-only">Jellyfin host</ArkField.Label>
                     <ArkField.Input
                       type="text"
                       value={field().state.value}
                       onInput={(event) => {
-                        const value = event.currentTarget.value;
+                        const { value } = event.currentTarget;
                         const explicitScheme = explicitSchemeFromInput(value);
                         const strippedHost = stripServerScheme(value);
                         field().handleChange(strippedHost);
-                        form.setFieldValue(
-                          'scheme',
-                          explicitScheme ?? defaultSchemeForHost(value),
-                        );
+                        form.setFieldValue('scheme', explicitScheme ?? defaultSchemeForHost(value));
                       }}
                       class="input-filled w-full"
                       placeholder="jellyfin.local or media.example.com/jellyfin"
@@ -434,13 +414,13 @@ export default function LoginPage(props: LoginPageProps) {
               </form.Field>
             </div>
 
-            <div class="rounded-2xl border border-outline-variant bg-surface-container-lowest/40 p-4 relative overflow-hidden backdrop-blur-sm">
-              <div class="absolute inset-y-0 left-0 w-[3px] bg-secondary" />
-              <p class="text-label-small uppercase text-on-surface-variant/90">
+            <div class="border-outline-variant bg-surface-container-lowest/40 relative overflow-hidden rounded-2xl border p-4 backdrop-blur-sm">
+              <div class="bg-secondary absolute inset-y-0 left-0 w-[3px]" />
+              <p class="text-label-small text-on-surface-variant/90 uppercase">
                 Server URL preview
               </p>
               <p
-                class={`mt-1 break-all font-mono text-body-medium ${serverUrl() ? 'text-secondary font-semibold drop-shadow-[0_0_8px_rgba(129,140,248,0.15)]' : 'text-warning'}`}
+                class={`text-body-medium mt-1 font-mono break-all ${serverUrl() ? 'text-secondary font-semibold drop-shadow-[0_0_8px_rgba(129,140,248,0.15)]' : 'text-warning'}`}
               >
                 {serverUrl() || 'Enter a server host to preview the final URL'}
               </p>
@@ -453,75 +433,77 @@ export default function LoginPage(props: LoginPageProps) {
               unmountOnExit
               onValueChange={(details) => {
                 const value = details.value as LoginMethod;
-                if (value !== 'quickConnect' && value !== 'password') return;
+                if (value !== 'quickConnect' && value !== 'password') {
+                  return;
+                }
                 resetQuickConnect();
                 setLoginMethod(value);
               }}
             >
               <Tabs.List
-                class="grid grid-cols-2 rounded-2xl border border-outline-variant bg-surface-container-high/40 p-1 mb-6"
+                class="border-outline-variant bg-surface-container-high/40 mb-6 grid grid-cols-2 rounded-2xl border p-1"
                 aria-label="Login Method"
               >
                 <Tabs.Trigger
                   value="quickConnect"
                   disabled={isQuickConnectWaiting()}
-                  class={`rounded-xl px-4 py-3 text-label-large cursor-pointer transition-all duration-300 ${loginMethod() === 'quickConnect' ? 'bg-brand-gradient text-on-primary shadow-lg shadow-primary/25 font-bold' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest/40'}`}
+                  class={`text-label-large cursor-pointer rounded-xl px-4 py-3 transition-all duration-300 ${loginMethod() === 'quickConnect' ? 'bg-brand-gradient text-on-primary shadow-primary/25 font-bold shadow-lg' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest/40'}`}
                 >
                   Quick Connect
                 </Tabs.Trigger>
                 <Tabs.Trigger
                   value="password"
                   disabled={isQuickConnectWaiting()}
-                  class={`rounded-xl px-4 py-3 text-label-large cursor-pointer transition-all duration-300 ${loginMethod() === 'password' ? 'bg-brand-gradient text-on-primary shadow-lg shadow-primary/25 font-bold' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest/40'}`}
+                  class={`text-label-large cursor-pointer rounded-xl px-4 py-3 transition-all duration-300 ${loginMethod() === 'password' ? 'bg-brand-gradient text-on-primary shadow-primary/25 font-bold shadow-lg' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest/40'}`}
                 >
                   Password
                 </Tabs.Trigger>
               </Tabs.List>
 
               <Tabs.Content value="quickConnect">
-                <div class="rounded-3xl border border-secondary/25 bg-secondary-container/20 p-6 text-center backdrop-blur-sm relative overflow-hidden transition-all duration-300">
-                  <div class="absolute inset-0 bg-gradient-to-b from-secondary/5 to-transparent pointer-events-none" />
+                <div class="border-secondary/25 bg-secondary-container/20 relative overflow-hidden rounded-3xl border p-6 text-center backdrop-blur-sm transition-all duration-300">
+                  <div class="from-secondary/5 pointer-events-none absolute inset-0 bg-gradient-to-b to-transparent" />
 
                   {/* Decorative radar background */}
-                  <div class="relative mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full border border-secondary/20 bg-secondary/5">
+                  <div class="border-secondary/20 bg-secondary/5 relative mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full border">
                     <Show when={isQuickConnectWaiting()}>
-                      <div class="absolute inset-0 rounded-full border border-secondary/40 animate-radar-ring" />
+                      <div class="border-secondary/40 animate-radar-ring absolute inset-0 rounded-full border" />
                       <div
-                        class="absolute inset-0 rounded-full border border-secondary/30 animate-radar-ring"
+                        class="border-secondary/30 animate-radar-ring absolute inset-0 rounded-full border"
                         style="animation-delay: 0.7s"
                       />
                       <div
-                        class="absolute inset-0 rounded-full border border-secondary/20 animate-radar-ring"
+                        class="border-secondary/20 animate-radar-ring absolute inset-0 rounded-full border"
                         style="animation-delay: 1.4s"
                       />
                     </Show>
                     <RadioTower
-                      class={`h-9 w-9 text-secondary ${isQuickConnectWaiting() ? 'animate-pulse' : ''} drop-shadow-[0_0_8px_rgba(129,140,248,0.4)]`}
+                      class={`text-secondary h-9 w-9 ${isQuickConnectWaiting() ? 'animate-pulse' : ''} drop-shadow-[0_0_8px_rgba(129,140,248,0.4)]`}
                     />
                   </div>
 
                   <p class="text-body-medium text-on-secondary-container font-medium">
-                    Approve this code from another signed-in Jellyfin client.
-                    JMSR will finish login automatically after approval.
+                    Approve this code from another signed-in Jellyfin client. JMSR will finish login
+                    automatically after approval.
                   </p>
-                  <p class="mt-2 text-body-small text-on-surface-variant/80">
+                  <p class="text-body-small text-on-surface-variant/80 mt-2">
                     You are authorizing this Playback Target.
                   </p>
 
                   <Show when={quickConnectCode()}>
-                    <div class="mt-6 inline-flex flex-col items-center justify-center px-6 py-3.5 rounded-2xl bg-surface-container-lowest/80 border border-outline-variant shadow-inner">
-                      <span class="text-[10px] uppercase tracking-[0.2em] text-on-surface-variant/80 mb-1 font-bold">
+                    <div class="bg-surface-container-lowest/80 border-outline-variant mt-6 inline-flex flex-col items-center justify-center rounded-2xl border px-6 py-3.5 shadow-inner">
+                      <span class="text-on-surface-variant/80 mb-1 text-[10px] font-bold tracking-[0.2em] uppercase">
                         Verification Code
                       </span>
-                      <p class="font-mono text-display-small tracking-[0.25em] text-secondary drop-shadow-[0_0_10px_rgba(129,140,248,0.55)] pl-[0.25em]">
+                      <p class="text-display-small text-secondary pl-[0.25em] font-mono tracking-[0.25em] drop-shadow-[0_0_10px_rgba(129,140,248,0.55)]">
                         {quickConnectCode()}
                       </p>
                     </div>
                   </Show>
 
                   <Show when={isQuickConnectWaiting()}>
-                    <div class="mt-5 flex items-center justify-center gap-2 text-label-medium text-secondary animate-pulse">
-                      <span class="w-2 h-2 rounded-full bg-secondary shadow-[0_0_8px_#818cf8]" />
+                    <div class="text-label-medium text-secondary mt-5 flex animate-pulse items-center justify-center gap-2">
+                      <span class="bg-secondary h-2 w-2 rounded-full shadow-[0_0_8px_#818cf8]" />
                       Awaiting Quick Connect Approval…
                     </div>
                   </Show>
@@ -533,15 +515,13 @@ export default function LoginPage(props: LoginPageProps) {
                   <form.Field name="username">
                     {(field) => (
                       <ArkField.Root class="block">
-                        <ArkField.Label class="mb-1.5 block text-label-medium">
+                        <ArkField.Label class="text-label-medium mb-1.5 block">
                           Username
                         </ArkField.Label>
                         <ArkField.Input
                           class="input-filled w-full"
                           value={field().state.value}
-                          onInput={(event) =>
-                            field().handleChange(event.currentTarget.value)
-                          }
+                          onInput={(event) => field().handleChange(event.currentTarget.value)}
                           placeholder="Jellyfin username"
                         />
                       </ArkField.Root>
@@ -550,16 +530,14 @@ export default function LoginPage(props: LoginPageProps) {
                   <form.Field name="password">
                     {(field) => (
                       <ArkField.Root class="block">
-                        <ArkField.Label class="mb-1.5 block text-label-medium">
+                        <ArkField.Label class="text-label-medium mb-1.5 block">
                           Password
                         </ArkField.Label>
                         <ArkField.Input
                           type="password"
                           class="input-filled w-full"
                           value={field().state.value}
-                          onInput={(event) =>
-                            field().handleChange(event.currentTarget.value)
-                          }
+                          onInput={(event) => field().handleChange(event.currentTarget.value)}
                           placeholder="Jellyfin password"
                         />
                       </ArkField.Root>
@@ -579,7 +557,7 @@ export default function LoginPage(props: LoginPageProps) {
                             <Check class="h-3.5 w-3.5" stroke-width={4} />
                           </Checkbox.Indicator>
                         </Checkbox.Control>
-                        <Checkbox.Label class="cursor-pointer font-medium hover:text-on-surface-variant transition-colors select-none">
+                        <Checkbox.Label class="hover:text-on-surface-variant cursor-pointer font-medium transition-colors select-none">
                           Remember Server URL and username
                         </Checkbox.Label>
                         <Checkbox.HiddenInput />
@@ -592,26 +570,19 @@ export default function LoginPage(props: LoginPageProps) {
 
             <Show when={error()}>
               <div
-                class="flex items-start gap-3 rounded-2xl bg-error-container/20 border border-error/30 p-4 text-on-error-container"
+                class="bg-error-container/20 border-error/30 text-on-error-container flex items-start gap-3 rounded-2xl border p-4"
                 role="alert"
               >
-                <CircleAlert class="mt-0.5 h-5 w-5 text-error shrink-0" />
+                <CircleAlert class="text-error mt-0.5 h-5 w-5 shrink-0" />
                 <div>
-                  <p class="text-title-small text-error font-bold">
-                    Connection needs attention
-                  </p>
+                  <p class="text-title-small text-error font-bold">Connection needs attention</p>
                   <p class="text-body-medium mt-0.5">{error()}</p>
                 </div>
               </div>
             </Show>
 
             {isQuickConnectWaiting() ? (
-              <Button
-                type="button"
-                variant="secondary"
-                class="w-full"
-                onClick={resetQuickConnect}
-              >
+              <Button type="button" variant="secondary" class="w-full" onClick={resetQuickConnect}>
                 Cancel Request
               </Button>
             ) : (

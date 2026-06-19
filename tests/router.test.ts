@@ -1,5 +1,7 @@
 import { afterEach, expect, rstest, test } from '@rstest/core';
-import { commands, type SavedSession } from '../src/bindings';
+
+import { commands } from '../src/bindings';
+import type { SavedSession } from '../src/bindings';
 import {
   redirectLegacyConsoleRoute,
   redirectLoggedInUsersToLibrary,
@@ -9,18 +11,15 @@ import {
 import { saveSession } from '../src/sessionAccess';
 
 const sampleSession: SavedSession = {
-  serverUrl: 'https://jellyfin.example.com',
   accessToken: 'token-1',
+  deviceId: 'device-1',
+  serverName: 'Jellyfin Home',
+  serverUrl: 'https://jellyfin.example.com',
   userId: 'user-1',
   userName: 'Ada',
-  serverName: 'Jellyfin Home',
-  deviceId: 'device-1',
 };
 
-async function expectRedirect(
-  action: () => Promise<void>,
-  expectedRoute: string,
-) {
+async function expectRedirect(action: () => Promise<void>, expectedRoute: string) {
   try {
     await action();
     throw new Error('Expected redirect');
@@ -43,8 +42,8 @@ test('login guard redirects authenticated users to Library', async () => {
 test('root guard restores a Saved Session into Library', async () => {
   rstest.spyOn(commands, 'jellyfinIsConnected').mockResolvedValue(false);
   rstest.spyOn(commands, 'jellyfinRestoreSession').mockResolvedValue({
-    status: 'ok',
     data: null,
+    status: 'ok',
   });
   saveSession(sampleSession);
 

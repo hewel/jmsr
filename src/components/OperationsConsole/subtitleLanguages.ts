@@ -17,15 +17,15 @@ export function parseSubtitleLanguageInput(value: string) {
     .filter((language) => language.length > 0);
 }
 
-export function normalizePreferredSubtitleLanguages(
-  languages: string[] | null | undefined,
-) {
+export function normalizePreferredSubtitleLanguages(languages: string[] | null | undefined) {
   const normalized: string[] = [];
   const seen = new Set<string>();
 
   for (const language of languages ?? []) {
     const [code] = parseSubtitleLanguageInput(language);
-    if (!code || seen.has(code)) continue;
+    if (!code || seen.has(code)) {
+      continue;
+    }
     seen.add(code);
     normalized.push(code);
   }
@@ -34,8 +34,5 @@ export function normalizePreferredSubtitleLanguages(
 }
 
 export function getSubtitleLanguageLabel(code: string) {
-  return (
-    COMMON_SUBTITLE_LANGUAGE_OPTIONS.find((option) => option.code === code)
-      ?.label ?? 'Custom'
-  );
+  return COMMON_SUBTITLE_LANGUAGE_OPTIONS.find((option) => option.code === code)?.label ?? 'Custom';
 }

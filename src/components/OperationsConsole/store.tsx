@@ -1,16 +1,18 @@
 import type { JSX } from 'solid-js';
 import { createContext, useContext } from 'solid-js';
-import { createStore, type SetStoreFunction } from 'solid-js/store';
+import { createStore } from 'solid-js/store';
+import type { SetStoreFunction } from 'solid-js/store';
+
 import type { IntroSkipperMode } from '../../bindings';
 
 // ---------------------------------------------------------------------------
 // State types
 // ---------------------------------------------------------------------------
 
-export type PlayerBridgeSaveStatus = {
+export interface PlayerBridgeSaveStatus {
   type: 'saving' | 'saved' | 'error';
   text: string;
-};
+}
 
 export interface OperationsConsoleState {
   disconnecting: boolean;
@@ -78,58 +80,38 @@ const OperationsConsoleContext = createContext<StoreValue>();
 export function useOperationsConsoleStore(): StoreValue {
   const ctx = useContext(OperationsConsoleContext);
   if (!ctx) {
-    throw new Error(
-      'useOperationsConsoleStore must be used within OperationsConsoleProvider',
-    );
+    throw new Error('useOperationsConsoleStore must be used within OperationsConsoleProvider');
   }
   return ctx;
 }
 
 // ---------------------------------------------------------------------------
 // Store factory — MUST return a fresh object each call because solid-js/store
-// mutates the initial state object in-place via its reactive proxy.
+// Mutates the initial state object in-place via its reactive proxy.
 // ---------------------------------------------------------------------------
 
 export function getInitialState(): OperationsConsoleState {
   return {
-    disconnecting: false,
-    reconnecting: false,
-    signingOut: false,
+    advancedOpen: false,
     confirmSignOut: false,
     detectingMpv: false,
-    advancedOpen: false,
     diagnosticsExpanded: false,
-    playerBridgeSaveStatus: null,
+    disconnecting: false,
     introSkipperDraft: null,
-    introSkipperSaving: false,
     introSkipperError: null,
+    introSkipperSaving: false,
+    playerBridgeSaveStatus: null,
+    reconnecting: false,
     selectedSubtitleLanguages: [],
+    signingOut: false,
     subtitleLanguageInput: '',
   };
 }
 
-function createActions(
-  set: SetStoreFunction<OperationsConsoleState>,
-): OperationsConsoleActions {
+function createActions(set: SetStoreFunction<OperationsConsoleState>): OperationsConsoleActions {
   return {
-    hydrateFromConfig(config) {
-      set('selectedSubtitleLanguages', config.preferredSubtitleLanguages ?? []);
-      if (config.mpvArgs && config.mpvArgs.length > 0) {
-        set('advancedOpen', true);
-      }
-    },
-
-    showPlayerBridgeStatus(status) {
-      set('playerBridgeSaveStatus', status);
-    },
-    clearPlayerBridgeStatus() {
-      set('playerBridgeSaveStatus', null);
-    },
-    setAdvancedOpen(open) {
-      set('advancedOpen', open);
-    },
-    toggleDiagnostics() {
-      set('diagnosticsExpanded', (prev) => !prev);
+    beginDisconnect() {
+      set('disconnecting', true);
     },
 
     beginIntroSkipperSave(mode) {
@@ -137,53 +119,80 @@ function createActions(
       set('introSkipperSaving', true);
       set('introSkipperError', null);
     },
-    finishIntroSkipperSave() {
-      set('introSkipperDraft', null);
-      set('introSkipperSaving', false);
+
+    beginMpvDetection() {
+      set('detectingMpv', true);
     },
+
+    beginReconnect() {
+      set('reconnecting', true);
+    },
+
+    beginSignOut() {
+      set('signingOut', true);
+    },
+
+    clearPlayerBridgeStatus() {
+      set('playerBridgeSaveStatus', null);
+    },
+
     failIntroSkipperSave(previous, message) {
       set('introSkipperDraft', previous);
       set('introSkipperSaving', false);
       set('introSkipperError', message);
     },
 
-    setPreferredSubtitleLanguages(languages) {
-      set('selectedSubtitleLanguages', languages);
-    },
-    setSubtitleLanguageInput(value) {
-      set('subtitleLanguageInput', value);
-    },
-
-    beginReconnect() {
-      set('reconnecting', true);
-    },
-    finishReconnect() {
-      set('reconnecting', false);
-    },
-
-    beginDisconnect() {
-      set('disconnecting', true);
-    },
     finishDisconnect() {
       set('disconnecting', false);
     },
 
-    beginSignOut() {
-      set('signingOut', true);
+    finishIntroSkipperSave() {
+      set('introSkipperDraft', null);
+      set('introSkipperSaving', false);
     },
+
+    finishMpvDetection() {
+      set('detectingMpv', false);
+    },
+
+    finishReconnect() {
+      set('reconnecting', false);
+    },
+
     finishSignOut() {
       set('signingOut', false);
       set('confirmSignOut', false);
     },
+
+    hydrateFromConfig(config) {
+      set('selectedSubtitleLanguages', config.preferredSubtitleLanguages ?? []);
+      if (config.mpvArgs && config.mpvArgs.length > 0) {
+        set('advancedOpen', true);
+      }
+    },
+
+    setAdvancedOpen(open) {
+      set('advancedOpen', open);
+    },
+
+    setPreferredSubtitleLanguages(languages) {
+      set('selectedSubtitleLanguages', languages);
+    },
+
     setSignOutDialogOpen(open) {
       set('confirmSignOut', open);
     },
 
-    beginMpvDetection() {
-      set('detectingMpv', true);
+    setSubtitleLanguageInput(value) {
+      set('subtitleLanguageInput', value);
     },
-    finishMpvDetection() {
-      set('detectingMpv', false);
+
+    showPlayerBridgeStatus(status) {
+      set('playerBridgeSaveStatus', status);
+    },
+
+    toggleDiagnostics() {
+      set('diagnosticsExpanded', (prev) => !prev);
     },
   };
 }
@@ -193,9 +202,7 @@ export function createOperationsConsoleStore(): {
   actions: OperationsConsoleActions;
   Provider: (props: { children: JSX.Element }) => JSX.Element;
 } {
-  const [state, setState] = createStore<OperationsConsoleState>(
-    getInitialState(),
-  );
+  const [state, setState] = createStore<OperationsConsoleState>(getInitialState());
   const actions = createActions(setState);
 
   const Provider = (props: { children: JSX.Element }) => {
@@ -207,5 +214,5 @@ export function createOperationsConsoleStore(): {
     );
   };
 
-  return { state, actions, Provider };
+  return { Provider, actions, state };
 }

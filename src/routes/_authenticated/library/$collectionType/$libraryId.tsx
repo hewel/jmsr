@@ -1,50 +1,41 @@
 import { Checkbox } from '@ark-ui/solid/checkbox';
-import type {
-  VideoLibraryKind,
-  VideoLibraryPlayedFilter,
-  VideoLibrarySort,
-} from '@bindings';
+import type { VideoLibraryKind, VideoLibraryPlayedFilter, VideoLibrarySort } from '@bindings';
 import {
   LibraryStatusPanel,
-  libraryTitle,
   MediaInfoHoverCard,
+  VideoLibraryCard,
+  libraryTitle,
   playedFilterLabel,
   sortItems,
-  VideoLibraryCard,
 } from '@components/library/shared';
 import { Button, JmsrSelect } from '@components/ui';
 import { createFileRoute } from '@tanstack/solid-router';
 import { Exit } from 'effect';
 import { Check, Library, RefreshCw } from 'lucide-solid';
-import { createSignal, For, onMount, Show } from 'solid-js';
+import { For, Show, createSignal, onMount } from 'solid-js';
 import { commandFailureMessage } from '~effects/commands';
-import {
-  fetchVideoLibraryPage,
-  type LibraryBrowseState,
-  type LibraryExit,
-} from '~effects/library';
+import { fetchVideoLibraryPage } from '~effects/library';
+import type { LibraryBrowseState, LibraryExit } from '~effects/library';
 
-export const Route = createFileRoute(
-  '/_authenticated/library/$collectionType/$libraryId',
-)({
+export const Route = createFileRoute('/_authenticated/library/$collectionType/$libraryId')({
   component: LibraryBrowseRoute,
 });
 
 function LibraryBrowseRoute() {
   const params = Route.useParams();
-  const [state, setState] =
-    createSignal<LibraryExit<LibraryBrowseState> | null>(null);
+  const [state, setState] = createSignal<LibraryExit<LibraryBrowseState> | null>(null);
   const [loading, setLoading] = createSignal(false);
   const [sort, setSort] = createSignal<VideoLibrarySort>('title');
-  const [playedFilter, setPlayedFilter] =
-    createSignal<VideoLibraryPlayedFilter>('all');
+  const [playedFilter, setPlayedFilter] = createSignal<VideoLibraryPlayedFilter>('all');
   const [favoritesOnly, setFavoritesOnly] = createSignal(false);
 
   const collectionType: VideoLibraryKind =
     params().collectionType === 'tvshows' ? 'tvshows' : 'movies';
 
   const loadPage = async (startIndex: number, replace = false) => {
-    if (loading()) return;
+    if (loading()) {
+      return;
+    }
     setLoading(true);
     const result = await fetchVideoLibraryPage(
       collectionType,
@@ -55,15 +46,10 @@ function LibraryBrowseRoute() {
       favoritesOnly(),
     );
     setState((current) => {
-      if (
-        !replace &&
-        current &&
-        Exit.isSuccess(current) &&
-        Exit.isSuccess(result)
-      ) {
+      if (!replace && current && Exit.isSuccess(current) && Exit.isSuccess(result)) {
         return Exit.succeed({
-          page: result.value.page,
           items: [...current.value.items, ...result.value.items],
+          page: result.value.page,
         });
       }
       return result;
@@ -85,27 +71,24 @@ function LibraryBrowseRoute() {
   };
   const statusTitle = () => {
     const current = state();
-    if (!current) return `Loading ${libraryTitle(collectionType)}`;
+    if (!current) {
+      return `Loading ${libraryTitle(collectionType)}`;
+    }
     if (Exit.isSuccess(current) && current.value.items.length === 0) {
       return `${libraryTitle(collectionType)} has no results`;
     }
-    if (!Exit.isSuccess(current)) return 'Could not load Library page';
+    if (!Exit.isSuccess(current)) {
+      return 'Could not load Library page';
+    }
     return `Loading ${libraryTitle(collectionType)}`;
   };
   const statusDescription = () => {
     const current = state();
-    if (
-      current &&
-      Exit.isSuccess(current) &&
-      current.value.items.length === 0
-    ) {
+    if (current && Exit.isSuccess(current) && current.value.items.length === 0) {
       return 'Jellyfin returned an empty server page for this video library.';
     }
     if (current && !Exit.isSuccess(current)) {
-      return commandFailureMessage(
-        current.cause,
-        'Could not load Library page',
-      );
+      return commandFailureMessage(current.cause, 'Could not load Library page');
     }
     return 'JMSR is loading a server-paged video library result set.';
   };
@@ -116,19 +99,17 @@ function LibraryBrowseRoute() {
 
   return (
     <div class="space-y-6">
-      <header class="flex flex-col gap-4 rounded-2xl border border-outline-variant bg-surface-container-low/60 p-3 shadow-xl backdrop-blur-md lg:p-4">
+      <header class="border-outline-variant bg-surface-container-low/60 flex flex-col gap-4 rounded-2xl border p-3 shadow-xl backdrop-blur-md lg:p-4">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div class="flex items-center gap-3">
-            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary-container/30 text-primary">
+            <div class="border-primary/20 bg-primary-container/30 text-primary flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border">
               <Library class="h-5 w-5" />
             </div>
             <div>
-              <h1 class="text-title-medium font-bold text-on-surface">
+              <h1 class="text-title-medium text-on-surface font-bold">
                 {libraryTitle(collectionType)}
               </h1>
-              <p class="text-[10px] font-semibold text-on-surface-variant/80">
-                Library Browser
-              </p>
+              <p class="text-on-surface-variant/80 text-[10px] font-semibold">Library Browser</p>
             </div>
           </div>
 
@@ -136,7 +117,7 @@ function LibraryBrowseRoute() {
             href="/library"
             variant="outlined"
             size="sm"
-            class="h-10 rounded-xl px-4 shrink-0"
+            class="h-10 shrink-0 rounded-xl px-4"
             leadingIcon={<Library class="h-4 w-4" />}
           >
             Video Home
@@ -163,15 +144,9 @@ function LibraryBrowseRoute() {
             />
 
             <fieldset class="min-w-0 space-y-2" aria-label="Played filter">
-              <legend class="text-label-medium text-on-surface-variant">
-                Status
-              </legend>
+              <legend class="text-label-medium text-on-surface-variant">Status</legend>
               <div class="flex flex-wrap gap-2">
-                <For
-                  each={
-                    ['all', 'played', 'unplayed'] as VideoLibraryPlayedFilter[]
-                  }
-                >
+                <For each={['all', 'played', 'unplayed'] as VideoLibraryPlayedFilter[]}>
                   {(filter) => (
                     <Button
                       type="button"
@@ -204,16 +179,14 @@ function LibraryBrowseRoute() {
               setFavoritesOnly(details.checked === true);
               reloadFromFirstPage();
             }}
-            class="ark-checkbox h-10 rounded-xl border border-outline-variant bg-surface-container-high/50 px-3 text-label-large text-on-surface transition-colors hover:border-secondary/40"
+            class="ark-checkbox border-outline-variant bg-surface-container-high/50 text-label-large text-on-surface hover:border-secondary/40 h-10 rounded-xl border px-3 transition-colors"
           >
             <Checkbox.Control class="ark-checkbox__control">
               <Checkbox.Indicator class="ark-checkbox__indicator">
                 <Check class="h-3.5 w-3.5" stroke-width={4} />
               </Checkbox.Indicator>
             </Checkbox.Control>
-            <Checkbox.Label class="cursor-pointer select-none">
-              Favorites Only
-            </Checkbox.Label>
+            <Checkbox.Label class="cursor-pointer select-none">Favorites Only</Checkbox.Label>
             <Checkbox.HiddenInput />
           </Checkbox.Root>
         </nav>
@@ -222,12 +195,7 @@ function LibraryBrowseRoute() {
       <div class="min-w-0">
         <Show
           when={readyState()}
-          fallback={
-            <LibraryStatusPanel
-              title={statusTitle()}
-              description={statusDescription()}
-            />
-          }
+          fallback={<LibraryStatusPanel title={statusTitle()} description={statusDescription()} />}
         >
           <section class="space-y-4" aria-labelledby="library-browse-title">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -235,18 +203,14 @@ function LibraryBrowseRoute() {
                 {libraryTitle(collectionType)}
               </h2>
               <p class="text-body-small">
-                {readyState()?.items.length ?? 0} of{' '}
-                {readyState()?.page.totalRecordCount ?? 0}
+                {readyState()?.items.length ?? 0} of {readyState()?.page.totalRecordCount ?? 0}
               </p>
             </div>
-            <div class="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 animate-fade-in">
+            <div class="animate-fade-in grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               <For each={readyState()?.items ?? []}>
                 {(item) => (
                   <MediaInfoHoverCard id={item.id} itemType={item.itemType}>
-                    <VideoLibraryCard
-                      item={item}
-                      collectionType={collectionType}
-                    />
+                    <VideoLibraryCard item={item} collectionType={collectionType} />
                   </MediaInfoHoverCard>
                 )}
               </For>
@@ -259,11 +223,7 @@ function LibraryBrowseRoute() {
                   class="rounded-full"
                   disabled={loading()}
                   onClick={() => void loadPage(loadMoreStartIndex())}
-                  leadingIcon={
-                    <RefreshCw
-                      class={`h-4 w-4 ${loading() ? 'animate-spin' : ''}`}
-                    />
-                  }
+                  leadingIcon={<RefreshCw class={`h-4 w-4 ${loading() ? 'animate-spin' : ''}`} />}
                 >
                   {loading() ? 'Loading more' : 'Load more'}
                 </Button>

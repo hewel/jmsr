@@ -23,8 +23,8 @@ export default defineConfig({
     rspack: {
       plugins: [
         tanstackRouter({
-          target: 'solid',
           autoCodeSplitting: false,
+          target: 'solid',
         }),
         new VanillaExtractPlugin(),
       ],

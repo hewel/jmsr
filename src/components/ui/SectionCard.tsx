@@ -13,9 +13,9 @@ interface SectionCardProps {
 export default function SectionCard(props: SectionCardProps) {
   return (
     <div class="card-filled relative">
-      <div class="absolute inset-0 bg-surface-tint/[0.03] rounded-[inherit] pointer-events-none" />
+      <div class="bg-surface-tint/[0.03] pointer-events-none absolute inset-0 rounded-[inherit]" />
       <div class="relative z-10">
-        <div class="flex items-center justify-between mb-6">
+        <div class="mb-6 flex items-center justify-between">
           <h2 class="text-title-medium text-primary flex items-center gap-3">
             {props.icon}
             {props.title}

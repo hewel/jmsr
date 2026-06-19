@@ -1,5 +1,6 @@
 import { Bot } from 'lucide-solid';
 import { For, Show } from 'solid-js';
+
 import type { IntroSkipperMode } from '../../bindings';
 import { SectionCard } from '../ui';
 import { INTRO_SKIPPER_MODES } from './introSkipperModes';
@@ -15,9 +16,7 @@ export default function IntroSkipCard(props: IntroSkipCardProps) {
 
   return (
     <SectionCard
-      icon={
-        <Bot class="h-5 w-5 text-secondary drop-shadow-[0_0_8px_rgba(129,140,248,0.4)]" />
-      }
+      icon={<Bot class="text-secondary h-5 w-5 drop-shadow-[0_0_8px_rgba(129,140,248,0.4)]" />}
       title="Intro Skip"
     >
       <div class="space-y-4">
@@ -26,7 +25,7 @@ export default function IntroSkipCard(props: IntroSkipCardProps) {
             {(option) => (
               <button
                 type="button"
-                class={`rounded-2xl border px-4 py-3 text-left cursor-pointer transition-all duration-300 backdrop-blur-sm ${
+                class={`cursor-pointer rounded-2xl border px-4 py-3 text-left backdrop-blur-sm transition-all duration-300 ${
                   props.currentMode === option.mode
                     ? 'border-primary bg-primary-container/35 text-on-primary-container shadow-brand-glow-lg font-semibold'
                     : 'border-outline-variant bg-surface-container-high/40 text-on-surface hover:border-primary/50 hover:bg-surface-container-high/60'
@@ -34,17 +33,15 @@ export default function IntroSkipCard(props: IntroSkipCardProps) {
                 aria-pressed={props.currentMode === option.mode}
                 onClick={() => props.onModeChange(option.mode)}
               >
-                <span class="block text-title-medium">{option.label}</span>
-                <span class="mt-1 block text-body-small opacity-80">
-                  {option.description}
-                </span>
+                <span class="text-title-medium block">{option.label}</span>
+                <span class="text-body-small mt-1 block opacity-80">{option.description}</span>
               </button>
             )}
           </For>
         </fieldset>
         <Show when={ui.introSkipperSaving}>
-          <p class="text-body-small text-secondary animate-pulse flex items-center gap-1.5 font-semibold">
-            <span class="w-1.5 h-1.5 rounded-full bg-secondary animate-ping" />
+          <p class="text-body-small text-secondary flex animate-pulse items-center gap-1.5 font-semibold">
+            <span class="bg-secondary h-1.5 w-1.5 animate-ping rounded-full" />
             Saving preference…
           </p>
         </Show>
@@ -53,7 +50,7 @@ export default function IntroSkipCard(props: IntroSkipCardProps) {
         </p>
         <Show when={ui.introSkipperError}>
           {(message) => (
-            <p class="rounded-2xl bg-error-container/20 border border-error/30 px-4 py-3 text-body-small text-on-error-container font-semibold">
+            <p class="bg-error-container/20 border-error/30 text-body-small text-on-error-container rounded-2xl border px-4 py-3 font-semibold">
               {message()}
             </p>
           )}

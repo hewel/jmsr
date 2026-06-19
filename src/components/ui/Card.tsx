@@ -17,19 +17,22 @@ export default function Card(props: CardProps) {
 
   const variantClasses = () => {
     switch (variant()) {
-      case 'elevated':
+      case 'elevated': {
         return 'card-elevated';
-      case 'outlined':
+      }
+      case 'outlined': {
         return 'card-outlined';
-      default:
+      }
+      default: {
         return 'card-filled';
+      }
     }
   };
 
   return (
     <div class={`${variantClasses()} relative ${props.class ?? ''}`}>
       {/* Subtle brand surface tint */}
-      <div class="absolute inset-0 bg-surface-tint/[0.03] rounded-[inherit] pointer-events-none" />
+      <div class="bg-surface-tint/[0.03] pointer-events-none absolute inset-0 rounded-[inherit]" />
       <div class="relative z-10">{props.children}</div>
     </div>
   );

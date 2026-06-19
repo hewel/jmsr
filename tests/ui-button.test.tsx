@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from '@rstest/core';
 import { fireEvent, screen } from '@testing-library/dom';
 import { render } from 'solid-js/web';
+
 import { Button } from '../src/components/ui';
 
 afterEach(() => {
@@ -92,10 +93,7 @@ test('Button renders as an a tag if href is provided', () => {
   const root = document.createElement('div');
   document.body.append(root);
 
-  const dispose = render(
-    () => <Button href="/test-path">Link Button</Button>,
-    root,
-  );
+  const dispose = render(() => <Button href="/test-path">Link Button</Button>, root);
 
   const link = screen.getByRole('link', { name: 'Link Button' });
   expect(link).toBeInTheDocument();

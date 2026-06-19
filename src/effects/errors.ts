@@ -1,4 +1,5 @@
 import { Data } from 'effect';
+
 import type { CommandErrorCode } from '../bindings';
 
 export class InvalidServerUrl extends Data.TaggedError('InvalidServerUrl')<{

@@ -1,9 +1,7 @@
 import { createFileRoute, useNavigate } from '@tanstack/solid-router';
+
 import LoginPage from '../components/LoginPage';
-import {
-  AUTHENTICATED_HOME_ROUTE,
-  redirectLoggedInUsersToLibrary,
-} from '../router-guards';
+import { AUTHENTICATED_HOME_ROUTE, redirectLoggedInUsersToLibrary } from '../router-guards';
 
 export const Route = createFileRoute('/login')({
   beforeLoad: redirectLoggedInUsersToLibrary,

@@ -15,11 +15,9 @@ Object.assign(window, {
 
 Object.assign(window, {
   __TAURI_EVENT_PLUGIN_INTERNALS__: {
-    unregisterListener: () => undefined,
+    unregisterListener: () => {},
   },
   __TAURI_INTERNALS__: {
-    transformCallback: () => 1,
-    unregisterCallback: () => undefined,
     invoke: async (cmd: string) => {
       if (cmd === 'plugin:app|version') {
         return 'test';
@@ -29,5 +27,7 @@ Object.assign(window, {
       }
       return null;
     },
+    transformCallback: () => 1,
+    unregisterCallback: () => undefined,
   },
 });

@@ -1,4 +1,5 @@
 import { redirect } from '@tanstack/solid-router';
+
 import { canAccessConsole, checkAuthWithRestore } from './sessionAccess';
 
 export const AUTHENTICATED_HOME_ROUTE = '/library';

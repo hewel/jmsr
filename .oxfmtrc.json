@@ -1,0 +1,16 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "singleQuote": true,
+  "tabWidth": 2,
+  "useTabs": false,
+  "sortImports": true,
+  "sortTailwindcss": true,
+  "sortPackageJson": false,
+  "ignorePatterns": [
+    "dist/**",
+    "node_modules/**",
+    "src/bindings.ts",
+    "src/routeTree.gen.ts",
+    "src-tauri/openapi/jellyfin-openapi-stable.json"
+  ]
+}

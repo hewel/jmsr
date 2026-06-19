@@ -1,11 +1,7 @@
 import { Effect } from 'effect';
-import {
-  hasExplicitPort,
-  isLocalServerHost,
-  type ServerUrlFields,
-  type ServerUrlResult,
-  stripServerScheme,
-} from '../serverUrl';
+
+import { hasExplicitPort, isLocalServerHost, stripServerScheme } from '../serverUrl';
+import type { ServerUrlFields, ServerUrlResult } from '../serverUrl';
 import { InvalidServerUrl } from './errors';
 
 export function buildServerUrlEffect(
@@ -14,18 +10,16 @@ export function buildServerUrlEffect(
   return Effect.gen(function* () {
     const rawHost = stripServerScheme(fields.host);
     if (!rawHost) {
-      return yield* Effect.fail(
-        new InvalidServerUrl({ message: 'Server host is required' }),
-      );
+      return yield* Effect.fail(new InvalidServerUrl({ message: 'Server host is required' }));
     }
 
     const candidate = `${fields.scheme}://${rawHost}`;
     const parsed = yield* Effect.try({
-      try: () => new URL(candidate),
       catch: () =>
         new InvalidServerUrl({
           message: 'Enter a valid Jellyfin server host',
         }),
+      try: () => new URL(candidate),
     });
 
     const isLocal = isLocalServerHost(parsed.host);
@@ -43,6 +37,6 @@ export function buildServerUrlEffect(
 
     const url = normalized.replace(/\/$/, parsed.pathname === '/' ? '' : '/');
 
-    return { url, isLocal };
+    return { isLocal, url };
   });
 }

@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/solid-router';
+
 import AuthenticatedShell from '../components/AuthenticatedShell';
 import { requireAuthenticatedShell } from '../router-guards';
 

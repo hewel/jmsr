@@ -11,18 +11,18 @@ export default defineConfig({
     }),
     pluginSolid(),
   ],
-  tools: {
-    rspack: {
-      plugins: [new VanillaExtractPlugin()],
-    },
-  },
-  testEnvironment: 'jsdom',
-  setupFiles: ['./rstest.setup.ts'],
   resolve: {
     alias: {
       'solid-js$': 'solid-js/dist/solid.js',
-      'solid-js/web': 'solid-js/web/dist/web.js',
       'solid-js/store': 'solid-js/store/dist/store.js',
+      'solid-js/web': 'solid-js/web/dist/web.js',
+    },
+  },
+  setupFiles: ['./rstest.setup.ts'],
+  testEnvironment: 'jsdom',
+  tools: {
+    rspack: {
+      plugins: [new VanillaExtractPlugin()],
     },
   },
 });

@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+
 import { expect, test } from '@rstest/core';
 
 const readText = (path: string) => readFileSync(path, 'utf8');
@@ -11,20 +12,14 @@ test('release workflow builds a source-based Arch package with desktop integrati
   expect(pkgbuild).toContain('pkgname=jmsr');
   expect(pkgbuild).toContain('pkgver=1.4.0');
   expect(pkgbuild).toContain("options=('!lto')");
-  expect(pkgbuild).toContain(
-    '"git+https://github.com/hewel/jmsr.git#tag=v$pkgver"',
-  );
+  expect(pkgbuild).toContain('"git+https://github.com/hewel/jmsr.git#tag=v$pkgver"');
   expect(pkgbuild).toContain("'top.pigfun.jmsr.desktop'");
   expect(pkgbuild).toContain("'SKIP'");
-  expect(pkgbuild).toContain(
-    "'fad7c84a15d92cefa357b4e2cf2c0877e0a97ae8da2114468d9f8c86a27bc98f'",
-  );
+  expect(pkgbuild).toContain("'fad7c84a15d92cefa357b4e2cf2c0877e0a97ae8da2114468d9f8c86a27bc98f'");
   expect(pkgbuild).toContain("'mpv'");
   expect(pkgbuild).toContain('bun tauri build --no-bundle --ci');
   expect(pkgbuild).toContain('install -Dm755 "src-tauri/target/release/jmsr"');
-  expect(pkgbuild).toContain(
-    'install -Dm644 "$srcdir/top.pigfun.jmsr.desktop"',
-  );
+  expect(pkgbuild).toContain('install -Dm644 "$srcdir/top.pigfun.jmsr.desktop"');
   expect(pkgbuild).not.toContain('install=');
 
   expect(desktopEntry).toContain('Name=JMSR');

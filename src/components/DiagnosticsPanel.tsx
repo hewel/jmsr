@@ -1,13 +1,7 @@
 import { Checkbox } from '@ark-ui/solid/checkbox';
 import { listen } from '@tauri-apps/api/event';
-import {
-  createEffect,
-  createSignal,
-  For,
-  onCleanup,
-  onMount,
-  Show,
-} from 'solid-js';
+import { For, Show, createEffect, createSignal, onCleanup, onMount } from 'solid-js';
+
 import { Button } from './ui';
 
 interface BackendLogEntry {
@@ -29,39 +23,34 @@ interface DiagnosticsPanelProps {
 
 const MAX_DIAGNOSTICS = 200;
 
-const LOG_LEVEL: Record<
-  number,
-  { name: string; color: string; badge: string }
-> = {
+const LOG_LEVEL: Record<number, { name: string; color: string; badge: string }> = {
   1: {
-    name: 'TRACE',
+    badge: 'bg-surface-container-highest border-outline-variant/40 text-outline',
     color: 'text-outline',
-    badge:
-      'bg-surface-container-highest border-outline-variant/40 text-outline',
+    name: 'TRACE',
   },
   2: {
-    name: 'DEBUG',
+    badge: 'bg-surface-container-highest border-outline/30 text-on-surface-variant',
     color: 'text-on-surface-variant',
-    badge:
-      'bg-surface-container-highest border-outline/30 text-on-surface-variant',
+    name: 'DEBUG',
   },
   3: {
-    name: 'INFO',
-    color: 'text-secondary',
     badge:
       'bg-secondary-container/30 border-secondary/30 text-secondary shadow-[0_0_6px_rgba(129,140,248,0.1)]',
+    color: 'text-secondary',
+    name: 'INFO',
   },
   4: {
-    name: 'WARN',
-    color: 'text-warning',
     badge:
       'bg-warning-container/30 border-warning/30 text-warning shadow-[0_0_6px_rgba(246,199,104,0.1)]',
+    color: 'text-warning',
+    name: 'WARN',
   },
   5: {
-    name: 'ERROR',
-    color: 'text-error',
     badge:
       'bg-error-container/30 border-error/30 text-error shadow-[0_0_6px_rgba(255,107,122,0.1)]',
+    color: 'text-error',
+    name: 'ERROR',
   },
 };
 
@@ -72,9 +61,9 @@ const BEARER_TOKEN = /(bearer\s+)[^\s]+/gi;
 function formatDiagnosticTime(date: Date) {
   return new Intl.DateTimeFormat(undefined, {
     hour: '2-digit',
+    hour12: false,
     minute: '2-digit',
     second: '2-digit',
-    hour12: false,
   }).format(date);
 }
 
@@ -86,32 +75,28 @@ function sanitizeDiagnosticMessage(message: string) {
 
 function toDiagnosticEntry(entry: BackendLogEntry): DiagnosticEntry {
   const level = LOG_LEVEL[entry.level] ?? {
-    name: 'UNKNOWN',
-    color: 'text-on-surface-variant',
     badge: 'bg-surface-container-highest text-on-surface-variant',
+    color: 'text-on-surface-variant',
+    name: 'UNKNOWN',
   };
 
   return {
-    levelName: level.name,
-    levelClass: level.color,
     badgeClass: level.badge,
+    levelClass: level.color,
+    levelName: level.name,
     message: sanitizeDiagnosticMessage(entry.message),
     time: formatDiagnosticTime(new Date()),
   };
 }
 
 function formatDiagnosticsForClipboard(entries: DiagnosticEntry[]) {
-  return entries
-    .map((entry) => `[${entry.time}] ${entry.levelName} ${entry.message}`)
-    .join('\n');
+  return entries.map((entry) => `[${entry.time}] ${entry.levelName} ${entry.message}`).join('\n');
 }
 
 export default function DiagnosticsPanel(props: DiagnosticsPanelProps) {
   const [diagnostics, setDiagnostics] = createSignal<DiagnosticEntry[]>([]);
   const [autoScroll, setAutoScroll] = createSignal(true);
-  const [copyStatus, setCopyStatus] = createSignal<
-    'idle' | 'copied' | 'failed'
-  >('idle');
+  const [copyStatus, setCopyStatus] = createSignal<'idle' | 'copied' | 'failed'>('idle');
   let containerRef: HTMLDivElement | undefined;
 
   onMount(() => {
@@ -119,9 +104,7 @@ export default function DiagnosticsPanel(props: DiagnosticsPanelProps) {
     let cleanup: (() => void) | undefined;
 
     listen<BackendLogEntry>('log://log', (event) => {
-      setDiagnostics((prev) =>
-        [...prev, toDiagnosticEntry(event.payload)].slice(-MAX_DIAGNOSTICS),
-      );
+      setDiagnostics((prev) => [...prev, toDiagnosticEntry(event.payload)].slice(-MAX_DIAGNOSTICS));
     }).then((unlisten) => {
       if (disposed) {
         unlisten();
@@ -143,8 +126,7 @@ export default function DiagnosticsPanel(props: DiagnosticsPanelProps) {
     }
   });
 
-  const visibleEntries = () =>
-    props.compact ? diagnostics().slice(-5) : diagnostics();
+  const visibleEntries = () => (props.compact ? diagnostics().slice(-5) : diagnostics());
 
   const clearDiagnostics = () => {
     setDiagnostics([]);
@@ -153,9 +135,7 @@ export default function DiagnosticsPanel(props: DiagnosticsPanelProps) {
 
   const copyDiagnostics = async () => {
     try {
-      await navigator.clipboard.writeText(
-        formatDiagnosticsForClipboard(diagnostics()),
-      );
+      await navigator.clipboard.writeText(formatDiagnosticsForClipboard(diagnostics()));
       setCopyStatus('copied');
     } catch {
       setCopyStatus('failed');
@@ -165,25 +145,19 @@ export default function DiagnosticsPanel(props: DiagnosticsPanelProps) {
   return (
     <div class="space-y-4">
       <div class="flex items-center justify-between gap-3 px-1">
-        <p class="font-mono text-[11px] font-semibold text-on-surface-variant/80">
+        <p class="text-on-surface-variant/80 font-mono text-[11px] font-semibold">
           {diagnostics().length} sanitized runtime events
         </p>
         <Show when={!props.compact}>
           <Checkbox.Root
             checked={autoScroll()}
-            onCheckedChange={(details) =>
-              setAutoScroll(details.checked === true)
-            }
+            onCheckedChange={(details) => setAutoScroll(details.checked === true)}
             class="ark-checkbox text-label-small text-on-surface-variant/95"
           >
             <Checkbox.Control class="ark-checkbox__control">
-              <Checkbox.Indicator class="ark-checkbox__indicator">
-                ✓
-              </Checkbox.Indicator>
+              <Checkbox.Indicator class="ark-checkbox__indicator">✓</Checkbox.Indicator>
             </Checkbox.Control>
-            <Checkbox.Label class="cursor-pointer select-none">
-              Auto-scroll
-            </Checkbox.Label>
+            <Checkbox.Label class="cursor-pointer select-none">Auto-scroll</Checkbox.Label>
             <Checkbox.HiddenInput />
           </Checkbox.Root>
         </Show>
@@ -191,32 +165,27 @@ export default function DiagnosticsPanel(props: DiagnosticsPanelProps) {
 
       <div
         ref={containerRef}
-        class={`${props.compact ? 'max-h-56' : 'max-h-96'} space-y-2.5 overflow-y-auto rounded-2xl border border-outline-variant bg-surface-container-lowest/60 p-3 shadow-inner backdrop-blur-sm`}
+        class={`${props.compact ? 'max-h-56' : 'max-h-96'} border-outline-variant bg-surface-container-lowest/60 space-y-2.5 overflow-y-auto rounded-2xl border p-3 shadow-inner backdrop-blur-sm`}
       >
         <Show
           when={visibleEntries().length > 0}
           fallback={
-            <p class="py-10 text-center font-mono text-body-small text-on-surface-variant/60">
-              No diagnostics yet. Runtime events from the Rust backend will
-              appear here.
+            <p class="text-body-small text-on-surface-variant/60 py-10 text-center font-mono">
+              No diagnostics yet. Runtime events from the Rust backend will appear here.
             </p>
           }
         >
           <For each={visibleEntries()}>
             {(entry) => (
               <div class="diagnostic-row relative overflow-hidden">
-                <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 relative z-10">
-                  <span class="text-outline font-semibold select-none">
-                    {entry.time}
-                  </span>
+                <div class="relative z-10 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                  <span class="text-outline font-semibold select-none">{entry.time}</span>
                   <span
-                    class={`px-2 py-0.5 rounded text-[10px] font-bold border tracking-wider select-none ${entry.badgeClass}`}
+                    class={`rounded border px-2 py-0.5 text-[10px] font-bold tracking-wider select-none ${entry.badgeClass}`}
                   >
                     {entry.levelName}
                   </span>
-                  <span class="break-all text-on-surface-variant font-medium">
-                    {entry.message}
-                  </span>
+                  <span class="text-on-surface-variant font-medium break-all">{entry.message}</span>
                 </div>
               </div>
             )}
@@ -240,7 +209,7 @@ export default function DiagnosticsPanel(props: DiagnosticsPanelProps) {
           disabled={diagnostics().length === 0}
           variant="text"
           size="sm"
-          class="border border-outline-variant hover:border-secondary hover:bg-secondary/5 rounded-xl text-label-small font-bold"
+          class="border-outline-variant hover:border-secondary hover:bg-secondary/5 text-label-small rounded-xl border font-bold"
         >
           Copy diagnostics
         </Button>
@@ -249,7 +218,7 @@ export default function DiagnosticsPanel(props: DiagnosticsPanelProps) {
           onClick={clearDiagnostics}
           variant="text"
           size="sm"
-          class="border border-outline-variant hover:border-error hover:bg-error/5 rounded-xl text-label-small font-bold hover:text-error"
+          class="border-outline-variant hover:border-error hover:bg-error/5 text-label-small hover:text-error rounded-xl border font-bold"
         >
           Clear
         </Button>

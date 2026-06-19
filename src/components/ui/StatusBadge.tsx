@@ -13,23 +13,27 @@ export default function StatusBadge(props: StatusBadgeProps) {
 
   const variantClasses = () => {
     switch (variant()) {
-      case 'success':
+      case 'success': {
         return 'bg-tertiary-container/20 text-tertiary border-tertiary/30 shadow-[0_0_8px_rgba(79,227,177,0.12)] font-bold';
-      case 'warning':
+      }
+      case 'warning': {
         return 'bg-warning-container/20 text-warning border-warning/30 shadow-[0_0_8px_rgba(246,199,104,0.12)] font-bold';
-      case 'error':
+      }
+      case 'error': {
         return 'bg-error-container/20 text-error border-error/30 shadow-[0_0_8px_rgba(255,107,122,0.12)] font-bold';
-      default:
+      }
+      default: {
         return 'bg-surface-container-highest/30 text-on-surface-variant border-outline-variant/60 font-semibold';
+      }
     }
   };
 
   return (
     <span
-      class={`px-3 py-1 rounded-full text-label-small border inline-flex items-center gap-1.5 shrink-0 select-none ${variantClasses()}`}
+      class={`text-label-small inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 select-none ${variantClasses()}`}
     >
       <span
-        class={`w-1.5 h-1.5 rounded-full ${
+        class={`h-1.5 w-1.5 rounded-full ${
           variant() === 'success'
             ? 'bg-tertiary animate-pulse'
             : variant() === 'warning'

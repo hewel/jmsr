@@ -6,7 +6,7 @@ Tauri v2 desktop app: Jellyfin MPV Shim rewrite. External MPV player controller 
 
 - **Frontend**: Solid.js + TypeScript + Rsbuild + TanStack Query + TanStack Form
 - **Backend**: Rust (Tauri v2) with tauri-specta for type-safe bindings
-- **Tools**: Bun, Biome (lint/format), Rstest (jsdom)
+- **Tools**: Bun, Oxc (Oxlint/Oxfmt), Rstest (jsdom)
 
 ## Structure
 
@@ -39,9 +39,9 @@ bun run dev          # Start Rsbuild dev server (port 3000)
 bun run build        # Production build → dist/
 bun run test         # Rstest
 bun run test:watch   # Rstest watch mode
-bun run check        # Biome check + autofix
+bun run check        # Oxfmt/Oxlint + type/Rust checks
 bun run typecheck    # TypeScript type check
-bun run format       # Biome format
+bun run format       # Oxfmt format
 
 # Tauri (run from project root)
 bun tauri dev       # Dev mode with hot reload
@@ -50,7 +50,7 @@ bun tauri build     # Production desktop build
 
 ## Conventions
 
-- **Single quotes** in JS/TS (biome.json)
+- **Single quotes** in JS/TS (.oxfmtrc.json)
 - **2-space indent** in Rust (rustfmt.toml: `tab_spaces = 2`)
 - **Type-safe IPC**: All Rust↔TS via tauri-specta, never raw `invoke()`
 - **NO libmpv embed**: MPV spawned as external process, controlled via JSON IPC

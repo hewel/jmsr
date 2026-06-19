@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+
 import { expect, test } from '@rstest/core';
 
 test('Saved Session JSON parsing uses an Effect throwing boundary', () => {
@@ -25,9 +26,7 @@ test('Saved Session restore and route checks use typed command helpers', () => {
   expect(sessionAccessSource).toContain(
     'runTauriCommand(() => commands.jellyfinRestoreSession(savedSession))',
   );
-  expect(sessionAccessSource).toContain(
-    'runTauriCommandRaw(() => commands.jellyfinIsConnected())',
-  );
+  expect(sessionAccessSource).toContain('runTauriCommandRaw(() => commands.jellyfinIsConnected())');
 });
 test('Password Login connect command uses typed command helper', () => {
   const loginSource = readFileSync('src/components/LoginPage.tsx', 'utf8');
@@ -35,12 +34,8 @@ test('Password Login connect command uses typed command helper', () => {
   expect(loginSource).toContain(
     "import { commandFailureMessage, runTauriCommand } from '../effects/commands';",
   );
-  expect(loginSource).toContain(
-    'runTauriCommand(() => commands.jellyfinConnect(credentials))',
-  );
-  expect(loginSource).not.toContain(
-    'const result = await commands.jellyfinConnect(credentials);',
-  );
+  expect(loginSource).toContain('runTauriCommand(() => commands.jellyfinConnect(credentials))');
+  expect(loginSource).not.toContain('const result = await commands.jellyfinConnect(credentials);');
 });
 test('Quick Connect commands use typed command helpers', () => {
   const loginSource = readFileSync('src/components/LoginPage.tsx', 'utf8');
@@ -48,9 +43,7 @@ test('Quick Connect commands use typed command helpers', () => {
   expect(loginSource).toContain(
     'runTauriCommand(() => commands.jellyfinQuickConnectStart(serverUrlValue))',
   );
-  expect(loginSource).toContain(
-    'commands.jellyfinQuickConnectCheck(serverUrlValue, secret)',
-  );
+  expect(loginSource).toContain('commands.jellyfinQuickConnectCheck(serverUrlValue, secret)');
   expect(loginSource).toContain(
     'commands.jellyfinQuickConnectAuthenticate(serverUrlValue, secret)',
   );
@@ -59,29 +52,18 @@ test('Quick Connect commands use typed command helpers', () => {
   );
 });
 test('Operations Console commands use typed command helpers', () => {
-  const consoleSource = readFileSync(
-    'src/components/OperationsConsole.tsx',
-    'utf8',
-  );
+  const consoleSource = readFileSync('src/components/OperationsConsole.tsx', 'utf8');
 
-  expect(consoleSource).toContain('runTauriCommand,');
-  expect(consoleSource).toContain('runTauriCommandRaw,');
-  expect(consoleSource).toContain(
-    'runTauriCommandRaw(() => commands.configGet())',
+  expect(consoleSource).toMatch(
+    /import \{[^}]*runTauriCommand[^}]*\} from '\.\.\/effects\/commands';/,
   );
-  expect(consoleSource).toContain(
-    'runTauriCommand(() => commands.configSet(nextSave.config))',
+  expect(consoleSource).toMatch(
+    /import \{[^}]*runTauriCommandRaw[^}]*\} from '\.\.\/effects\/commands';/,
   );
-  expect(consoleSource).toContain(
-    'runTauriCommand(() => commands.jellyfinDisconnect())',
-  );
-  expect(consoleSource).toContain(
-    'runTauriCommand(() => commands.jellyfinClearSession())',
-  );
-  expect(consoleSource).not.toContain(
-    'const result = await commands.jellyfinDisconnect();',
-  );
-  expect(consoleSource).not.toContain(
-    'const result = await commands.jellyfinClearSession();',
-  );
+  expect(consoleSource).toContain('runTauriCommandRaw(() => commands.configGet())');
+  expect(consoleSource).toContain('runTauriCommand(() => commands.configSet(nextSave.config))');
+  expect(consoleSource).toContain('runTauriCommand(() => commands.jellyfinDisconnect())');
+  expect(consoleSource).toContain('runTauriCommand(() => commands.jellyfinClearSession())');
+  expect(consoleSource).not.toContain('const result = await commands.jellyfinDisconnect();');
+  expect(consoleSource).not.toContain('const result = await commands.jellyfinClearSession();');
 });

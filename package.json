@@ -16,11 +16,11 @@
     "typecheck": "tsc --noEmit",
     "jellyfin:api:generate": "bun scripts/jellyfin-api.mjs generate",
     "jellyfin:api:update": "bun scripts/jellyfin-api.mjs update",
-    "format": "biome format --write .",
-    "format:check": "biome format .",
-    "lint": "biome lint .",
-    "lint:fix": "biome check --write .",
-    "check": "biome check . && bun run typecheck && bun run rust:fmt:check && bun run rust:clippy",
+    "format": "oxfmt --write package.json tsconfig.json tests/tsconfig.json '*.config.{js,json,jsonc,mjs,ts}' 'src/**/*.{css,js,jsx,json,jsonc,ts,tsx}' 'tests/**/*.{js,jsx,json,jsonc,ts,tsx}' 'scripts/**/*.mjs' 'src-tauri/**/*.json'",
+    "format:check": "oxfmt --check package.json tsconfig.json tests/tsconfig.json '*.config.{js,json,jsonc,mjs,ts}' 'src/**/*.{css,js,jsx,json,jsonc,ts,tsx}' 'tests/**/*.{js,jsx,json,jsonc,ts,tsx}' 'scripts/**/*.mjs' 'src-tauri/**/*.json'",
+    "lint": "oxlint --deny-warnings --no-error-on-unmatched-pattern src tests scripts rsbuild.config.ts rstest.config.ts rstest.setup.ts lint-staged.config.mjs",
+    "lint:fix": "oxlint --fix --deny-warnings --no-error-on-unmatched-pattern src tests scripts rsbuild.config.ts rstest.config.ts rstest.setup.ts lint-staged.config.mjs",
+    "check": "bun run format:check && bun run lint && bun run typecheck && bun run rust:fmt:check && bun run rust:clippy",
     "test:all": "bun run test && bun run rust:test",
     "prepare": "husky",
     "rust:fmt": "cargo fmt --manifest-path src-tauri/Cargo.toml",
@@ -47,7 +47,6 @@
     "tailwindcss": "^4.3.1"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.0",
     "@openapitools/openapi-generator-cli": "^2.38.0",
     "@rsbuild/core": "^2.0.15",
     "@rsbuild/plugin-babel": "^1.2.1",
@@ -65,6 +64,8 @@
     "husky": "^9.1.7",
     "jsdom": "^29.1.1",
     "lint-staged": "^17.0.7",
+    "oxfmt": "^0.55.0",
+    "oxlint": "^1.70.0",
     "typescript": "^6.0.3"
   }
 }

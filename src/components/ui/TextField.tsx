@@ -39,14 +39,13 @@ export default function TextField(props: TextFieldProps) {
   ]);
 
   const variant = () => local.variant ?? 'filled';
-  const inputVariantClass = () =>
-    variant() === 'outlined' ? 'input-outlined' : 'input-filled';
+  const inputVariantClass = () => (variant() === 'outlined' ? 'input-outlined' : 'input-filled');
 
   return (
     <div class={`group ${local.class ?? ''}`}>
       <label
         for={local.name}
-        class="text-label-medium block text-on-surface-variant mb-1 ml-1 uppercase tracking-wider group-focus-within:text-primary transition-colors"
+        class="text-label-medium text-on-surface-variant group-focus-within:text-primary mb-1 ml-1 block tracking-wider uppercase transition-colors"
       >
         {local.label}
       </label>
@@ -63,14 +62,12 @@ export default function TextField(props: TextFieldProps) {
         {...rest}
       />
       <Show when={local.error}>
-        <p class="text-error text-body-small mt-1.5 ml-1 animate-in slide-in-from-top-1 fade-in duration-200">
+        <p class="text-error text-body-small animate-in slide-in-from-top-1 fade-in mt-1.5 ml-1 duration-200">
           {local.error}
         </p>
       </Show>
       <Show when={local.hint && !local.error}>
-        <p class="text-on-surface-variant/70 text-body-small mt-1.5 ml-1">
-          {local.hint}
-        </p>
+        <p class="text-on-surface-variant/70 text-body-small mt-1.5 ml-1">{local.hint}</p>
       </Show>
     </div>
   );

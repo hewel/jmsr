@@ -10,8 +10,7 @@ export default function AppVersion(props: AppVersionProps) {
   return (
     <p
       class={
-        props.class ??
-        'text-on-surface-variant/50 text-label-small mt-1 font-mono tracking-wider'
+        props.class ?? 'text-on-surface-variant/50 text-label-small mt-1 font-mono tracking-wider'
       }
     >
       v{version() ?? '...'}

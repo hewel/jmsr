@@ -1,23 +1,12 @@
 import { createForm } from '@tanstack/solid-form';
 import { Effect, Exit } from 'effect';
 import { createEffect, createResource } from 'solid-js';
-import {
-  type AppConfig,
-  type ConnectionState,
-  commands,
-  type IntroSkipperMode,
-} from '../bindings';
-import {
-  commandFailureMessage,
-  runTauriCommand,
-  runTauriCommandRaw,
-} from '../effects/commands';
+
+import { commands } from '../bindings';
+import type { AppConfig, ConnectionState, IntroSkipperMode } from '../bindings';
+import { commandFailureMessage, runTauriCommand, runTauriCommandRaw } from '../effects/commands';
 import { detectMpv } from '../effects/config';
-import {
-  clearSavedSession,
-  loadSavedSession,
-  restoreSavedSession,
-} from '../sessionAccess';
+import { clearSavedSession, loadSavedSession, restoreSavedSession } from '../sessionAccess';
 import NowPlayingCard from './NowPlayingCard';
 import ConnectionCard from './OperationsConsole/ConnectionCard';
 import DiagnosticsCard from './OperationsConsole/DiagnosticsCard';
@@ -31,7 +20,8 @@ import {
   parseSubtitleLanguageInput,
 } from './OperationsConsole/subtitleLanguages';
 import { useToast } from './ToastProvider';
-import { type JmsrSelectItem, PageFooter } from './ui';
+import { PageFooter } from './ui';
+import type { JmsrSelectItem } from './ui';
 
 interface OperationsConsoleProps {
   onSignedOut: () => void;
@@ -50,11 +40,11 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
   const { state: ui, actions, Provider } = createOperationsConsoleStore();
 
   let configHydrated = false;
-  type PendingSave = {
+  interface PendingSave {
     config: AppConfig;
     onSuccess?: () => void;
     onError?: (message: string) => void;
-  };
+  }
   let lastSavedConfig: AppConfig | null = null;
   let saveInFlight = false;
   let pendingSave: PendingSave | null = null;
@@ -62,26 +52,24 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
   let clearPlayerBridgeStatusTimer: ReturnType<typeof setTimeout> | null = null;
 
   const subtitleLanguageSelectItems: JmsrSelectItem[] = [
-    { value: 'eng', label: 'eng — English' },
-    { value: 'jpn', label: 'jpn — Japanese' },
-    { value: 'spa', label: 'spa — Spanish' },
-    { value: 'fre', label: 'fre — French' },
-    { value: 'ger', label: 'ger — German' },
-    { value: 'ita', label: 'ita — Italian' },
-    { value: 'por', label: 'por — Portuguese' },
-    { value: 'chi', label: 'chi — Chinese' },
-    { value: 'kor', label: 'kor — Korean' },
+    { label: 'eng — English', value: 'eng' },
+    { label: 'jpn — Japanese', value: 'jpn' },
+    { label: 'spa — Spanish', value: 'spa' },
+    { label: 'fre — French', value: 'fre' },
+    { label: 'ger — German', value: 'ger' },
+    { label: 'ita — Italian', value: 'ita' },
+    { label: 'por — Portuguese', value: 'por' },
+    { label: 'chi — Chinese', value: 'chi' },
+    { label: 'kor — Korean', value: 'kor' },
   ];
 
-  const [connectionState, { refetch: refetchConnection }] =
-    createResource(fetchConnectionState);
-  const [_mpvConnected, { refetch: refetchMpv }] =
-    createResource(fetchMpvStatus);
+  const [connectionState, { refetch: refetchConnection }] = createResource(fetchConnectionState);
+  const [_mpvConnected, { refetch: refetchMpv }] = createResource(fetchMpvStatus);
   const [initialConfig, { mutate: mutateConfig }] = createResource(async () => {
-    const exit = await Effect.runPromiseExit(
-      runTauriCommandRaw(() => commands.configGet()),
-    );
-    if (Exit.isSuccess(exit)) return exit.value;
+    const exit = await Effect.runPromiseExit(runTauriCommandRaw(() => commands.configGet()));
+    if (Exit.isSuccess(exit)) {
+      return exit.value;
+    }
 
     console.error(
       'Failed to load config:',
@@ -93,12 +81,12 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
   const form = createForm(() => ({
     defaultValues: {
       deviceName: 'JMSR',
-      mpvPath: '',
-      mpvArgs: '',
+      introSkipperMode: 'automatic' as IntroSkipperMode,
+      keybindIntroSkip: 'g',
       keybindNext: 'Shift+>',
       keybindPrev: 'Shift+<',
-      keybindIntroSkip: 'g',
-      introSkipperMode: 'automatic' as IntroSkipperMode,
+      mpvArgs: '',
+      mpvPath: '',
     },
   }));
 
@@ -113,39 +101,29 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
       form.setFieldValue('keybindPrev', cfg.keybindPrev ?? 'Shift+<');
       form.setFieldValue('keybindIntroSkip', cfg.keybindIntroSkip ?? 'g');
       actions.hydrateFromConfig({
+        introSkipperMode: cfg.introSkipperMode ?? 'automatic',
+        mpvArgs: cfg.mpvArgs,
         preferredSubtitleLanguages: normalizePreferredSubtitleLanguages(
           cfg.preferredSubtitleLanguages,
         ),
-        introSkipperMode: cfg.introSkipperMode ?? 'automatic',
-        mpvArgs: cfg.mpvArgs,
       });
-      form.setFieldValue(
-        'introSkipperMode',
-        cfg.introSkipperMode ?? 'automatic',
-      );
+      form.setFieldValue('introSkipperMode', cfg.introSkipperMode ?? 'automatic');
       configHydrated = true;
     }
   });
 
   const state = () => connectionState();
   const config = () => initialConfig();
-  const introSkipperMode = () =>
-    ui.introSkipperDraft ?? config()?.introSkipperMode ?? 'automatic';
+  const introSkipperMode = () => ui.introSkipperDraft ?? config()?.introSkipperMode ?? 'automatic';
 
-  const showPlayerBridgeStatus = (
-    type: 'saving' | 'saved' | 'error',
-    text: string,
-  ) => {
+  const showPlayerBridgeStatus = (type: 'saving' | 'saved' | 'error', text: string) => {
     if (clearPlayerBridgeStatusTimer) {
       clearTimeout(clearPlayerBridgeStatusTimer);
       clearPlayerBridgeStatusTimer = null;
     }
-    actions.showPlayerBridgeStatus({ type, text });
+    actions.showPlayerBridgeStatus({ text, type });
     if (type === 'saved') {
-      clearPlayerBridgeStatusTimer = setTimeout(
-        () => actions.clearPlayerBridgeStatus(),
-        3000,
-      );
+      clearPlayerBridgeStatusTimer = setTimeout(() => actions.clearPlayerBridgeStatus(), 3000);
     }
   };
 
@@ -156,12 +134,10 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
       .filter((arg) => arg.length > 0);
 
   const buildConfigSnapshot = (overrides: Partial<AppConfig>) => {
-    const saved =
-      pendingSave?.config ??
-      latestConfigSnapshot ??
-      lastSavedConfig ??
-      config();
-    if (!saved) return null;
+    const saved = pendingSave?.config ?? latestConfigSnapshot ?? lastSavedConfig ?? config();
+    if (!saved) {
+      return null;
+    }
 
     return {
       ...saved,
@@ -170,7 +146,9 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
   };
 
   const processConfigSaveQueue = async () => {
-    if (saveInFlight) return;
+    if (saveInFlight) {
+      return;
+    }
     saveInFlight = true;
 
     try {
@@ -189,10 +167,7 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
           nextSave.onSuccess?.();
           showPlayerBridgeStatus('saved', 'Saved');
         } else {
-          const message = commandFailureMessage(
-            exit.cause,
-            'Could not save configuration',
-          );
+          const message = commandFailureMessage(exit.cause, 'Could not save configuration');
           nextSave.onError?.(message);
           showPlayerBridgeStatus('error', message);
           showToast('error', message);
@@ -204,7 +179,9 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
       showToast('error', message);
     } finally {
       saveInFlight = false;
-      if (pendingSave) void processConfigSaveQueue();
+      if (pendingSave) {
+        void processConfigSaveQueue();
+      }
     }
   };
 
@@ -212,7 +189,9 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
     snapshot: AppConfig | null,
     callbacks: Omit<PendingSave, 'config'> = {},
   ) => {
-    if (!snapshot) return;
+    if (!snapshot) {
+      return;
+    }
     latestConfigSnapshot = snapshot;
     pendingSave = { config: snapshot, ...callbacks };
     void processConfigSaveQueue();
@@ -230,12 +209,22 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
   ) => {
     const saved = lastSavedConfig ?? config();
     const desired = latestConfigSnapshot ?? saved;
-    if (!saved || !desired) return;
+    if (!saved || !desired) {
+      return;
+    }
 
-    if (field === 'deviceName' && value.trim().length === 0) return;
-    if (field === 'keybindNext' && value.trim().length === 0) return;
-    if (field === 'keybindPrev' && value.trim().length === 0) return;
-    if (field === 'keybindIntroSkip' && value.trim().length === 0) return;
+    if (field === 'deviceName' && value.trim().length === 0) {
+      return;
+    }
+    if (field === 'keybindNext' && value.trim().length === 0) {
+      return;
+    }
+    if (field === 'keybindPrev' && value.trim().length === 0) {
+      return;
+    }
+    if (field === 'keybindIntroSkip' && value.trim().length === 0) {
+      return;
+    }
 
     const override =
       field === 'mpvArgs'
@@ -249,10 +238,13 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
       if (
         nextArgs.length === (desired.mpvArgs?.length ?? 0) &&
         nextArgs.every((arg, index) => arg === desired.mpvArgs?.[index])
-      )
+      ) {
         return;
+      }
     } else if (field === 'mpvPath') {
-      if (override.mpvPath === desired.mpvPath) return;
+      if (override.mpvPath === desired.mpvPath) {
+        return;
+      }
     } else if (value === desired[field]) {
       return;
     }
@@ -265,37 +257,37 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
     if (
       desired &&
       languages.length === (desired.preferredSubtitleLanguages?.length ?? 0) &&
-      languages.every(
-        (language, index) =>
-          language === desired.preferredSubtitleLanguages?.[index],
-      )
-    )
+      languages.every((language, index) => language === desired.preferredSubtitleLanguages?.[index])
+    ) {
       return;
+    }
 
-    queueConfigSave(
-      buildConfigSnapshot({ preferredSubtitleLanguages: languages }),
-    );
+    queueConfigSave(buildConfigSnapshot({ preferredSubtitleLanguages: languages }));
   };
 
   const saveIntroSkipperSetting = (mode: IntroSkipperMode) => {
     const previous = introSkipperMode();
     const desired = latestConfigSnapshot ?? lastSavedConfig ?? config();
-    if (desired?.introSkipperMode === mode) return;
+    if (desired?.introSkipperMode === mode) {
+      return;
+    }
 
     actions.beginIntroSkipperSave(mode);
     queueConfigSave(buildConfigSnapshot({ introSkipperMode: mode }), {
-      onSuccess: () => {
-        actions.finishIntroSkipperSave();
-      },
       onError: (message) => {
         actions.failIntroSkipperSave(previous, message);
         form.setFieldValue('introSkipperMode', previous);
+      },
+      onSuccess: () => {
+        actions.finishIntroSkipperSave();
       },
     });
   };
 
   const addPreferredSubtitleLanguageCodes = (languages: string[]) => {
-    if (languages.length === 0) return;
+    if (languages.length === 0) {
+      return;
+    }
 
     const current = ui.selectedSubtitleLanguages;
     const seen = new Set(current);
@@ -303,7 +295,9 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
 
     for (const language of languages) {
       const [code] = parseSubtitleLanguageInput(language);
-      if (!code || seen.has(code)) continue;
+      if (!code || seen.has(code)) {
+        continue;
+      }
       seen.add(code);
       next.push(code);
     }
@@ -314,14 +308,10 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
   };
 
   const addPreferredSubtitleLanguages = () => {
-    addPreferredSubtitleLanguageCodes(
-      parseSubtitleLanguageInput(ui.subtitleLanguageInput),
-    );
+    addPreferredSubtitleLanguageCodes(parseSubtitleLanguageInput(ui.subtitleLanguageInput));
   };
   const removePreferredSubtitleLanguage = (language: string) => {
-    const next = ui.selectedSubtitleLanguages.filter(
-      (selected) => selected !== language,
-    );
+    const next = ui.selectedSubtitleLanguages.filter((selected) => selected !== language);
     actions.setPreferredSubtitleLanguages(next);
     savePreferredSubtitleLanguages(next);
   };
@@ -334,7 +324,9 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
   const movePreferredSubtitleLanguage = (index: number, direction: -1 | 1) => {
     const current = ui.selectedSubtitleLanguages;
     const target = index + direction;
-    if (target < 0 || target >= current.length) return;
+    if (target < 0 || target >= current.length) {
+      return;
+    }
 
     const next = [...current];
     [next[index], next[target]] = [next[target], next[index]];
@@ -371,17 +363,12 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
 
   const handleDisconnect = async () => {
     actions.beginDisconnect();
-    const exit = await Effect.runPromiseExit(
-      runTauriCommand(() => commands.jellyfinDisconnect()),
-    );
+    const exit = await Effect.runPromiseExit(runTauriCommand(() => commands.jellyfinDisconnect()));
     if (Exit.isSuccess(exit)) {
       showToast('success', 'Disconnected from Jellyfin');
       refetchConnection();
     } else {
-      showToast(
-        'error',
-        commandFailureMessage(exit.cause, 'Disconnect failed'),
-      );
+      showToast('error', commandFailureMessage(exit.cause, 'Disconnect failed'));
     }
     actions.finishDisconnect();
   };
@@ -410,10 +397,7 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
         queueConfigSave(buildConfigSnapshot({ mpvPath: path }));
         showToast('success', 'MPV detected successfully');
       } else {
-        showToast(
-          'warning',
-          'MPV not found in PATH. Configure the path manually.',
-        );
+        showToast('warning', 'MPV not found in PATH. Configure the path manually.');
       }
     } else {
       console.error(
@@ -438,7 +422,7 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
             <div class="space-y-6">
               <ConnectionCard
                 state={state()}
-                canReconnect={!!loadSavedSession()}
+                canReconnect={Boolean(loadSavedSession())}
                 onDisconnect={handleDisconnect}
                 onReconnect={handleReconnect}
                 onRefresh={handleRefresh}
@@ -453,11 +437,7 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
                   form={form}
                   subtitleLanguageSelectItems={subtitleLanguageSelectItems}
                   onSaveTextSetting={(field, value) => {
-                    if (
-                      field === 'deviceName' ||
-                      field === 'mpvPath' ||
-                      field === 'mpvArgs'
-                    ) {
+                    if (field === 'deviceName' || field === 'mpvPath' || field === 'mpvArgs') {
                       saveTextSetting(field, value);
                     }
                   }}
@@ -478,10 +458,7 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
                 currentMode={introSkipperMode()}
                 onModeChange={handleIntroSkipperModeChange}
               />
-              <ShortcutKeysCard
-                form={form}
-                onSaveTextSetting={saveTextSetting}
-              />
+              <ShortcutKeysCard form={form} onSaveTextSetting={saveTextSetting} />
 
               <SessionCard onSignOut={handleSignOut} />
 

@@ -1,4 +1,6 @@
-import { createRouter, type RouterHistory } from '@tanstack/solid-router';
+import { createRouter } from '@tanstack/solid-router';
+import type { RouterHistory } from '@tanstack/solid-router';
+
 import { routeTree } from './routeTree.gen';
 
 export {
@@ -10,9 +12,9 @@ export {
 
 export function createJmsrRouter(history?: RouterHistory) {
   return createRouter({
-    routeTree,
     defaultPreload: 'intent',
     history,
+    routeTree,
   });
 }
 

@@ -205,7 +205,7 @@ jmsr/
 
 ### 📏 Code Conventions
 
-*   **TypeScript**: Single quotes, Biome formatting.
+*   **TypeScript**: Single quotes, Oxfmt formatting.
 *   **Rust**: 2-space indent (standard `rustfmt.toml`).
 *   **IPC**: Always use typed `commands.*` from bindings, never raw `invoke()`.
 *   **Solid.js**: Use `createSignal`, `createResource` — **NOT** React hooks.
@@ -227,7 +227,7 @@ jmsr/
 | **Bundler** | Rsbuild |
 | **Styling** | TailwindCSS |
 | **IPC** | tauri-specta |
-| **Linting** | Biome |
+| **Linting** | Oxlint |
 | **Testing** | Rstest |
 
 ## ❓ Troubleshooting
@@ -271,7 +271,7 @@ Contributions are welcome! Please follow these steps:
 
 1.  Fork the repository.
 2.  Create a feature branch.
-3.  Follow existing code conventions (Biome for TS, rustfmt for Rust).
+3.  Follow existing code conventions (Oxc for TS, rustfmt for Rust).
 4.  Run `bun run check` before committing.
 5.  Submit a pull request.
 

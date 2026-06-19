@@ -6,18 +6,18 @@ export const INTRO_SKIPPER_MODES: {
   description: string;
 }[] = [
   {
-    mode: 'automatic',
-    label: 'Automatic',
     description: 'Skip ranges as playback reaches them.',
+    label: 'Automatic',
+    mode: 'automatic',
   },
   {
-    mode: 'manual',
-    label: 'Manual',
     description: 'Show an MPV prompt and wait for the shortcut.',
+    label: 'Manual',
+    mode: 'manual',
   },
   {
-    mode: 'off',
-    label: 'Off',
     description: 'Do not fetch or apply Intro Skipper ranges.',
+    label: 'Off',
+    mode: 'off',
   },
 ];

@@ -1,4 +1,5 @@
 import { createForm } from '@tanstack/solid-form';
+
 import type { IntroSkipperMode } from '../../bindings';
 
 export interface FormDefaultValues {
@@ -20,12 +21,12 @@ function inferFormType() {
   return createForm(() => ({
     defaultValues: {
       deviceName: '',
-      mpvPath: '',
-      mpvArgs: '',
+      introSkipperMode: 'automatic' as IntroSkipperMode,
+      keybindIntroSkip: '',
       keybindNext: '',
       keybindPrev: '',
-      keybindIntroSkip: '',
-      introSkipperMode: 'automatic' as IntroSkipperMode,
+      mpvArgs: '',
+      mpvPath: '',
     },
   }));
 }

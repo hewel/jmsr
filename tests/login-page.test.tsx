@@ -2,24 +2,22 @@ import { afterEach, expect, rstest, test } from '@rstest/core';
 import { fireEvent, screen, waitFor } from '@testing-library/dom';
 import { Cause, Effect, Exit } from 'effect';
 import { render } from 'solid-js/web';
+
 import { commands } from '../src/bindings';
 import LoginPage from '../src/components/LoginPage';
 import { StorageParseError } from '../src/effects/errors';
-import {
-  CREDENTIALS_STORAGE_KEY,
-  loadSavedCredentials,
-} from '../src/effects/session';
+import { CREDENTIALS_STORAGE_KEY, loadSavedCredentials } from '../src/effects/session';
 import { loadSavedSession } from '../src/sessionAccess';
 
 const sampleSession = {
-  serverUrl: 'https://jellyfin.example.com',
   accessToken: 'token-1',
+  deviceId: 'device-1',
+  serverName: 'Jellyfin Home',
+  serverUrl: 'https://jellyfin.example.com',
   userId: 'user-1',
   userName: 'Ada',
-  serverName: 'Jellyfin Home',
-  deviceId: 'device-1',
 };
-function renderLoginPage(onConnected = () => undefined) {
+function renderLoginPage(onConnected = () => {}) {
   const root = document.createElement('div');
   document.body.append(root);
   const dispose = render(() => <LoginPage onConnected={onConnected} />, root);
@@ -29,12 +27,9 @@ function renderLoginPage(onConnected = () => undefined) {
   };
 }
 async function fillPasswordLogin() {
-  fireEvent.input(
-    screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin'),
-    {
-      target: { value: 'jellyfin.example.com' },
-    },
-  );
+  fireEvent.input(screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin'), {
+    target: { value: 'jellyfin.example.com' },
+  });
   fireEvent.click(screen.getByRole('tab', { name: 'Password' }));
 
   await waitFor(() => expect(screen.getByText('Username')).toBeVisible());
@@ -56,9 +51,7 @@ afterEach(() => {
 test('login page shows quick connect as the default login method', () => {
   const cleanup = renderLoginPage();
 
-  expect(
-    screen.getByRole('button', { name: 'Request Quick Connect code' }),
-  ).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Request Quick Connect code' })).toBeVisible();
   expect(screen.getByRole('tab', { name: 'Quick Connect' })).toHaveAttribute(
     'aria-selected',
     'true',
@@ -73,16 +66,12 @@ test('login page uses Ark tabs, fields, and checkbox primitives', async () => {
   const quickConnectTab = screen.getByRole('tab', { name: 'Quick Connect' });
   expect(quickConnectTab.closest('[data-scope="tabs"]')).not.toBeNull();
 
-  const serverHost = screen.getByPlaceholderText(
-    'jellyfin.local or media.example.com/jellyfin',
-  );
+  const serverHost = screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin');
   expect(serverHost.closest('[data-scope="field"]')).not.toBeNull();
 
   fireEvent.click(screen.getByRole('tab', { name: 'Password' }));
 
-  await waitFor(() =>
-    expect(screen.getByText('Remember Server URL and username')).toBeVisible(),
-  );
+  await waitFor(() => expect(screen.getByText('Remember Server URL and username')).toBeVisible());
   const rememberMe = screen.getByRole('checkbox', {
     name: 'Remember Server URL and username',
   });
@@ -96,17 +85,12 @@ test('login page uses Ark tabs, fields, and checkbox primitives', async () => {
 test('login page builds local http server url preview with jellyfin port', () => {
   const cleanup = renderLoginPage();
 
-  fireEvent.input(
-    screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin'),
-    {
-      target: { value: '192.168.1.20' },
-    },
-  );
+  fireEvent.input(screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin'), {
+    target: { value: '192.168.1.20' },
+  });
 
   expect(screen.getByText('http://192.168.1.20:8096')).toBeVisible();
-  expect(screen.getByRole('button', { name: 'HTTP' })).toHaveClass(
-    'bg-primary',
-  );
+  expect(screen.getByRole('button', { name: 'HTTP' })).toHaveClass('bg-primary');
 
   cleanup();
 });
@@ -114,27 +98,17 @@ test('login page builds local http server url preview with jellyfin port', () =>
 test('login page preserves explicit pasted schemes', () => {
   const cleanup = renderLoginPage();
 
-  fireEvent.input(
-    screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin'),
-    {
-      target: { value: 'http://media.example.com' },
-    },
-  );
+  fireEvent.input(screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin'), {
+    target: { value: 'http://media.example.com' },
+  });
   expect(screen.getByText('http://media.example.com')).toBeVisible();
-  expect(screen.getByRole('button', { name: 'HTTP' })).toHaveClass(
-    'bg-primary',
-  );
+  expect(screen.getByRole('button', { name: 'HTTP' })).toHaveClass('bg-primary');
 
-  fireEvent.input(
-    screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin'),
-    {
-      target: { value: 'https://192.168.1.20:8096' },
-    },
-  );
+  fireEvent.input(screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin'), {
+    target: { value: 'https://192.168.1.20:8096' },
+  });
   expect(screen.getByText('https://192.168.1.20:8096')).toBeVisible();
-  expect(screen.getByRole('button', { name: 'HTTPS' })).toHaveClass(
-    'bg-primary',
-  );
+  expect(screen.getByRole('button', { name: 'HTTPS' })).toHaveClass('bg-primary');
 
   cleanup();
 });
@@ -142,12 +116,9 @@ test('login page preserves explicit pasted schemes', () => {
 test('login page preserves public reverse proxy path without default jellyfin port', () => {
   const cleanup = renderLoginPage();
 
-  fireEvent.input(
-    screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin'),
-    {
-      target: { value: 'media.example.com/jellyfin' },
-    },
-  );
+  fireEvent.input(screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin'), {
+    target: { value: 'media.example.com/jellyfin' },
+  });
 
   expect(screen.getByText('https://media.example.com/jellyfin')).toBeVisible();
 
@@ -158,21 +129,12 @@ test('login page rejects invalid server hosts before starting quick connect', as
   const startQuickConnect = rstest.spyOn(commands, 'jellyfinQuickConnectStart');
   const cleanup = renderLoginPage();
 
-  fireEvent.input(
-    screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin'),
-    {
-      target: { value: 'not a valid host?!' },
-    },
-  );
-  fireEvent.click(
-    screen.getByRole('button', { name: 'Request Quick Connect code' }),
-  );
+  fireEvent.input(screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin'), {
+    target: { value: 'not a valid host?!' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Request Quick Connect code' }));
 
-  await waitFor(() =>
-    expect(
-      screen.getByText('Enter a valid Jellyfin server host'),
-    ).toBeVisible(),
-  );
+  await waitFor(() => expect(screen.getByText('Enter a valid Jellyfin server host')).toBeVisible());
   expect(startQuickConnect).not.toHaveBeenCalled();
 
   cleanup();
@@ -180,24 +142,19 @@ test('login page rejects invalid server hosts before starting quick connect', as
 
 test('login page locks quick connect request while waiting for approval', async () => {
   rstest.spyOn(commands, 'jellyfinQuickConnectStart').mockResolvedValue({
-    status: 'ok',
     data: { code: 'ABCD12', secret: 'secret-123' },
+    status: 'ok',
   });
   rstest.spyOn(commands, 'jellyfinQuickConnectCheck').mockResolvedValue({
-    status: 'ok',
     data: 'waiting',
+    status: 'ok',
   });
   const cleanup = renderLoginPage();
 
-  fireEvent.input(
-    screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin'),
-    {
-      target: { value: 'jellyfin.example.com' },
-    },
-  );
-  fireEvent.click(
-    screen.getByRole('button', { name: 'Request Quick Connect code' }),
-  );
+  fireEvent.input(screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin'), {
+    target: { value: 'jellyfin.example.com' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Request Quick Connect code' }));
 
   await waitFor(() => expect(screen.getByText('ABCD12')).toBeVisible());
   expect(
@@ -210,9 +167,7 @@ test('login page locks quick connect request while waiting for approval', async 
 
   await waitFor(() =>
     expect(
-      screen.getByPlaceholderText(
-        'jellyfin.local or media.example.com/jellyfin',
-      ),
+      screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin'),
     ).not.toBeDisabled(),
   );
 
@@ -237,30 +192,25 @@ test('login page shows password login after method selection', async () => {
 test('login page completes quick connect when approval is observed', async () => {
   rstest.useFakeTimers();
   rstest.spyOn(commands, 'jellyfinQuickConnectStart').mockResolvedValue({
-    status: 'ok',
     data: { code: 'ABCD12', secret: 'secret-123' },
+    status: 'ok',
   });
   rstest.spyOn(commands, 'jellyfinQuickConnectCheck').mockResolvedValue({
-    status: 'ok',
     data: 'approved',
+    status: 'ok',
   });
   rstest.spyOn(commands, 'jellyfinQuickConnectAuthenticate').mockResolvedValue({
-    status: 'ok',
     data: null,
+    status: 'ok',
   });
   rstest.spyOn(commands, 'jellyfinGetSession').mockResolvedValue(sampleSession);
   const onConnected = rstest.fn();
   const cleanup = renderLoginPage(onConnected);
 
-  fireEvent.input(
-    screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin'),
-    {
-      target: { value: 'jellyfin.example.com' },
-    },
-  );
-  fireEvent.click(
-    screen.getByRole('button', { name: 'Request Quick Connect code' }),
-  );
+  fireEvent.input(screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin'), {
+    target: { value: 'jellyfin.example.com' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Request Quick Connect code' }));
 
   await waitFor(() => expect(screen.getByText('ABCD12')).toBeVisible());
   await rstest.advanceTimersByTimeAsync(5000);
@@ -272,27 +222,18 @@ test('login page completes quick connect when approval is observed', async () =>
 });
 test('quick connect start status errors show failure and unlock request', async () => {
   rstest.spyOn(commands, 'jellyfinQuickConnectStart').mockResolvedValue({
-    status: 'error',
     error: { code: 'network', message: 'Server unavailable' },
+    status: 'error',
   });
   const cleanup = renderLoginPage();
 
-  fireEvent.input(
-    screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin'),
-    {
-      target: { value: 'jellyfin.example.com' },
-    },
-  );
-  fireEvent.click(
-    screen.getByRole('button', { name: 'Request Quick Connect code' }),
-  );
+  fireEvent.input(screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin'), {
+    target: { value: 'jellyfin.example.com' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Request Quick Connect code' }));
 
-  await waitFor(() =>
-    expect(screen.getByText('Server unavailable')).toBeVisible(),
-  );
-  expect(
-    screen.getByRole('button', { name: 'Request a new code' }),
-  ).not.toBeDisabled();
+  await waitFor(() => expect(screen.getByText('Server unavailable')).toBeVisible());
+  expect(screen.getByRole('button', { name: 'Request a new code' })).not.toBeDisabled();
 
   cleanup();
 });
@@ -303,59 +244,41 @@ test('quick connect start rejected commands show failure and unlock request', as
     .mockRejectedValue(new Error('IPC unavailable'));
   const cleanup = renderLoginPage();
 
-  fireEvent.input(
-    screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin'),
-    {
-      target: { value: 'jellyfin.example.com' },
-    },
-  );
-  fireEvent.click(
-    screen.getByRole('button', { name: 'Request Quick Connect code' }),
-  );
+  fireEvent.input(screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin'), {
+    target: { value: 'jellyfin.example.com' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Request Quick Connect code' }));
 
-  await waitFor(() =>
-    expect(screen.getByText('IPC unavailable')).toBeVisible(),
-  );
-  expect(
-    screen.getByRole('button', { name: 'Request a new code' }),
-  ).not.toBeDisabled();
+  await waitFor(() => expect(screen.getByText('IPC unavailable')).toBeVisible());
+  expect(screen.getByRole('button', { name: 'Request a new code' })).not.toBeDisabled();
 
   cleanup();
 });
 test('quick connect ignores a start result after switching login methods', async () => {
   let resolveStart: (
     result: Awaited<ReturnType<typeof commands.jellyfinQuickConnectStart>>,
-  ) => void = () => undefined;
-  const startResult = new Promise<
-    Awaited<ReturnType<typeof commands.jellyfinQuickConnectStart>>
-  >((resolve) => {
-    resolveStart = resolve;
-  });
-  rstest
-    .spyOn(commands, 'jellyfinQuickConnectStart')
-    .mockReturnValue(startResult);
+  ) => void = () => {};
+  const startResult = new Promise<Awaited<ReturnType<typeof commands.jellyfinQuickConnectStart>>>(
+    (resolve) => {
+      resolveStart = resolve;
+    },
+  );
+  rstest.spyOn(commands, 'jellyfinQuickConnectStart').mockReturnValue(startResult);
   const check = rstest.spyOn(commands, 'jellyfinQuickConnectCheck');
   const cleanup = renderLoginPage();
 
-  fireEvent.input(
-    screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin'),
-    {
-      target: { value: 'jellyfin.example.com' },
-    },
-  );
-  fireEvent.click(
-    screen.getByRole('button', { name: 'Request Quick Connect code' }),
-  );
-  await waitFor(() =>
-    expect(screen.getByRole('button', { name: /Requesting/ })).toBeDisabled(),
-  );
+  fireEvent.input(screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin'), {
+    target: { value: 'jellyfin.example.com' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Request Quick Connect code' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: /Requesting/ })).toBeDisabled());
 
   fireEvent.click(screen.getByRole('tab', { name: 'Password' }));
   await waitFor(() => expect(screen.getByText('Username')).toBeVisible());
 
   resolveStart({
-    status: 'ok',
     data: { code: 'ABCD12', secret: 'secret-123' },
+    status: 'ok',
   });
   await Promise.resolve();
 
@@ -368,71 +291,53 @@ test('quick connect ignores a start result after switching login methods', async
 test('quick connect polling rejected commands fail without changing cancel behavior', async () => {
   rstest.useFakeTimers();
   rstest.spyOn(commands, 'jellyfinQuickConnectStart').mockResolvedValue({
-    status: 'ok',
     data: { code: 'ABCD12', secret: 'secret-123' },
+    status: 'ok',
   });
   rstest
     .spyOn(commands, 'jellyfinQuickConnectCheck')
     .mockRejectedValue(new Error('Polling unavailable'));
   const cleanup = renderLoginPage();
 
-  fireEvent.input(
-    screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin'),
-    {
-      target: { value: 'jellyfin.example.com' },
-    },
-  );
-  fireEvent.click(
-    screen.getByRole('button', { name: 'Request Quick Connect code' }),
-  );
+  fireEvent.input(screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin'), {
+    target: { value: 'jellyfin.example.com' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Request Quick Connect code' }));
 
   await waitFor(() => expect(screen.getByText('ABCD12')).toBeVisible());
   expect(screen.getByRole('button', { name: 'Cancel Request' })).toBeVisible();
 
   await rstest.advanceTimersByTimeAsync(5000);
 
-  await waitFor(() =>
-    expect(screen.getByText('Polling unavailable')).toBeVisible(),
-  );
-  expect(
-    screen.getByRole('button', { name: 'Request a new code' }),
-  ).not.toBeDisabled();
+  await waitFor(() => expect(screen.getByText('Polling unavailable')).toBeVisible());
+  expect(screen.getByRole('button', { name: 'Request a new code' })).not.toBeDisabled();
 
   cleanup();
 });
 test('quick connect polling status errors fail without changing cancel behavior', async () => {
   rstest.useFakeTimers();
   rstest.spyOn(commands, 'jellyfinQuickConnectStart').mockResolvedValue({
-    status: 'ok',
     data: { code: 'ABCD12', secret: 'secret-123' },
+    status: 'ok',
   });
   rstest.spyOn(commands, 'jellyfinQuickConnectCheck').mockResolvedValue({
-    status: 'error',
     error: { code: 'network', message: 'Approval polling failed' },
+    status: 'error',
   });
   const cleanup = renderLoginPage();
 
-  fireEvent.input(
-    screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin'),
-    {
-      target: { value: 'jellyfin.example.com' },
-    },
-  );
-  fireEvent.click(
-    screen.getByRole('button', { name: 'Request Quick Connect code' }),
-  );
+  fireEvent.input(screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin'), {
+    target: { value: 'jellyfin.example.com' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Request Quick Connect code' }));
 
   await waitFor(() => expect(screen.getByText('ABCD12')).toBeVisible());
   expect(screen.getByRole('button', { name: 'Cancel Request' })).toBeVisible();
 
   await rstest.advanceTimersByTimeAsync(5000);
 
-  await waitFor(() =>
-    expect(screen.getByText('Approval polling failed')).toBeVisible(),
-  );
-  expect(
-    screen.getByRole('button', { name: 'Request a new code' }),
-  ).not.toBeDisabled();
+  await waitFor(() => expect(screen.getByText('Approval polling failed')).toBeVisible());
+  expect(screen.getByRole('button', { name: 'Request a new code' })).not.toBeDisabled();
 
   cleanup();
 });
@@ -440,47 +345,35 @@ test('quick connect polling status errors fail without changing cancel behavior'
 test('quick connect ignores an approval result after cancellation', async () => {
   rstest.useFakeTimers();
   rstest.spyOn(commands, 'jellyfinQuickConnectStart').mockResolvedValue({
-    status: 'ok',
     data: { code: 'ABCD12', secret: 'secret-123' },
+    status: 'ok',
   });
   let resolveCheck: (
     result: Awaited<ReturnType<typeof commands.jellyfinQuickConnectCheck>>,
-  ) => void = () => undefined;
-  const checkResult = new Promise<
-    Awaited<ReturnType<typeof commands.jellyfinQuickConnectCheck>>
-  >((resolve) => {
-    resolveCheck = resolve;
-  });
-  const check = rstest
-    .spyOn(commands, 'jellyfinQuickConnectCheck')
-    .mockReturnValue(checkResult);
-  const authenticate = rstest.spyOn(
-    commands,
-    'jellyfinQuickConnectAuthenticate',
+  ) => void = () => {};
+  const checkResult = new Promise<Awaited<ReturnType<typeof commands.jellyfinQuickConnectCheck>>>(
+    (resolve) => {
+      resolveCheck = resolve;
+    },
   );
+  const check = rstest.spyOn(commands, 'jellyfinQuickConnectCheck').mockReturnValue(checkResult);
+  const authenticate = rstest.spyOn(commands, 'jellyfinQuickConnectAuthenticate');
   const onConnected = rstest.fn();
   const cleanup = renderLoginPage(onConnected);
 
-  fireEvent.input(
-    screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin'),
-    {
-      target: { value: 'jellyfin.example.com' },
-    },
-  );
-  fireEvent.click(
-    screen.getByRole('button', { name: 'Request Quick Connect code' }),
-  );
+  fireEvent.input(screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin'), {
+    target: { value: 'jellyfin.example.com' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Request Quick Connect code' }));
 
   await waitFor(() => expect(screen.getByText('ABCD12')).toBeVisible());
   await rstest.advanceTimersByTimeAsync(5000);
   await waitFor(() => expect(check).toHaveBeenCalledTimes(1));
 
   fireEvent.click(screen.getByRole('button', { name: 'Cancel Request' }));
-  expect(
-    screen.getByRole('button', { name: 'Request Quick Connect code' }),
-  ).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Request Quick Connect code' })).toBeVisible();
 
-  resolveCheck({ status: 'ok', data: 'approved' });
+  resolveCheck({ data: 'approved', status: 'ok' });
   await rstest.advanceTimersByTimeAsync(0);
 
   expect(authenticate).not.toHaveBeenCalled();
@@ -493,37 +386,32 @@ test('quick connect can request a new code after timeout with a poll in flight',
   rstest
     .spyOn(commands, 'jellyfinQuickConnectStart')
     .mockResolvedValueOnce({
-      status: 'ok',
       data: { code: 'ABCD12', secret: 'secret-123' },
+      status: 'ok',
     })
     .mockResolvedValueOnce({
-      status: 'ok',
       data: { code: 'WXYZ99', secret: 'secret-456' },
+      status: 'ok',
     });
-  const pendingCheck = new Promise<
-    Awaited<ReturnType<typeof commands.jellyfinQuickConnectCheck>>
-  >(() => undefined);
+  const pendingCheck = new Promise<Awaited<ReturnType<typeof commands.jellyfinQuickConnectCheck>>>(
+    () => {},
+  );
   rstest
     .spyOn(commands, 'jellyfinQuickConnectCheck')
     .mockReturnValueOnce(pendingCheck)
-    .mockResolvedValueOnce({ status: 'ok', data: 'approved' });
+    .mockResolvedValueOnce({ data: 'approved', status: 'ok' });
   rstest.spyOn(commands, 'jellyfinQuickConnectAuthenticate').mockResolvedValue({
-    status: 'ok',
     data: null,
+    status: 'ok',
   });
   rstest.spyOn(commands, 'jellyfinGetSession').mockResolvedValue(sampleSession);
   const onConnected = rstest.fn();
   const cleanup = renderLoginPage(onConnected);
 
-  fireEvent.input(
-    screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin'),
-    {
-      target: { value: 'jellyfin.example.com' },
-    },
-  );
-  fireEvent.click(
-    screen.getByRole('button', { name: 'Request Quick Connect code' }),
-  );
+  fireEvent.input(screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin'), {
+    target: { value: 'jellyfin.example.com' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Request Quick Connect code' }));
 
   await waitFor(() => expect(screen.getByText('ABCD12')).toBeVisible());
   await rstest.advanceTimersByTimeAsync(5000);
@@ -531,9 +419,7 @@ test('quick connect can request a new code after timeout with a poll in flight',
 
   await waitFor(() =>
     expect(
-      screen.getByText(
-        'Quick Connect code expired. Request a new code to try again.',
-      ),
+      screen.getByText('Quick Connect code expired. Request a new code to try again.'),
     ).toBeVisible(),
   );
 
@@ -550,12 +436,12 @@ test('quick connect can request a new code after timeout with a poll in flight',
 test('quick connect authentication rejected commands fail and unlock request', async () => {
   rstest.useFakeTimers();
   rstest.spyOn(commands, 'jellyfinQuickConnectStart').mockResolvedValue({
-    status: 'ok',
     data: { code: 'ABCD12', secret: 'secret-123' },
+    status: 'ok',
   });
   rstest.spyOn(commands, 'jellyfinQuickConnectCheck').mockResolvedValue({
-    status: 'ok',
     data: 'approved',
+    status: 'ok',
   });
   rstest
     .spyOn(commands, 'jellyfinQuickConnectAuthenticate')
@@ -563,25 +449,16 @@ test('quick connect authentication rejected commands fail and unlock request', a
   const onConnected = rstest.fn();
   const cleanup = renderLoginPage(onConnected);
 
-  fireEvent.input(
-    screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin'),
-    {
-      target: { value: 'jellyfin.example.com' },
-    },
-  );
-  fireEvent.click(
-    screen.getByRole('button', { name: 'Request Quick Connect code' }),
-  );
+  fireEvent.input(screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin'), {
+    target: { value: 'jellyfin.example.com' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Request Quick Connect code' }));
 
   await waitFor(() => expect(screen.getByText('ABCD12')).toBeVisible());
   await rstest.advanceTimersByTimeAsync(5000);
 
-  await waitFor(() =>
-    expect(screen.getByText('Authentication unavailable')).toBeVisible(),
-  );
-  expect(
-    screen.getByRole('button', { name: 'Request a new code' }),
-  ).not.toBeDisabled();
+  await waitFor(() => expect(screen.getByText('Authentication unavailable')).toBeVisible());
+  expect(screen.getByRole('button', { name: 'Request a new code' })).not.toBeDisabled();
   expect(onConnected).not.toHaveBeenCalled();
 
   cleanup();
@@ -589,39 +466,30 @@ test('quick connect authentication rejected commands fail and unlock request', a
 test('quick connect authentication status errors fail and unlock request', async () => {
   rstest.useFakeTimers();
   rstest.spyOn(commands, 'jellyfinQuickConnectStart').mockResolvedValue({
-    status: 'ok',
     data: { code: 'ABCD12', secret: 'secret-123' },
+    status: 'ok',
   });
   rstest.spyOn(commands, 'jellyfinQuickConnectCheck').mockResolvedValue({
-    status: 'ok',
     data: 'approved',
+    status: 'ok',
   });
   rstest.spyOn(commands, 'jellyfinQuickConnectAuthenticate').mockResolvedValue({
-    status: 'error',
     error: { code: 'authFailed', message: 'Authentication failed' },
+    status: 'error',
   });
   const onConnected = rstest.fn();
   const cleanup = renderLoginPage(onConnected);
 
-  fireEvent.input(
-    screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin'),
-    {
-      target: { value: 'jellyfin.example.com' },
-    },
-  );
-  fireEvent.click(
-    screen.getByRole('button', { name: 'Request Quick Connect code' }),
-  );
+  fireEvent.input(screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin'), {
+    target: { value: 'jellyfin.example.com' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Request Quick Connect code' }));
 
   await waitFor(() => expect(screen.getByText('ABCD12')).toBeVisible());
   await rstest.advanceTimersByTimeAsync(5000);
 
-  await waitFor(() =>
-    expect(screen.getByText('Authentication failed')).toBeVisible(),
-  );
-  expect(
-    screen.getByRole('button', { name: 'Request a new code' }),
-  ).not.toBeDisabled();
+  await waitFor(() => expect(screen.getByText('Authentication failed')).toBeVisible());
+  expect(screen.getByRole('button', { name: 'Request a new code' })).not.toBeDisabled();
   expect(onConnected).not.toHaveBeenCalled();
 
   cleanup();
@@ -629,19 +497,16 @@ test('quick connect authentication status errors fail and unlock request', async
 
 test('password login saves the authenticated session', async () => {
   rstest.spyOn(commands, 'jellyfinConnect').mockResolvedValue({
-    status: 'ok',
     data: null,
+    status: 'ok',
   });
   rstest.spyOn(commands, 'jellyfinGetSession').mockResolvedValue(sampleSession);
   const onConnected = rstest.fn();
   const cleanup = renderLoginPage(onConnected);
 
-  fireEvent.input(
-    screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin'),
-    {
-      target: { value: 'jellyfin.example.com' },
-    },
-  );
+  fireEvent.input(screen.getByPlaceholderText('jellyfin.local or media.example.com/jellyfin'), {
+    target: { value: 'jellyfin.example.com' },
+  });
   fireEvent.click(screen.getByRole('tab', { name: 'Password' }));
 
   await waitFor(() => expect(screen.getByText('Username')).toBeVisible());
@@ -660,10 +525,10 @@ test('password login saves the authenticated session', async () => {
 });
 test('password login stays locked while saving the authenticated session', async () => {
   const connect = rstest.spyOn(commands, 'jellyfinConnect').mockResolvedValue({
-    status: 'ok',
     data: null,
+    status: 'ok',
   });
-  let resolveSession: (session: typeof sampleSession) => void = () => undefined;
+  let resolveSession: (session: typeof sampleSession) => void = () => {};
   const session = new Promise<typeof sampleSession>((resolve) => {
     resolveSession = resolve;
   });
@@ -684,21 +549,17 @@ test('password login stays locked while saving the authenticated session', async
 });
 test('password login session-save failures show an error and unlock submit', async () => {
   rstest.spyOn(commands, 'jellyfinConnect').mockResolvedValue({
-    status: 'ok',
     data: null,
+    status: 'ok',
   });
-  rstest
-    .spyOn(commands, 'jellyfinGetSession')
-    .mockRejectedValue(new Error('Session unavailable'));
+  rstest.spyOn(commands, 'jellyfinGetSession').mockRejectedValue(new Error('Session unavailable'));
   const onConnected = rstest.fn();
   const cleanup = renderLoginPage(onConnected);
 
   await fillPasswordLogin();
   fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
 
-  await waitFor(() =>
-    expect(screen.getByText('Session unavailable')).toBeVisible(),
-  );
+  await waitFor(() => expect(screen.getByText('Session unavailable')).toBeVisible());
   expect(screen.getByRole('button', { name: 'Connect' })).not.toBeDisabled();
   expect(onConnected).not.toHaveBeenCalled();
 
@@ -706,23 +567,21 @@ test('password login session-save failures show an error and unlock submit', asy
 });
 test('password login saves remembered Login Prefill when remember me is checked', async () => {
   rstest.spyOn(commands, 'jellyfinConnect').mockResolvedValue({
-    status: 'ok',
     data: null,
+    status: 'ok',
   });
   rstest.spyOn(commands, 'jellyfinGetSession').mockResolvedValue(sampleSession);
   const cleanup = renderLoginPage();
 
   await fillPasswordLogin();
-  fireEvent.click(
-    screen.getByRole('checkbox', { name: 'Remember Server URL and username' }),
-  );
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Remember Server URL and username' }));
   fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
 
   await waitFor(() =>
     expect(Effect.runSync(loadSavedCredentials())).toEqual({
+      rememberMe: true,
       serverUrl: 'https://jellyfin.example.com',
       username: 'ada',
-      rememberMe: true,
     }),
   );
 
@@ -733,35 +592,31 @@ test('password login clears Login Prefill when remember me is unchecked', async 
   localStorage.setItem(
     CREDENTIALS_STORAGE_KEY,
     JSON.stringify({
+      rememberMe: true,
       serverUrl: 'https://old.example.com',
       username: 'old',
-      rememberMe: true,
     }),
   );
   rstest.spyOn(commands, 'jellyfinConnect').mockResolvedValue({
-    status: 'ok',
     data: null,
+    status: 'ok',
   });
   rstest.spyOn(commands, 'jellyfinGetSession').mockResolvedValue(sampleSession);
   const cleanup = renderLoginPage();
 
   await fillPasswordLogin();
-  fireEvent.click(
-    screen.getByRole('checkbox', { name: 'Remember Server URL and username' }),
-  );
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Remember Server URL and username' }));
   fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
 
-  await waitFor(() =>
-    expect(Effect.runSync(loadSavedCredentials())).toBeNull(),
-  );
+  await waitFor(() => expect(Effect.runSync(loadSavedCredentials())).toBeNull());
 
   cleanup();
 });
 
 test('password login status errors show the command message and unlock submit', async () => {
   rstest.spyOn(commands, 'jellyfinConnect').mockResolvedValue({
-    status: 'error',
     error: { code: 'authFailed', message: 'Invalid username or password' },
+    status: 'error',
   });
   const onConnected = rstest.fn();
   const cleanup = renderLoginPage(onConnected);
@@ -769,9 +624,7 @@ test('password login status errors show the command message and unlock submit', 
   await fillPasswordLogin();
   fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
 
-  await waitFor(() =>
-    expect(screen.getByText('Invalid username or password')).toBeVisible(),
-  );
+  await waitFor(() => expect(screen.getByText('Invalid username or password')).toBeVisible());
   expect(screen.getByRole('button', { name: 'Connect' })).not.toBeDisabled();
   expect(onConnected).not.toHaveBeenCalled();
 
@@ -779,18 +632,14 @@ test('password login status errors show the command message and unlock submit', 
 });
 
 test('password login rejected commands show an error and unlock submit', async () => {
-  rstest
-    .spyOn(commands, 'jellyfinConnect')
-    .mockRejectedValue(new Error('IPC unavailable'));
+  rstest.spyOn(commands, 'jellyfinConnect').mockRejectedValue(new Error('IPC unavailable'));
   const onConnected = rstest.fn();
   const cleanup = renderLoginPage(onConnected);
 
   await fillPasswordLogin();
   fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
 
-  await waitFor(() =>
-    expect(screen.getByText('IPC unavailable')).toBeVisible(),
-  );
+  await waitFor(() => expect(screen.getByText('IPC unavailable')).toBeVisible());
   expect(screen.getByRole('button', { name: 'Connect' })).not.toBeDisabled();
   expect(onConnected).not.toHaveBeenCalled();
 
@@ -806,7 +655,7 @@ test('loadSavedCredentials returns StorageParseError for malformed JSON', () => 
     if (!reason || !Cause.isFailReason(reason)) {
       throw new Error('Expected typed StorageParseError failure');
     }
-    const error = reason.error;
+    const { error } = reason;
     expect(error).toBeInstanceOf(StorageParseError);
     expect(error.key).toBe(CREDENTIALS_STORAGE_KEY);
   }
@@ -820,17 +669,14 @@ test('loadSavedCredentials returns StorageParseError for empty malformed JSON', 
     if (!reason || !Cause.isFailReason(reason)) {
       throw new Error('Expected typed StorageParseError failure');
     }
-    const error = reason.error;
+    const { error } = reason;
     expect(error).toBeInstanceOf(StorageParseError);
     expect(error.key).toBe(CREDENTIALS_STORAGE_KEY);
   }
 });
 
 test('loadSavedCredentials returns StorageParseError for wrong shape', () => {
-  localStorage.setItem(
-    CREDENTIALS_STORAGE_KEY,
-    JSON.stringify({ notServerUrl: true }),
-  );
+  localStorage.setItem(CREDENTIALS_STORAGE_KEY, JSON.stringify({ notServerUrl: true }));
   const exit = Effect.runSyncExit(loadSavedCredentials());
   expect(Exit.isFailure(exit)).toBe(true);
   if (Exit.isFailure(exit)) {
@@ -838,7 +684,7 @@ test('loadSavedCredentials returns StorageParseError for wrong shape', () => {
     if (!reason || !Cause.isFailReason(reason)) {
       throw new Error('Expected typed StorageParseError failure');
     }
-    const error = reason.error;
+    const { error } = reason;
     expect(error).toBeInstanceOf(StorageParseError);
   }
 });

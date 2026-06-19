@@ -1,62 +1,45 @@
 import type { VideoLibraryItem, VideoSeason } from '@bindings';
-import {
-  LibraryPlaybackChooser,
-  type LibraryPlaybackSelection,
-  type PendingLibraryPlayback,
+import { LibraryPlaybackChooser } from '@components/library/LibraryPlaybackChooser';
+import type {
+  LibraryPlaybackSelection,
+  PendingLibraryPlayback,
 } from '@components/library/LibraryPlaybackChooser';
 import {
-  formatRuntime,
   LibraryStatusPanel,
+  UserDataControls,
+  formatRuntime,
   seasonLabel,
   showSubtitle,
-  UserDataControls,
 } from '@components/library/shared';
 import { Button, StatusBadge } from '@components/ui';
 import { createFileRoute } from '@tanstack/solid-router';
 import { Exit } from 'effect';
 import { Film, Library, RefreshCw, Tv } from 'lucide-solid';
-import {
-  createEffect,
-  createResource,
-  createSignal,
-  For,
-  Show,
-} from 'solid-js';
+import { For, Show, createEffect, createResource, createSignal } from 'solid-js';
 import { commandFailureMessage } from '~effects/commands';
 import {
   fetchSeasonEpisodes,
   fetchVideoItemDetail,
   fetchVideoShowDetail,
-  type LibraryExit,
-  type SeasonEpisodesState,
   startLibraryPlayback,
   updateLibraryUserData,
 } from '~effects/library';
+import type { LibraryExit, SeasonEpisodesState } from '~effects/library';
 
-export const Route = createFileRoute('/_authenticated/library/shows/$seriesId')(
-  {
-    component: LibraryShowDetailRoute,
-  },
-);
+export const Route = createFileRoute('/_authenticated/library/shows/$seriesId')({
+  component: LibraryShowDetailRoute,
+});
 
 function LibraryShowDetailRoute() {
   const params = Route.useParams();
-  const [state, { refetch }] = createResource(() =>
-    fetchVideoShowDetail(params().seriesId),
-  );
-  const [selectedSeason, setSelectedSeason] = createSignal<VideoSeason | null>(
-    null,
-  );
-  const [episodes, setEpisodes] =
-    createSignal<LibraryExit<SeasonEpisodesState> | null>(null);
+  const [state, { refetch }] = createResource(() => fetchVideoShowDetail(params().seriesId));
+  const [selectedSeason, setSelectedSeason] = createSignal<VideoSeason | null>(null);
+  const [episodes, setEpisodes] = createSignal<LibraryExit<SeasonEpisodesState> | null>(null);
   const [episodesLoading, setEpisodesLoading] = createSignal(false);
   const [playBusy, setPlayBusy] = createSignal(false);
-  const [episodePlayBusy, setEpisodePlayBusy] = createSignal<string | null>(
-    null,
-  );
+  const [episodePlayBusy, setEpisodePlayBusy] = createSignal<string | null>(null);
   const [confirmBusy, setConfirmBusy] = createSignal(false);
-  const [pendingPlayback, setPendingPlayback] =
-    createSignal<PendingLibraryPlayback | null>(null);
+  const [pendingPlayback, setPendingPlayback] = createSignal<PendingLibraryPlayback | null>(null);
   const [playError, setPlayError] = createSignal<string | null>(null);
   const [autoLoaded, setAutoLoaded] = createSignal(false);
   const detail = () => {
@@ -65,20 +48,20 @@ function LibraryShowDetailRoute() {
   };
   const seasonEpisodes = () => {
     const current = episodes();
-    return current && Exit.isSuccess(current)
-      ? current.value.page.episodes
-      : [];
+    return current && Exit.isSuccess(current) ? current.value.page.episodes : [];
   };
   const hasSeasonEpisodes = () => seasonEpisodes().length > 0;
   const loadEpisodes = async (season: VideoSeason) => {
-    if (episodesLoading()) return;
+    if (episodesLoading()) {
+      return;
+    }
     setSelectedSeason(season);
     setEpisodes(null);
     setEpisodesLoading(true);
     const result = await fetchSeasonEpisodes({
-      seriesId: params().seriesId,
       seasonId: season.id,
       seasonNumber: season.seasonNumber,
+      seriesId: params().seriesId,
     });
     setEpisodes(result);
     setEpisodesLoading(false);
@@ -86,12 +69,12 @@ function LibraryShowDetailRoute() {
   // Auto-load the season containing the next-up episode via reactive effect
   createEffect(() => {
     const show = detail();
-    if (!show || autoLoaded()) return;
+    if (!show || autoLoaded()) {
+      return;
+    }
     setAutoLoaded(true);
     if (show.nextEpisode?.seasonNumber != null) {
-      const match = show.seasons.find(
-        (s) => s.seasonNumber === show.nextEpisode?.seasonNumber,
-      );
+      const match = show.seasons.find((s) => s.seasonNumber === show.nextEpisode?.seasonNumber);
       if (match) {
         void loadEpisodes(match);
         return;
@@ -105,22 +88,22 @@ function LibraryShowDetailRoute() {
   const openEpisodePlaybackChooser = async (itemId: string) => {
     const result = await fetchVideoItemDetail(itemId);
     Exit.match(result, {
-      onFailure: (cause) =>
-        setPlayError(commandFailureMessage(cause, 'Could not load episode')),
+      onFailure: (cause) => setPlayError(commandFailureMessage(cause, 'Could not load episode')),
       onSuccess: (episodeDetail) => {
         const mode = episodeDetail.canResume ? 'resume' : 'start';
         setPendingPlayback({
           detail: episodeDetail,
           mode,
-          startPositionSeconds:
-            mode === 'resume' ? episodeDetail.resumePositionSeconds : 0,
+          startPositionSeconds: mode === 'resume' ? episodeDetail.resumePositionSeconds : 0,
         });
       },
     });
   };
   const playShow = async () => {
     const show = detail();
-    if (!show?.nextEpisode || playBusy() || confirmBusy()) return;
+    if (!show?.nextEpisode || playBusy() || confirmBusy()) {
+      return;
+    }
 
     setPlayBusy(true);
     setPlayError(null);
@@ -128,7 +111,9 @@ function LibraryShowDetailRoute() {
     setPlayBusy(false);
   };
   const playEpisode = async (episode: VideoLibraryItem) => {
-    if (episodePlayBusy() || confirmBusy()) return;
+    if (episodePlayBusy() || confirmBusy()) {
+      return;
+    }
 
     setEpisodePlayBusy(episode.id);
     setPlayError(null);
@@ -137,30 +122,34 @@ function LibraryShowDetailRoute() {
   };
   const confirmPlayback = async (selection: LibraryPlaybackSelection) => {
     const pending = pendingPlayback();
-    if (!pending || confirmBusy()) return;
+    if (!pending || confirmBusy()) {
+      return;
+    }
 
     setConfirmBusy(true);
     setPlayError(null);
     const result = await startLibraryPlayback({
+      audioStreamIndex: selection.audioStreamIndex,
       itemId: pending.detail.id,
       mode: pending.mode,
       startPositionSeconds: pending.startPositionSeconds,
-      audioStreamIndex: selection.audioStreamIndex,
       subtitleStreamIndex: selection.subtitleStreamIndex,
     });
     const message = Exit.match(result, {
-      onFailure: (cause) =>
-        commandFailureMessage(cause, 'Could not start playback'),
+      onFailure: (cause) => commandFailureMessage(cause, 'Could not start playback'),
       onSuccess: () => null,
     });
     setPlayError(message);
     setConfirmBusy(false);
-    if (!message) setPendingPlayback(null);
+    if (!message) {
+      setPendingPlayback(null);
+    }
   };
   const statusTitle = () => {
     const current = state.latest;
-    if (current && !Exit.isSuccess(current))
+    if (current && !Exit.isSuccess(current)) {
       return 'Could not load show detail';
+    }
     return 'Loading show detail';
   };
   const statusDescription = () => {
@@ -172,12 +161,10 @@ function LibraryShowDetailRoute() {
   };
   const episodesStatusTitle = () => {
     const current = episodes();
-    if (episodesLoading()) return 'Loading season episodes';
-    if (
-      current &&
-      Exit.isSuccess(current) &&
-      current.value.page.episodes.length === 0
-    ) {
+    if (episodesLoading()) {
+      return 'Loading season episodes';
+    }
+    if (current && Exit.isSuccess(current) && current.value.page.episodes.length === 0) {
       return 'Season has no episodes';
     }
     if (current && !Exit.isSuccess(current)) {
@@ -190,18 +177,11 @@ function LibraryShowDetailRoute() {
     if (episodesLoading()) {
       return 'JMSR is loading exact Episode cards for the selected Season.';
     }
-    if (
-      current &&
-      Exit.isSuccess(current) &&
-      current.value.page.episodes.length === 0
-    ) {
+    if (current && Exit.isSuccess(current) && current.value.page.episodes.length === 0) {
       return 'Jellyfin returned no Episodes for the selected Season.';
     }
     if (current && !Exit.isSuccess(current)) {
-      return commandFailureMessage(
-        current.cause,
-        'Could not load season episodes',
-      );
+      return commandFailureMessage(current.cause, 'Could not load season episodes');
     }
     return 'Season buttons keep manual episode selection available alongside Jellyfin next-up resolution.';
   };
@@ -237,18 +217,13 @@ function LibraryShowDetailRoute() {
 
       <Show
         when={detail()}
-        fallback={
-          <LibraryStatusPanel
-            title={statusTitle()}
-            description={statusDescription()}
-          />
-        }
+        fallback={<LibraryStatusPanel title={statusTitle()} description={statusDescription()} />}
       >
         {(show) => (
           <div class="console-grid">
             {/* Left Column (Interactive): Seasons & Episode List */}
             <section
-              class="space-y-4 min-w-0 order-2 lg:order-1"
+              class="order-2 min-w-0 space-y-4 lg:order-1"
               aria-labelledby="show-seasons-title"
             >
               <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
@@ -257,9 +232,7 @@ function LibraryShowDetailRoute() {
                     Episodes
                   </h2>
                 </div>
-                <p class="text-body-small">
-                  {show().seasons.length} seasons available
-                </p>
+                <p class="text-body-small">{show().seasons.length} seasons available</p>
               </div>
 
               <Show
@@ -272,7 +245,7 @@ function LibraryShowDetailRoute() {
                 }
               >
                 <ul
-                  class="flex gap-2 overflow-x-auto rounded-2xl border border-outline-variant bg-surface-container-low/70 p-2"
+                  class="border-outline-variant bg-surface-container-low/70 flex gap-2 overflow-x-auto rounded-2xl border p-2"
                   aria-label="Show seasons"
                 >
                   <For each={show().seasons}>
@@ -306,25 +279,20 @@ function LibraryShowDetailRoute() {
                     />
                   }
                 >
-                  <section
-                    class="space-y-3"
-                    aria-labelledby="season-episodes-title"
-                  >
+                  <section class="space-y-3" aria-labelledby="season-episodes-title">
                     <h3 id="season-episodes-title" class="text-title-medium">
-                      {selectedSeason()
-                        ? `${selectedSeason()?.name} Episodes`
-                        : 'Episodes'}
+                      {selectedSeason() ? `${selectedSeason()?.name} Episodes` : 'Episodes'}
                     </h3>
-                    <div class="flex flex-col gap-3 animate-fade-in">
+                    <div class="animate-fade-in flex flex-col gap-3">
                       <For each={seasonEpisodes()}>
                         {(episode) => (
-                          <div class="card-filled grid gap-4 p-3 grid-cols-1 sm:grid-cols-[160px_1fr_auto] items-center">
+                          <div class="card-filled grid grid-cols-1 items-center gap-4 p-3 sm:grid-cols-[160px_1fr_auto]">
                             {/* Episode thumbnail - landscape, episode-specific */}
-                            <div class="aspect-video w-full overflow-hidden rounded-lg bg-surface-container-lowest/60">
+                            <div class="bg-surface-container-lowest/60 aspect-video w-full overflow-hidden rounded-lg">
                               <Show
                                 when={episode.artworkUrl}
                                 fallback={
-                                  <div class="flex h-full items-center justify-center text-label-small text-on-surface-variant">
+                                  <div class="text-label-small text-on-surface-variant flex h-full items-center justify-center">
                                     <Film class="h-5 w-5" />
                                   </div>
                                 }
@@ -347,23 +315,15 @@ function LibraryShowDetailRoute() {
                                   {episodeLabel(episode)}
                                 </span>
                                 <Show when={episode.played}>
-                                  <StatusBadge variant="success">
-                                    Played
-                                  </StatusBadge>
+                                  <StatusBadge variant="success">Played</StatusBadge>
                                 </Show>
                                 <Show when={episode.favorite}>
-                                  <StatusBadge variant="success">
-                                    Favorite
-                                  </StatusBadge>
+                                  <StatusBadge variant="success">Favorite</StatusBadge>
                                 </Show>
-                                <Show
-                                  when={formatRuntime(episode.runtimeSeconds)}
-                                >
+                                <Show when={formatRuntime(episode.runtimeSeconds)}>
                                   {(runtime) => (
                                     <>
-                                      <span class="text-on-surface-variant/70">
-                                        ·
-                                      </span>{' '}
+                                      <span class="text-on-surface-variant/70">·</span>{' '}
                                       <span class="text-body-small text-on-surface-variant/70">
                                         {runtime()}
                                       </span>
@@ -377,18 +337,15 @@ function LibraryShowDetailRoute() {
                                     !episode.played
                                   }
                                 >
-                                  <span class="text-on-surface-variant/70">
-                                    ·
-                                  </span>{' '}
+                                  <span class="text-on-surface-variant/70">·</span>{' '}
                                   <span class="text-body-small text-secondary font-semibold">
-                                    {Math.round(episode.playedPercentage ?? 0)}%
-                                    watched
+                                    {Math.round(episode.playedPercentage ?? 0)}% watched
                                   </span>
                                 </Show>
                               </div>
                               <a
                                 href={`/library/items/${episode.id}`}
-                                class="block text-title-medium hover:underline truncate"
+                                class="text-title-medium block truncate hover:underline"
                               >
                                 {episode.name}
                               </a>
@@ -406,31 +363,22 @@ function LibraryShowDetailRoute() {
                                   <Button
                                     type="button"
                                     variant="primary"
-                                    class="rounded-full px-5 py-2 text-label-large"
-                                    disabled={
-                                      episodePlayBusy() !== null ||
-                                      confirmBusy()
-                                    }
+                                    class="text-label-large rounded-full px-5 py-2"
+                                    disabled={episodePlayBusy() !== null || confirmBusy()}
                                     onClick={() => void playEpisode(episode)}
                                   >
-                                    {episodePlayBusy() === episode.id
-                                      ? 'Loading...'
-                                      : 'Play'}
+                                    {episodePlayBusy() === episode.id ? 'Loading...' : 'Play'}
                                   </Button>
                                 }
                               >
                                 <Button
                                   type="button"
                                   variant="primary"
-                                  class="rounded-full px-5 py-2 text-label-large"
-                                  disabled={
-                                    episodePlayBusy() !== null || confirmBusy()
-                                  }
+                                  class="text-label-large rounded-full px-5 py-2"
+                                  disabled={episodePlayBusy() !== null || confirmBusy()}
                                   onClick={() => void playEpisode(episode)}
                                 >
-                                  {episodePlayBusy() === episode.id
-                                    ? 'Loading...'
-                                    : 'Resume'}
+                                  {episodePlayBusy() === episode.id ? 'Loading...' : 'Resume'}
                                 </Button>
                               </Show>
                             </div>
@@ -444,13 +392,13 @@ function LibraryShowDetailRoute() {
             </section>
 
             {/* Right Column (Sidebar): Series Info */}
-            <aside class="space-y-6 order-1 lg:order-2">
+            <aside class="order-1 space-y-6 lg:order-2">
               <article class="card-filled space-y-4">
-                <div class="aspect-[2/3] overflow-hidden rounded-2xl bg-surface-container-lowest/60 border border-outline-variant">
+                <div class="bg-surface-container-lowest/60 border-outline-variant aspect-[2/3] overflow-hidden rounded-2xl border">
                   <Show
                     when={show().artworkUrl}
                     fallback={
-                      <div class="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-on-surface-variant">
+                      <div class="text-on-surface-variant flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
                         <Tv class="h-8 w-8" />
                         <p class="text-title-medium">{show().name}</p>
                         <p class="text-label-small">No artwork</p>
@@ -461,7 +409,7 @@ function LibraryShowDetailRoute() {
                       <img
                         src={artworkUrl()}
                         alt={`${show().name} artwork`}
-                        class="h-full w-full object-cover animate-fade-in"
+                        class="animate-fade-in h-full w-full object-cover"
                       />
                     )}
                   </Show>
@@ -469,15 +417,13 @@ function LibraryShowDetailRoute() {
                 <div>
                   <p class="text-label-small text-secondary">Series</p>
                   <h1 class="text-headline-medium">{show().name}</h1>
-                  <p class="mt-1 text-body-medium">{showSubtitle(show())}</p>
+                  <p class="text-body-medium mt-1">{showSubtitle(show())}</p>
                 </div>
                 <div class="flex flex-wrap gap-2">
                   <StatusBadge variant={show().played ? 'success' : 'neutral'}>
                     {show().played ? 'Played' : 'Unplayed'}
                   </StatusBadge>
-                  <StatusBadge
-                    variant={show().favorite ? 'success' : 'neutral'}
-                  >
+                  <StatusBadge variant={show().favorite ? 'success' : 'neutral'}>
                     {show().favorite ? 'Favorite' : 'Not favorite'}
                   </StatusBadge>
                 </div>
@@ -493,17 +439,17 @@ function LibraryShowDetailRoute() {
 
                 <Show when={show().overview}>
                   {(overview) => (
-                    <p class="text-body-medium border-t border-outline-variant/30 pt-3 leading-relaxed">
+                    <p class="text-body-medium border-outline-variant/30 border-t pt-3 leading-relaxed">
                       {overview()}
                     </p>
                   )}
                 </Show>
 
                 <Show when={show().genres.length > 0}>
-                  <div class="flex flex-wrap gap-1.5 border-t border-outline-variant/30 pt-3">
+                  <div class="border-outline-variant/30 flex flex-wrap gap-1.5 border-t pt-3">
                     <For each={show().genres}>
                       {(genre) => (
-                        <span class="rounded-full border border-outline-variant px-2.5 py-0.5 text-[11px] font-bold text-on-surface-variant/90">
+                        <span class="border-outline-variant text-on-surface-variant/90 rounded-full border px-2.5 py-0.5 text-[11px] font-bold">
                           {genre}
                         </span>
                       )}
@@ -514,12 +460,12 @@ function LibraryShowDetailRoute() {
                 {/* Secondary Play next episode shortcut */}
                 <Show when={show().nextEpisode}>
                   {(nextEpisode) => (
-                    <div class="flex flex-col gap-3 border-t border-outline-variant/30 pt-3">
+                    <div class="border-outline-variant/30 flex flex-col gap-3 border-t pt-3">
                       <p class="text-label-small text-secondary">Up Next</p>
                       <Button
                         type="button"
                         variant="primary"
-                        class="rounded-full w-full"
+                        class="w-full rounded-full"
                         disabled={playBusy() || confirmBusy()}
                         onClick={() => void playShow()}
                       >
@@ -527,7 +473,7 @@ function LibraryShowDetailRoute() {
                       </Button>
                       <a
                         href={`/library/items/${nextEpisode().id}`}
-                        class="text-body-small text-center text-on-surface-variant underline-offset-4 hover:underline hover:text-secondary truncate block"
+                        class="text-body-small text-on-surface-variant hover:text-secondary block truncate text-center underline-offset-4 hover:underline"
                       >
                         Next: {nextEpisode().name}
                       </a>

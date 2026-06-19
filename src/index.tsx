@@ -1,13 +1,14 @@
-import { render } from 'solid-js/web';
+import { attachDevtoolsOverlay } from '@solid-devtools/overlay';
 import '@fontsource-variable/inter';
 import '@fontsource-variable/space-grotesk';
-import { attachDevtoolsOverlay } from '@solid-devtools/overlay';
+import { render } from 'solid-js/web';
+
 import './index.css';
 import App from './App';
 
 attachDevtoolsOverlay();
 
-const root = document.getElementById('root');
+const root = document.querySelector('#root');
 if (root) {
   render(() => <App />, root);
 }

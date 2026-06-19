@@ -1,25 +1,27 @@
 import { Play, X } from 'lucide-solid';
 import { createEffect, createMemo, createSignal } from 'solid-js';
+
 import type {
   VideoItemDetail,
   VideoLibraryPlayMode,
   VideoPlaybackStreamOption,
 } from '../../bindings';
-import { Button, JmsrSelect, type JmsrSelectItem } from '../ui';
+import { Button, JmsrSelect } from '../ui';
+import type { JmsrSelectItem } from '../ui';
 
 const SUBTITLE_AUTO = 'auto';
 const SUBTITLE_OFF = 'off';
 
-export type PendingLibraryPlayback = {
+export interface PendingLibraryPlayback {
   detail: VideoItemDetail;
   mode: VideoLibraryPlayMode;
   startPositionSeconds: number | null;
-};
+}
 
-export type LibraryPlaybackSelection = {
+export interface LibraryPlaybackSelection {
   audioStreamIndex: number | null;
   subtitleStreamIndex: number | null;
-};
+}
 
 export function LibraryPlaybackChooser(props: {
   pending: PendingLibraryPlayback;
@@ -30,20 +32,20 @@ export function LibraryPlaybackChooser(props: {
   const audioItems = createMemo<JmsrSelectItem[]>(() => {
     const streams = props.pending.detail.audioStreams;
     if (streams.length === 0) {
-      return [{ value: '', label: 'No audio tracks', disabled: true }];
+      return [{ disabled: true, label: 'No audio tracks', value: '' }];
     }
 
     return streams.map((stream) => ({
-      value: String(stream.index),
       label: streamLabel(stream),
+      value: String(stream.index),
     }));
   });
   const subtitleItems = createMemo<JmsrSelectItem[]>(() => [
-    { value: SUBTITLE_AUTO, label: 'Auto' },
-    { value: SUBTITLE_OFF, label: 'Off' },
+    { label: 'Auto', value: SUBTITLE_AUTO },
+    { label: 'Off', value: SUBTITLE_OFF },
     ...props.pending.detail.subtitleStreams.map((stream) => ({
-      value: String(stream.index),
       label: streamLabel(stream),
+      value: String(stream.index),
     })),
   ]);
   const defaultAudioValue = createMemo(() => {
@@ -61,12 +63,15 @@ export function LibraryPlaybackChooser(props: {
     setSubtitleValue(SUBTITLE_AUTO);
   });
 
-  const audioStreamIndex = () =>
-    audioValue() === '' ? null : Number(audioValue());
+  const audioStreamIndex = () => (audioValue() === '' ? null : Number(audioValue()));
   const subtitleStreamIndex = () => {
     const value = subtitleValue();
-    if (value === SUBTITLE_AUTO) return null;
-    if (value === SUBTITLE_OFF) return -1;
+    if (value === SUBTITLE_AUTO) {
+      return null;
+    }
+    if (value === SUBTITLE_OFF) {
+      return -1;
+    }
     return Number(value);
   };
   const confirmLabel = () =>
@@ -74,13 +79,11 @@ export function LibraryPlaybackChooser(props: {
 
   return (
     <section
-      class="card-filled space-y-4 border-secondary/40 bg-secondary-container/10"
+      class="card-filled border-secondary/40 bg-secondary-container/10 space-y-4"
       aria-labelledby="library-playback-chooser-title"
     >
       <div>
-        <p class="text-label-small text-secondary">
-          {props.pending.detail.itemType}
-        </p>
+        <p class="text-label-small text-secondary">{props.pending.detail.itemType}</p>
         <h2 id="library-playback-chooser-title" class="text-title-large">
           {props.pending.detail.name}
         </h2>
@@ -90,9 +93,7 @@ export function LibraryPlaybackChooser(props: {
         <JmsrSelect
           label="Audio track"
           items={audioItems()}
-          disabled={
-            props.busy || props.pending.detail.audioStreams.length === 0
-          }
+          disabled={props.busy || props.pending.detail.audioStreams.length === 0}
           value={audioValue()}
           placeholder="No audio tracks"
           size="compact"
@@ -148,7 +149,5 @@ function streamLabel(stream: VideoPlaybackStreamOption) {
     stream.isDefault ? 'Default' : null,
   ].filter((tag) => tag !== null);
 
-  return tags.length > 0
-    ? `${stream.label} (${tags.join(', ')})`
-    : stream.label;
+  return tags.length > 0 ? `${stream.label} (${tags.join(', ')})` : stream.label;
 }

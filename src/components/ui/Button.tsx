@@ -1,8 +1,9 @@
-import { type JSX, Show, splitProps } from 'solid-js';
+import { Show, splitProps } from 'solid-js';
+import type { JSX } from 'solid-js';
+
 import * as styles from './Button.css';
 
-export interface ButtonProps
-  extends JSX.ButtonHTMLAttributes<HTMLButtonElement> {
+export interface ButtonProps extends JSX.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'tonal' | 'outlined' | 'text' | 'icon';
   size?: 'sm' | 'md' | 'lg';
   leadingIcon?: JSX.Element;
@@ -29,16 +30,15 @@ export default function Button(props: ButtonProps) {
 
   const variant = () => local.variant ?? 'primary';
   const size = () => local.size ?? 'md';
+  const anchorRest = () => rest as unknown as JSX.AnchorHTMLAttributes<HTMLAnchorElement>;
 
   const buttonClass = () => {
     const classes = [styles.baseButton];
 
     if (variant() === 'icon') {
-      classes.push(styles.variantStyles.icon);
-      classes.push(styles.iconSizeStyles[size()]);
+      classes.push(styles.variantStyles.icon, styles.iconSizeStyles[size()]);
     } else {
-      classes.push(styles.variantStyles[variant()]);
-      classes.push(styles.sizeStyles[size()]);
+      classes.push(styles.variantStyles[variant()], styles.sizeStyles[size()]);
     }
 
     if (local.class) {
@@ -65,8 +65,7 @@ export default function Button(props: ButtonProps) {
         </button>
       }
     >
-      {/* biome-ignore lint/suspicious/noExplicitAny: rest forwards HTML button props, cast to any is safe here for anchor */}
-      <a href={local.href} class={buttonClass()} {...(rest as any)}>
+      <a href={local.href} class={buttonClass()} {...anchorRest()}>
         <Show when={local.leadingIcon}>
           <span class={styles.buttonIconLeading}>{local.leadingIcon}</span>
         </Show>

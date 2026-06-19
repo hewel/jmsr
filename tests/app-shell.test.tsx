@@ -1,18 +1,18 @@
 import { afterEach, expect, rstest, test } from '@rstest/core';
-import { createMemoryHistory, RouterProvider } from '@tanstack/solid-router';
+import { RouterProvider, createMemoryHistory } from '@tanstack/solid-router';
 import { fireEvent, screen, waitFor } from '@testing-library/dom';
 import { render } from 'solid-js/web';
-import {
-  type AppConfig,
-  commands,
-  events,
-  type NowPlayingState,
-  type VideoHome,
-  type VideoItemDetail,
-  type VideoLibraryPage,
-  type VideoSearchPage,
-  type VideoSeasonEpisodes,
-  type VideoShowDetail,
+
+import { commands, events } from '../src/bindings';
+import type {
+  AppConfig,
+  NowPlayingState,
+  VideoHome,
+  VideoItemDetail,
+  VideoLibraryPage,
+  VideoSearchPage,
+  VideoSeasonEpisodes,
+  VideoShowDetail,
 } from '../src/bindings';
 import { ToastProvider } from '../src/components/ToastProvider';
 import { createJmsrRouter } from '../src/router';
@@ -23,8 +23,8 @@ window.scrollTo = () => {};
 
 const connectedState = {
   connected: true,
-  serverUrl: 'https://jellyfin.example.com',
   serverName: 'Jellyfin Home',
+  serverUrl: 'https://jellyfin.example.com',
   userName: 'Ada',
 };
 
@@ -34,69 +34,69 @@ const disconnectedState = {
 };
 
 const nowPlaying: NowPlayingState = {
-  status: 'playing',
-  player: {
-    connected: true,
-    paused: false,
-    muted: false,
-    timePos: 42,
-    duration: 180,
-    volume: 80,
-  },
-  media: {
-    itemId: 'episode-1',
-    name: 'The Pilot',
-    itemType: 'Episode',
-    seriesName: 'Example Show',
-    seasonNumber: 1,
-    episodeNumber: 1,
-  },
   canPlayNext: true,
   canPlayPrevious: false,
+  media: {
+    episodeNumber: 1,
+    itemId: 'episode-1',
+    itemType: 'Episode',
+    name: 'The Pilot',
+    seasonNumber: 1,
+    seriesName: 'Example Show',
+  },
   nextUnavailableReason: null,
+  player: {
+    connected: true,
+    duration: 180,
+    muted: false,
+    paused: false,
+    timePos: 42,
+    volume: 80,
+  },
   previousUnavailableReason: 'noCurrentItem',
+  status: 'playing',
 };
 
 const config: AppConfig = {
   deviceName: 'JMSR Test',
-  mpvPath: null,
-  mpvArgs: [],
-  progressInterval: 5,
-  startMinimized: false,
   introSkipperMode: 'automatic',
+  keybindIntroSkip: 'g',
   keybindNext: 'Shift+>',
   keybindPrev: 'Shift+<',
-  keybindIntroSkip: 'g',
+  mpvArgs: [],
+  mpvPath: null,
   preferredSubtitleLanguages: [],
+  progressInterval: 5,
+  startMinimized: false,
 };
 
 const audioStreams = [
   {
-    index: 1,
-    label: 'English - AAC 2.0',
-    language: 'eng',
     codec: 'aac',
+    index: 1,
     isDefault: true,
     isExternal: false,
+    label: 'English - AAC 2.0',
+    language: 'eng',
   },
   {
-    index: 2,
-    label: 'Japanese - FLAC 5.1',
-    language: 'jpn',
     codec: 'flac',
+    index: 2,
     isDefault: false,
     isExternal: false,
+    label: 'Japanese - FLAC 5.1',
+    language: 'jpn',
   },
 ];
 
 const subtitleStreams = [
   {
-    index: 3,
-    label: 'English - SRT',
-    language: 'eng',
     codec: 'srt',
+    index: 3,
     isDefault: false,
     isExternal: true,
+    label: 'English - SRT',
+    language: 'eng',
   },
 ];
 
@@ -119,17 +119,17 @@ const videoHome: VideoHome = {
       artworkUrl: 'https://jellyfin.example.com/Items/movie-1/Images/Primary',
     },
   ],
-  nextUp: [
+  latestEpisodes: [
     {
-      id: 'episode-1',
-      name: 'Next Episode',
+      id: 'episode-2',
+      name: 'Latest Episode',
       itemType: 'Episode',
       seriesId: 'series-1',
       seriesName: 'Example Show',
       seasonNumber: 1,
-      episodeNumber: 2,
+      episodeNumber: 3,
       productionYear: null,
-      runtimeSeconds: 1800,
+      runtimeSeconds: null,
       resumePositionSeconds: null,
       playedPercentage: null,
       played: false,
@@ -155,24 +155,6 @@ const videoHome: VideoHome = {
       artworkUrl: null,
     },
   ],
-  latestEpisodes: [
-    {
-      id: 'episode-2',
-      name: 'Latest Episode',
-      itemType: 'Episode',
-      seriesId: 'series-1',
-      seriesName: 'Example Show',
-      seasonNumber: 1,
-      episodeNumber: 3,
-      productionYear: null,
-      runtimeSeconds: null,
-      resumePositionSeconds: null,
-      playedPercentage: null,
-      played: false,
-      favorite: false,
-      artworkUrl: null,
-    },
-  ],
   libraryShortcuts: [
     {
       id: 'movies',
@@ -189,92 +171,110 @@ const videoHome: VideoHome = {
       artworkUrl: null,
     },
   ],
+  nextUp: [
+    {
+      id: 'episode-1',
+      name: 'Next Episode',
+      itemType: 'Episode',
+      seriesId: 'series-1',
+      seriesName: 'Example Show',
+      seasonNumber: 1,
+      episodeNumber: 2,
+      productionYear: null,
+      runtimeSeconds: 1800,
+      resumePositionSeconds: null,
+      playedPercentage: null,
+      played: false,
+      favorite: false,
+      artworkUrl: null,
+    },
+  ],
 };
 
 const movieDetail: VideoItemDetail = {
-  id: 'detail-movie',
-  name: 'Detail Movie',
-  itemType: 'Movie',
-  overview: 'A movie overview.',
-  productionYear: 2024,
-  runtimeSeconds: 7200,
-  seriesId: null,
-  seriesName: null,
-  seasonNumber: null,
-  episodeNumber: null,
-  genres: ['Drama', 'Mystery'],
-  played: false,
-  favorite: true,
-  playedPercentage: 25,
-  resumePositionSeconds: 120,
-  canResume: true,
-  canPlay: true,
   artworkUrl: 'https://jellyfin.example.com/Items/detail-movie/Images/Primary',
   audioStreams,
+  canPlay: true,
+  canResume: true,
+  episodeNumber: null,
+  favorite: true,
+  genres: ['Drama', 'Mystery'],
+  id: 'detail-movie',
+  itemType: 'Movie',
+  name: 'Detail Movie',
+  overview: 'A movie overview.',
+  played: false,
+  playedPercentage: 25,
+  productionYear: 2024,
+  resumePositionSeconds: 120,
+  runtimeSeconds: 7200,
+  seasonNumber: null,
+  seriesId: null,
+  seriesName: null,
   subtitleStreams,
 };
 
 const episodeDetail: VideoItemDetail = {
-  id: 'detail-episode',
-  name: 'Detail Episode',
-  itemType: 'Episode',
-  overview: null,
-  productionYear: null,
-  runtimeSeconds: null,
-  seriesId: 'series-1',
-  seriesName: 'Example Show',
-  seasonNumber: 2,
-  episodeNumber: 3,
-  genres: ['Sci-Fi'],
-  played: true,
-  favorite: false,
-  playedPercentage: 100,
-  resumePositionSeconds: 0,
-  canResume: false,
-  canPlay: true,
   artworkUrl: null,
   audioStreams,
+  canPlay: true,
+  canResume: false,
+  episodeNumber: 3,
+  favorite: false,
+  genres: ['Sci-Fi'],
+  id: 'detail-episode',
+  itemType: 'Episode',
+  name: 'Detail Episode',
+  overview: null,
+  played: true,
+  playedPercentage: 100,
+  productionYear: null,
+  resumePositionSeconds: 0,
+  runtimeSeconds: null,
+  seasonNumber: 2,
+  seriesId: 'series-1',
+  seriesName: 'Example Show',
   subtitleStreams,
 };
 
 const nextEpisodeDetail: VideoItemDetail = {
   ...episodeDetail,
+  canResume: false,
+  episodeNumber: 2,
   id: 'episode-2',
   name: 'Next Episode',
-  seasonNumber: 1,
-  episodeNumber: 2,
   played: false,
   playedPercentage: null,
   resumePositionSeconds: null,
-  canResume: false,
+  seasonNumber: 1,
 };
 
 const showDetail: VideoShowDetail = {
+  artworkUrl: null,
+  canPlay: true,
+  favorite: false,
+  genres: ['Drama'],
   id: 'series-1',
   name: 'Example Show',
-  overview: 'A show overview.',
-  productionYear: 2023,
-  genres: ['Drama'],
-  played: false,
-  favorite: false,
-  canPlay: true,
-  artworkUrl: null,
   nextEpisode: {
-    id: 'episode-2',
-    name: 'Next Episode',
-    itemType: 'Episode',
-    productionYear: null,
-    runtimeSeconds: null,
-    played: false,
-    favorite: false,
     artworkUrl: null,
-    seasonNumber: 1,
     episodeNumber: 2,
+    favorite: false,
+    id: 'episode-2',
+    itemType: 'Episode',
+    name: 'Next Episode',
+    played: false,
+    playedPercentage: null,
+    productionYear: null,
+    resumePositionSeconds: null,
+    runtimeSeconds: null,
+    seasonNumber: 1,
     seriesId: 'series-1',
     seriesName: 'Example Show',
-    resumePositionSeconds: null,
-    playedPercentage: null,
   },
+  overview: 'A show overview.',
+  played: false,
+  productionYear: 2023,
   seasons: [
     {
       id: 'season-1',
@@ -296,9 +296,6 @@ const showDetail: VideoShowDetail = {
 };
 
 const seasonEpisodes: VideoSeasonEpisodes = {
-  seriesId: 'series-1',
-  seasonId: 'season-1',
-  seasonNumber: 1,
   episodes: [
     {
       id: 'episode-2',
@@ -317,16 +314,15 @@ const seasonEpisodes: VideoSeasonEpisodes = {
       playedPercentage: null,
     },
   ],
+  seasonId: 'season-1',
+  seasonNumber: 1,
+  seriesId: 'series-1',
 };
 
 function videoLibraryPage(startIndex: number): VideoLibraryPage {
   if (startIndex === 0) {
     return {
-      libraryId: 'movies',
       collectionType: 'movies',
-      startIndex: 0,
-      limit: 24,
-      totalRecordCount: 25,
       hasMore: true,
       items: [
         {
@@ -337,8 +333,7 @@ function videoLibraryPage(startIndex: number): VideoLibraryPage {
           runtimeSeconds: 5400,
           played: false,
           favorite: true,
-          artworkUrl:
-            'https://jellyfin.example.com/Items/movie-1/Images/Primary',
+          artworkUrl: 'https://jellyfin.example.com/Items/movie-1/Images/Primary',
           seasonNumber: null,
           episodeNumber: null,
           seriesId: null,
@@ -347,15 +342,15 @@ function videoLibraryPage(startIndex: number): VideoLibraryPage {
           playedPercentage: null,
         },
       ],
+      libraryId: 'movies',
+      limit: 24,
+      startIndex: 0,
+      totalRecordCount: 25,
     };
   }
 
   return {
-    libraryId: 'movies',
     collectionType: 'movies',
-    startIndex,
-    limit: 24,
-    totalRecordCount: 25,
     hasMore: false,
     items: [
       {
@@ -375,16 +370,16 @@ function videoLibraryPage(startIndex: number): VideoLibraryPage {
         playedPercentage: null,
       },
     ],
+    libraryId: 'movies',
+    limit: 24,
+    startIndex,
+    totalRecordCount: 25,
   };
 }
 
 function videoSearchPage(query: string, startIndex: number): VideoSearchPage {
   if (startIndex === 0) {
     return {
-      query,
-      startIndex: 0,
-      limit: 24,
-      totalRecordCount: 25,
       hasMore: true,
       items: [
         {
@@ -420,14 +415,14 @@ function videoSearchPage(query: string, startIndex: number): VideoSearchPage {
           playedPercentage: null,
         },
       ],
+      limit: 24,
+      query,
+      startIndex: 0,
+      totalRecordCount: 25,
     };
   }
 
   return {
-    query,
-    startIndex,
-    limit: 24,
-    totalRecordCount: 25,
     hasMore: false,
     items: [
       {
@@ -447,6 +442,10 @@ function videoSearchPage(query: string, startIndex: number): VideoSearchPage {
         playedPercentage: null,
       },
     ],
+    limit: 24,
+    query,
+    startIndex,
+    totalRecordCount: 25,
   };
 }
 
@@ -456,19 +455,19 @@ function mockShellCommands(state = connectedState) {
   rstest.spyOn(commands, 'mpvIsConnected').mockResolvedValue(false);
   rstest.spyOn(commands, 'configGet').mockResolvedValue(config);
   rstest.spyOn(commands, 'libraryVideoHome').mockResolvedValue({
-    status: 'ok',
     data: videoHome,
+    status: 'ok',
   });
   rstest.spyOn(commands, 'libraryBrowseVideo').mockImplementation((request) =>
     Promise.resolve({
-      status: 'ok',
       data: videoLibraryPage(request.startIndex),
+      status: 'ok',
     }),
   );
   rstest.spyOn(commands, 'librarySearchVideo').mockImplementation((request) =>
     Promise.resolve({
-      status: 'ok',
       data: videoSearchPage(request.query, request.startIndex),
+      status: 'ok',
     }),
   );
   rstest.spyOn(commands, 'libraryItemDetail').mockImplementation((itemId) => {
@@ -479,39 +478,35 @@ function mockShellCommands(state = connectedState) {
           ? nextEpisodeDetail
           : movieDetail;
 
-    return Promise.resolve({ status: 'ok', data });
+    return Promise.resolve({ data, status: 'ok' });
   });
   rstest.spyOn(commands, 'libraryShowDetail').mockResolvedValue({
-    status: 'ok',
     data: showDetail,
+    status: 'ok',
   });
   rstest.spyOn(commands, 'librarySeasonEpisodes').mockResolvedValue({
-    status: 'ok',
     data: seasonEpisodes,
+    status: 'ok',
   });
   rstest.spyOn(commands, 'libraryPlay').mockResolvedValue({
-    status: 'ok',
     data: null,
+    status: 'ok',
   });
   rstest.spyOn(commands, 'libraryUpdateUserData').mockResolvedValue({
+    data: { favorite: false, itemId: 'detail-movie', played: false },
     status: 'ok',
-    data: { itemId: 'detail-movie', played: false, favorite: false },
   });
   rstest.spyOn(commands, 'nowPlayingGetState').mockResolvedValue({
-    status: 'ok',
     data: nowPlaying,
+    status: 'ok',
   });
-  rstest
-    .spyOn(events.nowPlayingChanged, 'listen')
-    .mockResolvedValue(() => undefined);
+  rstest.spyOn(events.nowPlayingChanged, 'listen').mockResolvedValue(() => {});
 }
 
 function renderShell(path = '/library') {
   const root = document.createElement('div');
   document.body.append(root);
-  const router = createJmsrRouter(
-    createMemoryHistory({ initialEntries: [path] }),
-  );
+  const router = createJmsrRouter(createMemoryHistory({ initialEntries: [path] }));
   const dispose = render(
     () => (
       <ToastProvider>
@@ -530,9 +525,7 @@ function renderShell(path = '/library') {
 function getArkHiddenSelect(label: string) {
   const select = screen
     .getAllByLabelText(label)
-    .find(
-      (element): element is HTMLSelectElement => element.tagName === 'SELECT',
-    );
+    .find((element): element is HTMLSelectElement => element.tagName === 'SELECT');
 
   if (!select) {
     throw new Error(`Could not find hidden Ark select for ${label}`);
@@ -544,10 +537,7 @@ function getArkHiddenSelect(label: string) {
 function getArkCombobox(label: string) {
   const combobox = screen
     .getAllByLabelText(label)
-    .find(
-      (element): element is HTMLButtonElement =>
-        element.getAttribute('role') === 'combobox',
-    );
+    .find((element): element is HTMLButtonElement => element.getAttribute('role') === 'combobox');
 
   if (!combobox) {
     throw new Error(`Could not find Ark combobox for ${label}`);
@@ -592,9 +582,7 @@ test('library landing renders command-backed rows and compact now playing link',
 
   await screen.findByRole('heading', { name: 'Library' });
 
-  expect(
-    await screen.findByRole('heading', { name: 'Continue Watching' }),
-  ).toBeVisible();
+  expect(await screen.findByRole('heading', { name: 'Continue Watching' })).toBeVisible();
   expect(screen.getByRole('link', { name: /Resume Movie/ })).toBeVisible();
   expect(screen.getByRole('link', { name: /Next Episode/ })).toBeVisible();
   expect(screen.getByRole('link', { name: /Latest Movie/ })).toBeVisible();
@@ -608,21 +596,19 @@ test('library landing renders command-backed rows and compact now playing link',
     '/library/tvshows/shows',
   );
   const resumeArtwork = screen.getByAltText('Resume Movie artwork');
-  expect(resumeArtwork).toHaveAttribute(
-    'src',
-    videoHome.continueWatching[0]?.artworkUrl ?? '',
-  );
+  expect(resumeArtwork).toHaveAttribute('src', videoHome.continueWatching[0]?.artworkUrl ?? '');
   expect(resumeArtwork.parentElement).toHaveClass('aspect-video');
   fireEvent.load(resumeArtwork);
   expect(resumeArtwork.parentElement).toHaveClass('aspect-video');
-  expect(
-    screen.getByRole('link', { name: /Latest Movie/ }).firstElementChild,
-  ).toHaveClass('aspect-[2/3]');
+  expect(screen.getByRole('link', { name: /Latest Movie/ }).firstElementChild).toHaveClass(
+    'aspect-[2/3]',
+  );
   expect(screen.getAllByText('No artwork')).toHaveLength(3);
   expect(await screen.findByText('The Pilot')).toBeVisible();
-  expect(
-    screen.getByRole('link', { name: 'Open Now Playing' }),
-  ).toHaveAttribute('href', '/now-playing');
+  expect(screen.getByRole('link', { name: 'Open Now Playing' })).toHaveAttribute(
+    'href',
+    '/now-playing',
+  );
 
   cleanup();
 });
@@ -639,17 +625,18 @@ test('library search loads paged video results and opens detail links without pl
   });
   fireEvent.click(screen.getByRole('button', { name: 'Search' }));
 
-  expect(
-    await screen.findByRole('link', { name: /Search Movie/ }),
-  ).toHaveAttribute('href', '/library/items/search-movie-1');
+  expect(await screen.findByRole('link', { name: /Search Movie/ })).toHaveAttribute(
+    'href',
+    '/library/items/search-movie-1',
+  );
   expect(screen.getByRole('link', { name: /Search Show/ })).toHaveAttribute(
     'href',
     '/library/shows/search-show-1',
   );
   expect(searchCommand).toHaveBeenCalledWith({
+    limit: 24,
     query: 'pilot',
     startIndex: 0,
-    limit: 24,
   });
 
   const movieLink = screen.getByRole('link', { name: /Search Movie/ });
@@ -658,13 +645,14 @@ test('library search loads paged video results and opens detail links without pl
   expect(mpvStart).not.toHaveBeenCalled();
 
   fireEvent.click(screen.getByRole('button', { name: 'Load more results' }));
-  expect(
-    await screen.findByRole('link', { name: /Search Episode 25/ }),
-  ).toHaveAttribute('href', '/library/items/search-episode-25');
+  expect(await screen.findByRole('link', { name: /Search Episode 25/ })).toHaveAttribute(
+    'href',
+    '/library/items/search-episode-25',
+  );
   expect(searchCommand).toHaveBeenLastCalledWith({
+    limit: 24,
     query: 'pilot',
     startIndex: 24,
-    limit: 24,
   });
 
   cleanup();
@@ -675,23 +663,23 @@ test('library search exposes empty results and command errors with retry', async
   const searchCommand = rstest
     .spyOn(commands, 'librarySearchVideo')
     .mockResolvedValueOnce({
-      status: 'ok',
       data: {
-        query: 'missing',
-        startIndex: 0,
-        limit: 24,
-        totalRecordCount: 0,
         hasMore: false,
         items: [],
+        limit: 24,
+        query: 'missing',
+        startIndex: 0,
+        totalRecordCount: 0,
       },
-    })
-    .mockResolvedValueOnce({
-      status: 'error',
-      error: { code: 'network', message: 'Search unavailable' },
-    })
-    .mockResolvedValueOnce({
       status: 'ok',
+    })
+    .mockResolvedValueOnce({
+      error: { code: 'network', message: 'Search unavailable' },
+      status: 'error',
+    })
+    .mockResolvedValueOnce({
       data: videoSearchPage('missing', 0),
+      status: 'ok',
     });
   const cleanup = renderShell();
 
@@ -705,9 +693,7 @@ test('library search exposes empty results and command errors with retry', async
   fireEvent.click(screen.getByRole('button', { name: 'Search' }));
   await screen.findByText('Search unavailable');
   fireEvent.click(screen.getByRole('button', { name: 'Retry Search' }));
-  expect(
-    await screen.findByRole('link', { name: /Search Movie/ }),
-  ).toBeVisible();
+  expect(await screen.findByRole('link', { name: /Search Movie/ })).toBeVisible();
   expect(searchCommand).toHaveBeenCalledTimes(3);
 
   cleanup();
@@ -738,18 +724,19 @@ test('library browse loads paged results and opens detail links without playback
   const cleanup = renderShell('/library/movies/movies');
 
   await screen.findByRole('heading', { name: 'Movies' });
-  expect(
-    await screen.findByRole('link', { name: /Paged Movie/ }),
-  ).toHaveAttribute('href', '/library/items/movie-1');
+  expect(await screen.findByRole('link', { name: /Paged Movie/ })).toHaveAttribute(
+    'href',
+    '/library/items/movie-1',
+  );
   expect(screen.getByAltText('Paged Movie artwork')).toBeVisible();
   expect(browseCommand).toHaveBeenCalledWith({
     collectionType: 'movies',
-    libraryId: 'movies',
-    startIndex: 0,
-    limit: 24,
-    sort: 'title',
-    playedFilter: 'all',
     favoritesOnly: false,
+    libraryId: 'movies',
+    limit: 24,
+    playedFilter: 'all',
+    sort: 'title',
+    startIndex: 0,
   });
 
   const movieLink = screen.getByRole('link', { name: /Paged Movie/ });
@@ -758,17 +745,18 @@ test('library browse loads paged results and opens detail links without playback
   expect(mpvStart).not.toHaveBeenCalled();
 
   fireEvent.click(screen.getByRole('button', { name: 'Load more' }));
-  expect(
-    await screen.findByRole('link', { name: /Paged Movie 25/ }),
-  ).toHaveAttribute('href', '/library/items/movie-25');
+  expect(await screen.findByRole('link', { name: /Paged Movie 25/ })).toHaveAttribute(
+    'href',
+    '/library/items/movie-25',
+  );
   expect(browseCommand).toHaveBeenLastCalledWith({
     collectionType: 'movies',
-    libraryId: 'movies',
-    startIndex: 24,
-    limit: 24,
-    sort: 'title',
-    playedFilter: 'all',
     favoritesOnly: false,
+    libraryId: 'movies',
+    limit: 24,
+    playedFilter: 'all',
+    sort: 'title',
+    startIndex: 24,
   });
   expect(screen.queryByRole('button', { name: 'Load more' })).toBeNull();
 
@@ -787,12 +775,12 @@ test('library browse controls reload paged results from the first page', async (
   await waitFor(() =>
     expect(browseCommand).toHaveBeenLastCalledWith({
       collectionType: 'movies',
-      libraryId: 'movies',
-      startIndex: 0,
-      limit: 24,
-      sort: 'recentlyAdded',
-      playedFilter: 'all',
       favoritesOnly: false,
+      libraryId: 'movies',
+      limit: 24,
+      playedFilter: 'all',
+      sort: 'recentlyAdded',
+      startIndex: 0,
     }),
   );
 
@@ -800,12 +788,12 @@ test('library browse controls reload paged results from the first page', async (
   await waitFor(() =>
     expect(browseCommand).toHaveBeenLastCalledWith({
       collectionType: 'movies',
-      libraryId: 'movies',
-      startIndex: 0,
-      limit: 24,
-      sort: 'recentlyAdded',
-      playedFilter: 'unplayed',
       favoritesOnly: false,
+      libraryId: 'movies',
+      limit: 24,
+      playedFilter: 'unplayed',
+      sort: 'recentlyAdded',
+      startIndex: 0,
     }),
   );
 
@@ -813,12 +801,12 @@ test('library browse controls reload paged results from the first page', async (
   await waitFor(() =>
     expect(browseCommand).toHaveBeenLastCalledWith({
       collectionType: 'movies',
-      libraryId: 'movies',
-      startIndex: 0,
-      limit: 24,
-      sort: 'recentlyAdded',
-      playedFilter: 'unplayed',
       favoritesOnly: true,
+      libraryId: 'movies',
+      limit: 24,
+      playedFilter: 'unplayed',
+      sort: 'recentlyAdded',
+      startIndex: 0,
     }),
   );
 
@@ -828,8 +816,8 @@ test('library browse controls reload paged results from the first page', async (
 test('library browse surfaces backend sort and filter errors', async () => {
   mockShellCommands();
   rstest.spyOn(commands, 'libraryBrowseVideo').mockResolvedValue({
-    status: 'error',
     error: { code: 'internal', message: 'Unsupported library filter' },
+    status: 'error',
   });
   const cleanup = renderShell('/library/movies/movies');
 
@@ -857,52 +845,46 @@ test('library item detail renders resume-primary movie metadata', async () => {
     movieDetail.artworkUrl ?? '',
   );
   expect(screen.getByRole('button', { name: 'Resume' })).toBeVisible();
-  expect(
-    screen.getByRole('button', { name: 'Play from beginning' }),
-  ).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Play from beginning' })).toBeVisible();
   expect(getArkHiddenSelect('Audio track')).toHaveValue('auto');
   expect(getArkHiddenSelect('Subtitle track')).toHaveValue('auto');
   fireEvent.click(screen.getByRole('button', { name: 'Resume' }));
   await waitFor(() =>
     expect(playCommand).toHaveBeenCalledWith({
+      audioStreamIndex: null,
       itemId: 'detail-movie',
       mode: 'resume',
       startPositionSeconds: 120,
-      audioStreamIndex: null,
       subtitleStreamIndex: null,
     }),
   );
   expect(screen.queryByRole('button', { name: 'Resume playback' })).toBeNull();
   await waitFor(() =>
-    expect(
-      screen.getByRole('button', { name: 'Play from beginning' }),
-    ).not.toBeDisabled(),
+    expect(screen.getByRole('button', { name: 'Play from beginning' })).not.toBeDisabled(),
   );
   await selectArkOption('Audio track', /Japanese - FLAC/);
   await selectArkOption('Subtitle track', /English - SRT/);
   fireEvent.click(screen.getByRole('button', { name: 'Play from beginning' }));
   await waitFor(() =>
     expect(playCommand).toHaveBeenLastCalledWith({
+      audioStreamIndex: 2,
       itemId: 'detail-movie',
       mode: 'start',
       startPositionSeconds: 0,
-      audioStreamIndex: 2,
       subtitleStreamIndex: 3,
     }),
   );
   await waitFor(() =>
-    expect(
-      screen.getByRole('button', { name: 'Play from beginning' }),
-    ).not.toBeDisabled(),
+    expect(screen.getByRole('button', { name: 'Play from beginning' })).not.toBeDisabled(),
   );
   await selectArkOption('Subtitle track', 'Off');
   fireEvent.click(screen.getByRole('button', { name: 'Resume' }));
   await waitFor(() =>
     expect(playCommand).toHaveBeenLastCalledWith({
+      audioStreamIndex: 2,
       itemId: 'detail-movie',
       mode: 'resume',
       startPositionSeconds: 120,
-      audioStreamIndex: 2,
       subtitleStreamIndex: -1,
     }),
   );
@@ -916,10 +898,10 @@ test('library item detail refreshes user data only after mutation success', asyn
   const updateCommand = rstest.spyOn(commands, 'libraryUpdateUserData');
   rstest
     .spyOn(commands, 'libraryItemDetail')
-    .mockResolvedValueOnce({ status: 'ok', data: movieDetail })
+    .mockResolvedValueOnce({ data: movieDetail, status: 'ok' })
     .mockResolvedValueOnce({
-      status: 'ok',
       data: { ...movieDetail, favorite: false },
+      status: 'ok',
     });
   const cleanup = renderShell('/library/items/detail-movie');
 
@@ -928,8 +910,8 @@ test('library item detail refreshes user data only after mutation success', asyn
 
   await waitFor(() =>
     expect(updateCommand).toHaveBeenCalledWith({
-      itemId: 'detail-movie',
       action: 'unfavorite',
+      itemId: 'detail-movie',
     }),
   );
   expect(await screen.findByText('Not favorite')).toBeVisible();
@@ -940,8 +922,8 @@ test('library item detail refreshes user data only after mutation success', asyn
 test('library item detail keeps previous user data visible on mutation failure', async () => {
   mockShellCommands();
   rstest.spyOn(commands, 'libraryUpdateUserData').mockResolvedValue({
-    status: 'error',
     error: { code: 'network', message: 'Favorite update failed' },
+    status: 'error',
   });
   const cleanup = renderShell('/library/items/detail-movie');
 
@@ -974,10 +956,10 @@ test('library item detail renders episode metadata and semantic artwork placehol
   fireEvent.click(screen.getByRole('button', { name: 'Play' }));
   await waitFor(() =>
     expect(playCommand).toHaveBeenCalledWith({
+      audioStreamIndex: null,
       itemId: 'detail-episode',
       mode: 'start',
       startPositionSeconds: 0,
-      audioStreamIndex: null,
       subtitleStreamIndex: -1,
     }),
   );
@@ -1006,8 +988,8 @@ test('library show detail auto-loads next-up season and renders episode rows', a
   fireEvent.click(screen.getByRole('button', { name: 'Favorite' }));
   await waitFor(() =>
     expect(updateCommand).toHaveBeenCalledWith({
-      itemId: 'series-1',
       action: 'favorite',
+      itemId: 'series-1',
     }),
   );
 
@@ -1020,21 +1002,20 @@ test('library show detail auto-loads next-up season and renders episode rows', a
   fireEvent.click(screen.getByRole('button', { name: 'Start playback' }));
   await waitFor(() =>
     expect(playCommand).toHaveBeenCalledWith({
+      audioStreamIndex: 2,
       itemId: 'episode-2',
       mode: 'start',
       startPositionSeconds: 0,
-      audioStreamIndex: 2,
       subtitleStreamIndex: null,
     }),
   );
-  await waitFor(() =>
-    expect(screen.queryAllByLabelText('Audio track')).toHaveLength(0),
-  );
+  await waitFor(() => expect(screen.queryAllByLabelText('Audio track')).toHaveLength(0));
 
   // Next episode link
-  expect(
-    screen.getByRole('link', { name: 'Next: Next Episode' }),
-  ).toHaveAttribute('href', '/library/items/episode-2');
+  expect(screen.getByRole('link', { name: 'Next: Next Episode' })).toHaveAttribute(
+    'href',
+    '/library/items/episode-2',
+  );
 
   // Season selector buttons
   expect(screen.getByRole('button', { name: 'Season 1' })).toBeVisible();
@@ -1044,9 +1025,9 @@ test('library show detail auto-loads next-up season and renders episode rows', a
   // Auto-load: nextEpisode.seasonNumber=1, so season 1 loads automatically
   await waitFor(() =>
     expect(seasonCommand).toHaveBeenCalledWith({
-      seriesId: 'series-1',
       seasonId: 'season-1',
       seasonNumber: 1,
+      seriesId: 'series-1',
     }),
   );
 
@@ -1064,18 +1045,16 @@ test('library show detail auto-loads next-up season and renders episode rows', a
   const episodePlayBtn = screen.getByRole('button', { name: 'Play' });
   expect(episodePlayBtn).toBeVisible();
   fireEvent.click(episodePlayBtn);
-  await waitFor(() =>
-    expect(itemCommand).toHaveBeenLastCalledWith('episode-2'),
-  );
+  await waitFor(() => expect(itemCommand).toHaveBeenLastCalledWith('episode-2'));
   await waitFor(() => expect(getArkCombobox('Subtitle track')).toBeVisible());
   await selectArkOption('Subtitle track', 'Off');
   fireEvent.click(screen.getByRole('button', { name: 'Start playback' }));
   await waitFor(() =>
     expect(playCommand).toHaveBeenLastCalledWith({
+      audioStreamIndex: 1,
       itemId: 'episode-2',
       mode: 'start',
       startPositionSeconds: 0,
-      audioStreamIndex: 1,
       subtitleStreamIndex: -1,
     }),
   );
@@ -1084,9 +1063,9 @@ test('library show detail auto-loads next-up season and renders episode rows', a
   fireEvent.click(screen.getByRole('button', { name: 'Season 2' }));
   await waitFor(() =>
     expect(seasonCommand).toHaveBeenLastCalledWith({
-      seriesId: 'series-1',
       seasonId: 'season-2',
       seasonNumber: 2,
+      seriesId: 'series-1',
     }),
   );
 
@@ -1102,14 +1081,9 @@ test('settings shell area preserves session and configuration controls', async (
   await screen.findByRole('heading', { name: 'Connection' });
   expect(screen.getByRole('button', { name: 'Disconnect' })).toBeVisible();
   expect(screen.getByRole('button', { name: 'Sign out' })).toBeVisible();
-  await waitFor(() =>
-    expect(screen.getByDisplayValue('JMSR Test')).toBeVisible(),
-  );
+  await waitFor(() => expect(screen.getByDisplayValue('JMSR Test')).toBeVisible());
   expect(screen.getByRole('heading', { name: 'Shortcut keys' })).toBeVisible();
-  expect(screen.getByRole('button', { name: /Automatic/ })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
+  expect(screen.getByRole('button', { name: /Automatic/ })).toHaveAttribute('aria-pressed', 'true');
 
   cleanup();
 });
@@ -1121,9 +1095,7 @@ test('diagnostics shell area preserves diagnostics panel behavior', async () => 
   await screen.findByRole('heading', { name: 'Diagnostics' });
   expect(screen.getByText('0 sanitized runtime events')).toBeVisible();
   expect(screen.getByRole('checkbox', { name: 'Auto-scroll' })).toBeChecked();
-  expect(
-    screen.getByRole('button', { name: 'Copy diagnostics' }),
-  ).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Copy diagnostics' })).toBeVisible();
 
   cleanup();
 });
@@ -1133,9 +1105,7 @@ test('library landing keeps retry and skips video home when disconnected', async
   const videoHomeCommand = rstest.spyOn(commands, 'libraryVideoHome');
   const cleanup = renderShell();
 
-  expect(
-    await screen.findByRole('button', { name: 'Retry Library' }),
-  ).toBeVisible();
+  expect(await screen.findByRole('button', { name: 'Retry Library' })).toBeVisible();
   expect(videoHomeCommand).not.toHaveBeenCalled();
 
   cleanup();
@@ -1145,21 +1115,17 @@ test('library landing renders no fake content on command error', async () => {
   rstest.spyOn(commands, 'jellyfinIsConnected').mockResolvedValue(true);
   rstest.spyOn(commands, 'jellyfinGetState').mockResolvedValue(connectedState);
   rstest.spyOn(commands, 'libraryVideoHome').mockResolvedValue({
-    status: 'error',
     error: { code: 'network', message: 'Jellyfin unavailable' },
+    status: 'error',
   });
   rstest.spyOn(commands, 'nowPlayingGetState').mockResolvedValue({
-    status: 'ok',
     data: nowPlaying,
+    status: 'ok',
   });
-  rstest
-    .spyOn(events.nowPlayingChanged, 'listen')
-    .mockResolvedValue(() => undefined);
+  rstest.spyOn(events.nowPlayingChanged, 'listen').mockResolvedValue(() => {});
   const cleanup = renderShell();
 
-  expect(
-    await screen.findByRole('button', { name: 'Retry Library' }),
-  ).toBeVisible();
+  expect(await screen.findByRole('button', { name: 'Retry Library' })).toBeVisible();
   expect(screen.queryByText('Continue Watching')).toBeNull();
 
   cleanup();
@@ -1168,20 +1134,18 @@ test('library landing renders no fake content on command error', async () => {
 test('library landing renders no rows for empty video home', async () => {
   mockShellCommands();
   rstest.spyOn(commands, 'libraryVideoHome').mockResolvedValue({
-    status: 'ok',
     data: {
       continueWatching: [],
-      nextUp: [],
-      latestMovies: [],
       latestEpisodes: [],
+      latestMovies: [],
       libraryShortcuts: [],
+      nextUp: [],
     },
+    status: 'ok',
   });
   const cleanup = renderShell();
 
-  expect(
-    await screen.findByRole('button', { name: 'Retry Library' }),
-  ).toBeVisible();
+  expect(await screen.findByRole('button', { name: 'Retry Library' })).toBeVisible();
   expect(screen.queryByText('No artwork')).toBeNull();
 
   cleanup();

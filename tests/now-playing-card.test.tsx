@@ -1,58 +1,60 @@
 import { afterEach, expect, rstest, test } from '@rstest/core';
 import { fireEvent, screen, waitFor } from '@testing-library/dom';
 import { render } from 'solid-js/web';
-import { commands, events, type NowPlayingState } from '../src/bindings';
+
+import { commands, events } from '../src/bindings';
+import type { NowPlayingState } from '../src/bindings';
 import NowPlayingCard from '../src/components/NowPlayingCard';
 import { ToastProvider } from '../src/components/ToastProvider';
 
 const offlineState: NowPlayingState = {
-  status: 'offline',
-  player: {
-    connected: false,
-    paused: true,
-    muted: false,
-    timePos: 0,
-    duration: 0,
-    volume: 100,
-  },
-  media: null,
   canPlayNext: false,
   canPlayPrevious: false,
+  media: null,
   nextUnavailableReason: 'noCurrentItem',
+  player: {
+    connected: false,
+    duration: 0,
+    muted: false,
+    paused: true,
+    timePos: 0,
+    volume: 100,
+  },
   previousUnavailableReason: 'noCurrentItem',
+  status: 'offline',
 };
 
 const playingState: NowPlayingState = {
-  status: 'playing',
-  player: {
-    connected: true,
-    paused: false,
-    muted: false,
-    timePos: 30,
-    duration: 120,
-    volume: 80,
-  },
-  media: {
-    itemId: 'episode-1',
-    name: 'The Pilot',
-    itemType: 'Episode',
-    seriesName: 'Example Show',
-    seasonNumber: 1,
-    episodeNumber: 1,
-  },
   canPlayNext: true,
   canPlayPrevious: true,
+  media: {
+    episodeNumber: 1,
+    itemId: 'episode-1',
+    itemType: 'Episode',
+    name: 'The Pilot',
+    seasonNumber: 1,
+    seriesName: 'Example Show',
+  },
   nextUnavailableReason: null,
+  player: {
+    connected: true,
+    duration: 120,
+    muted: false,
+    paused: false,
+    timePos: 30,
+    volume: 80,
+  },
   previousUnavailableReason: null,
+  status: 'playing',
 };
 
 const idleState: NowPlayingState = {
   ...offlineState,
-  status: 'idle',
   player: {
     ...offlineState.player,
     connected: true,
   },
+  status: 'idle',
 };
 
 const unknownState: NowPlayingState = {
@@ -62,24 +64,17 @@ const unknownState: NowPlayingState = {
 
 const pausedWithoutMetadataState: NowPlayingState = {
   ...playingState,
-  status: 'paused',
+  media: null,
   player: {
     ...playingState.player,
     paused: true,
   },
-  media: null,
+  status: 'paused',
 };
 
-function renderCard(
-  state: NowPlayingState = offlineState,
-  jellyfinConnected = true,
-) {
-  rstest
-    .spyOn(commands, 'nowPlayingGetState')
-    .mockResolvedValue({ status: 'ok', data: state });
-  rstest
-    .spyOn(events.nowPlayingChanged, 'listen')
-    .mockResolvedValue(() => undefined);
+function renderCard(state: NowPlayingState = offlineState, jellyfinConnected = true) {
+  rstest.spyOn(commands, 'nowPlayingGetState').mockResolvedValue({ data: state, status: 'ok' });
+  rstest.spyOn(events.nowPlayingChanged, 'listen').mockResolvedValue(() => {});
   const root = document.createElement('div');
   document.body.append(root);
   const dispose = render(
@@ -104,9 +99,7 @@ afterEach(() => {
 test('offline now playing offers start mpv when Jellyfin is connected', async () => {
   const cleanup = renderCard();
 
-  await waitFor(() =>
-    expect(screen.getByText('Player bridge offline')).toBeVisible(),
-  );
+  await waitFor(() => expect(screen.getByText('Player bridge offline')).toBeVisible());
   expect(screen.getByRole('button', { name: 'Play' })).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Start MPV' })).toBeVisible();
 
@@ -116,16 +109,10 @@ test('offline now playing offers start mpv when Jellyfin is connected', async ()
 test('media controls use shared icon buttons and primary text action', async () => {
   const cleanup = renderCard();
 
-  await waitFor(() =>
-    expect(screen.getByText('Player bridge offline')).toBeVisible(),
-  );
+  await waitFor(() => expect(screen.getByText('Player bridge offline')).toBeVisible());
 
-  expect(screen.getByLabelText('Previous episode').className).toContain(
-    'variantStyles_icon',
-  );
-  expect(screen.getByLabelText('Stop playback').className).toContain(
-    'variantStyles_icon',
-  );
+  expect(screen.getByLabelText('Previous episode').className).toContain('variantStyles_icon');
+  expect(screen.getByLabelText('Stop playback').className).toContain('variantStyles_icon');
   const startMpv = screen.getByRole('button', { name: 'Start MPV' });
   expect(startMpv).toHaveTextContent('Start MPV');
   expect(startMpv.querySelector('svg')).not.toBeNull();
@@ -136,16 +123,12 @@ test('media controls use shared icon buttons and primary text action', async () 
 test('offline now playing blocks start mpv when Jellyfin is disconnected', async () => {
   const startMpv = rstest
     .spyOn(commands, 'mpvStart')
-    .mockResolvedValue({ status: 'ok', data: null });
+    .mockResolvedValue({ data: null, status: 'ok' });
   const cleanup = renderCard(offlineState, false);
 
-  await waitFor(() =>
-    expect(screen.getByText('Player bridge offline')).toBeVisible(),
-  );
+  await waitFor(() => expect(screen.getByText('Player bridge offline')).toBeVisible());
 
-  expect(
-    screen.getByText('Reconnect Jellyfin before starting MPV'),
-  ).toBeVisible();
+  expect(screen.getByText('Reconnect Jellyfin before starting MPV')).toBeVisible();
   const button = screen.getByRole('button', {
     name: 'Reconnect Jellyfin first',
   });
@@ -159,7 +142,7 @@ test('offline now playing blocks start mpv when Jellyfin is disconnected', async
 test('playing state exposes transport controls and media metadata', async () => {
   const setPause = rstest
     .spyOn(commands, 'mpvSetPause')
-    .mockResolvedValue({ status: 'ok', data: null });
+    .mockResolvedValue({ data: null, status: 'ok' });
   const cleanup = renderCard(playingState);
 
   await waitFor(() => expect(screen.getByText('The Pilot')).toBeVisible());
@@ -170,12 +153,10 @@ test('playing state exposes transport controls and media metadata', async () => 
   cleanup();
 });
 test('playing state uses Ark sliders for seek and volume', async () => {
-  const seek = rstest
-    .spyOn(commands, 'mpvSeek')
-    .mockResolvedValue({ status: 'ok', data: null });
+  const seek = rstest.spyOn(commands, 'mpvSeek').mockResolvedValue({ data: null, status: 'ok' });
   const setVolume = rstest
     .spyOn(commands, 'mpvSetVolume')
-    .mockResolvedValue({ status: 'ok', data: null });
+    .mockResolvedValue({ data: null, status: 'ok' });
   const cleanup = renderCard(playingState);
 
   await waitFor(() => expect(screen.getByText('The Pilot')).toBeVisible());
@@ -199,9 +180,7 @@ test('playing state uses Ark sliders for seek and volume', async () => {
 test('next and previous are disabled when unavailable', async () => {
   const cleanup = renderCard();
 
-  await waitFor(() =>
-    expect(screen.getByLabelText('Next episode')).toBeDisabled(),
-  );
+  await waitFor(() => expect(screen.getByLabelText('Next episode')).toBeDisabled());
   expect(screen.getByLabelText('Previous episode')).toBeDisabled();
 
   cleanup();
@@ -217,9 +196,7 @@ test('idle and unknown states disable transport controls without exposing startu
   cleanup();
 
   const cleanupUnknown = renderCard(unknownState);
-  await waitFor(() =>
-    expect(screen.getByText('Playback state unknown')).toBeVisible(),
-  );
+  await waitFor(() => expect(screen.getByText('Playback state unknown')).toBeVisible());
   expect(screen.getByRole('button', { name: 'Play' })).toBeDisabled();
   expect(screen.getByLabelText('Stop playback')).toBeDisabled();
   expect(screen.queryByRole('button', { name: 'Start MPV' })).toBeNull();
@@ -230,7 +207,7 @@ test('idle and unknown states disable transport controls without exposing startu
 test('paused playback remains controllable without metadata', async () => {
   const setPause = rstest
     .spyOn(commands, 'mpvSetPause')
-    .mockResolvedValue({ status: 'ok', data: null });
+    .mockResolvedValue({ data: null, status: 'ok' });
   const cleanup = renderCard(pausedWithoutMetadataState);
 
   await waitFor(() => expect(screen.getByText('Paused')).toBeVisible());
@@ -246,22 +223,18 @@ test('paused playback remains controllable without metadata', async () => {
 test('clicking mute toggles icon and label after state reloads', async () => {
   const nowPlayingGetState = rstest
     .spyOn(commands, 'nowPlayingGetState')
-    .mockResolvedValue({ status: 'ok', data: playingState });
-  const toggleMute = rstest
-    .spyOn(commands, 'mpvToggleMute')
-    .mockImplementation(async () => {
-      nowPlayingGetState.mockResolvedValue({
-        status: 'ok',
-        data: {
-          ...playingState,
-          player: { ...playingState.player, muted: true },
-        },
-      });
-      return { status: 'ok', data: null };
+    .mockResolvedValue({ data: playingState, status: 'ok' });
+  const toggleMute = rstest.spyOn(commands, 'mpvToggleMute').mockImplementation(async () => {
+    nowPlayingGetState.mockResolvedValue({
+      data: {
+        ...playingState,
+        player: { ...playingState.player, muted: true },
+      },
+      status: 'ok',
     });
-  rstest
-    .spyOn(events.nowPlayingChanged, 'listen')
-    .mockResolvedValue(() => undefined);
+    return { data: null, status: 'ok' };
+  });
+  rstest.spyOn(events.nowPlayingChanged, 'listen').mockResolvedValue(() => {});
   const root = document.createElement('div');
   document.body.append(root);
   const dispose = render(
@@ -280,9 +253,7 @@ test('clicking mute toggles icon and label after state reloads', async () => {
   fireEvent.click(muteBtn);
 
   await waitFor(() => expect(toggleMute).toHaveBeenCalled());
-  await waitFor(() =>
-    expect(screen.getByRole('button', { name: 'Unmute' })).toBeVisible(),
-  );
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Unmute' })).toBeVisible());
 
   dispose();
   root.remove();

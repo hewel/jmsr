@@ -1,14 +1,7 @@
 import { Exit } from 'effect';
-import {
-  Check,
-  Clapperboard,
-  Film,
-  Heart,
-  Library,
-  RefreshCw,
-  Tv,
-} from 'lucide-solid';
-import { createSignal, For, Show } from 'solid-js';
+import { Check, Clapperboard, Film, Heart, Library, RefreshCw, Tv } from 'lucide-solid';
+import { For, Show, createSignal } from 'solid-js';
+
 import type {
   VideoHomeItem,
   VideoItemDetail,
@@ -25,24 +18,19 @@ import type {
 } from '../../bindings';
 import { commandFailureMessage } from '../../effects/commands';
 import type { CommandError } from '../../effects/errors';
-import { Button, type JmsrSelectItem } from '../ui';
+import { Button } from '../ui';
+import type { JmsrSelectItem } from '../ui';
 import { MediaInfoHoverCard } from './MediaInfoHoverCard';
 import { VideoHomeCard } from './VideoHomeCard';
 
 export { MediaInfoHoverCard } from './MediaInfoHoverCard';
 export { VideoHomeCard } from './VideoHomeCard';
 
-export function LibraryStatusPanel(props: {
-  title: string;
-  description?: string;
-}) {
+export function LibraryStatusPanel(props: { title: string; description?: string }) {
   return (
-    <section
-      class="card-elevated space-y-5"
-      aria-labelledby="video-home-status-title"
-    >
+    <section class="card-elevated space-y-5" aria-labelledby="video-home-status-title">
       <div class="flex items-start gap-4">
-        <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-tertiary/30 bg-tertiary-container/25 text-tertiary">
+        <div class="border-tertiary/30 bg-tertiary-container/25 text-tertiary flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border">
           <Clapperboard class="h-6 w-6" />
         </div>
         <div class="space-y-2">
@@ -59,11 +47,7 @@ export function LibraryStatusPanel(props: {
   );
 }
 
-type VideoHomeRowKind =
-  | 'continueWatching'
-  | 'nextUp'
-  | 'latestMovies'
-  | 'latestEpisodes';
+type VideoHomeRowKind = 'continueWatching' | 'nextUp' | 'latestMovies' | 'latestEpisodes';
 
 type VideoHomeAspectClass = 'aspect-[2/3]' | 'aspect-video';
 
@@ -86,10 +70,7 @@ export function VideoHomeRow(props: {
           <For each={props.items}>
             {(item) => (
               <MediaInfoHoverCard id={item.id} itemType={item.itemType}>
-                <VideoHomeCard
-                  item={item}
-                  aspectClass={videoHomeAspectClass(props.kind)}
-                />
+                <VideoHomeCard item={item} aspectClass={videoHomeAspectClass(props.kind)} />
               </MediaInfoHoverCard>
             )}
           </For>
@@ -110,25 +91,21 @@ export function LibraryShortcutRow(props: {
         <h2 id="library-shortcuts" class="text-title-large">
           Video Libraries
         </h2>
-        <div
-          class={isList() ? 'flex flex-col gap-3' : 'grid gap-3 sm:grid-cols-4'}
-        >
+        <div class={isList() ? 'flex flex-col gap-3' : 'grid gap-3 sm:grid-cols-4'}>
           <For each={props.shortcuts}>
             {(shortcut) => (
               <a
                 href={`/library/${shortcut.collectionType}/${shortcut.id}`}
-                class="card-filled flex items-center justify-between gap-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary/70"
+                class="card-filled focus-visible:ring-secondary/70 flex items-center justify-between gap-4 focus-visible:ring-2 focus-visible:outline-none"
               >
                 <div>
                   <p class="text-title-medium">{shortcut.name}</p>
                   <p class="text-body-small">
                     {shortcut.collectionType === 'tvshows' ? 'Shows' : 'Movies'}{' '}
-                    {shortcut.itemCount !== null
-                      ? `· ${shortcut.itemCount} items`
-                      : ''}
+                    {shortcut.itemCount !== null ? `· ${shortcut.itemCount} items` : ''}
                   </p>
                 </div>
-                <Library class="h-5 w-5 shrink-0 text-secondary" />
+                <Library class="text-secondary h-5 w-5 shrink-0" />
               </a>
             )}
           </For>
@@ -144,29 +121,29 @@ export function libraryTitle(collectionType: VideoLibraryKind) {
 
 export function playedFilterLabel(filter: VideoLibraryPlayedFilter) {
   switch (filter) {
-    case 'played':
+    case 'played': {
       return 'Played';
-    case 'unplayed':
+    }
+    case 'unplayed': {
       return 'Unplayed';
-    default:
+    }
+    default: {
       return 'All';
+    }
   }
 }
 
 export const sortItems: JmsrSelectItem<VideoLibrarySort>[] = [
-  { value: 'title', label: 'Title' },
-  { value: 'recentlyAdded', label: 'Recently added' },
-  { value: 'releaseDate', label: 'Release date' },
+  { label: 'Title', value: 'title' },
+  { label: 'Recently added', value: 'recentlyAdded' },
+  { label: 'Release date', value: 'releaseDate' },
 ];
 
 export function VideoLibraryCard(props: {
   item: VideoLibraryItem;
   collectionType?: VideoLibraryKind;
 }) {
-  const Icon =
-    props.collectionType === 'tvshows' || props.item.itemType === 'Series'
-      ? Tv
-      : Film;
+  const Icon = props.collectionType === 'tvshows' || props.item.itemType === 'Series' ? Tv : Film;
   const href = () =>
     props.item.itemType === 'Series'
       ? `/library/shows/${props.item.id}`
@@ -189,15 +166,16 @@ export function VideoLibraryCard(props: {
   return (
     <a
       href={href()}
-      class="card-filled group block overflow-hidden p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary/70 transition-all duration-300 hover:border-primary/50 hover:shadow-brand-glow-sm"
+      aria-label={`Open ${props.item.name}`}
+      class="card-filled group focus-visible:ring-secondary/70 hover:border-primary/50 hover:shadow-brand-glow-sm block overflow-hidden p-0 transition-all duration-300 focus-visible:ring-2 focus-visible:outline-none"
     >
       <div
-        class={`${aspectClass()} border-b border-outline-variant bg-surface-container-lowest/60 overflow-hidden`}
+        class={`${aspectClass()} border-outline-variant bg-surface-container-lowest/60 overflow-hidden border-b`}
       >
         <Show
           when={props.item.artworkUrl}
           fallback={
-            <div class="flex h-full flex-col items-center justify-center gap-2 px-4 text-center text-label-small text-on-surface-variant">
+            <div class="text-label-small text-on-surface-variant flex h-full flex-col items-center justify-center gap-2 px-4 text-center">
               <Icon class="h-5 w-5" />
               <span>No artwork</span>
             </div>
@@ -214,7 +192,7 @@ export function VideoLibraryCard(props: {
         </Show>
       </div>
       <div class="space-y-2 p-4">
-        <p class="line-clamp-2 text-title-medium">{props.item.name}</p>
+        <p class="text-title-medium line-clamp-2">{props.item.name}</p>
         <p class="text-body-small">{subtitle()}</p>
         <Show when={props.item.favorite}>
           <p class="text-label-small text-secondary">Favorite</p>
@@ -225,7 +203,9 @@ export function VideoLibraryCard(props: {
 }
 
 export function formatRuntime(seconds: number | null) {
-  if (seconds === null) return null;
+  if (seconds === null) {
+    return null;
+  }
   const totalMinutes = Math.round(seconds / 60);
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
@@ -248,9 +228,7 @@ export function showSubtitle(detail: VideoShowDetail) {
 }
 
 export function seasonLabel(season: VideoSeason) {
-  return season.seasonNumber !== null
-    ? `Season ${season.seasonNumber}`
-    : season.name;
+  return season.seasonNumber !== null ? `Season ${season.seasonNumber}` : season.name;
 }
 
 export function UserDataControls(props: {
@@ -266,22 +244,25 @@ export function UserDataControls(props: {
   const [busy, setBusy] = createSignal<VideoUserDataAction | null>(null);
   const [error, setError] = createSignal<string | null>(null);
   const runAction = async (action: VideoUserDataAction) => {
-    if (busy()) return;
+    if (busy()) {
+      return;
+    }
 
     setBusy(action);
     setError(null);
     const result = await props.onUpdate({
-      itemId: props.itemId,
       action,
+      itemId: props.itemId,
     });
     const message = Exit.match(result, {
-      onFailure: (cause) =>
-        commandFailureMessage(cause, 'Could not update user data'),
+      onFailure: (cause) => commandFailureMessage(cause, 'Could not update user data'),
       onSuccess: () => null,
     });
     setError(message);
     setBusy(null);
-    if (!message) props.onSuccess();
+    if (!message) {
+      props.onSuccess();
+    }
   };
   const favoriteAction = () => (props.favorite ? 'unfavorite' : 'favorite');
   const playedAction = () => (props.played ? 'markUnplayed' : 'markPlayed');
@@ -304,15 +285,11 @@ export function UserDataControls(props: {
                 />
               }
             >
-              <RefreshCw class="h-4 w-4 animate-spin text-secondary" />
+              <RefreshCw class="text-secondary h-4 w-4 animate-spin" />
             </Show>
           }
         >
-          {busy() === favoriteAction()
-            ? 'Updating...'
-            : props.favorite
-              ? 'Unfavorite'
-              : 'Favorite'}
+          {busy() === favoriteAction() ? 'Updating...' : props.favorite ? 'Unfavorite' : 'Favorite'}
         </Button>
         <Button
           type="button"
@@ -329,7 +306,7 @@ export function UserDataControls(props: {
                 />
               }
             >
-              <RefreshCw class="h-4 w-4 animate-spin text-secondary" />
+              <RefreshCw class="text-secondary h-4 w-4 animate-spin" />
             </Show>
           }
         >
