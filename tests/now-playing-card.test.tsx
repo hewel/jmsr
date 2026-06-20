@@ -108,7 +108,7 @@ afterEach(() => {
 test('offline now playing offers start mpv when Jellyfin is connected', async () => {
   const cleanup = renderCard();
 
-  await waitFor(() => expect(screen.getByText('Player bridge offline')).toBeVisible());
+  await waitFor(() => expect(screen.getByText('Offline')).toBeVisible());
   expect(screen.getByRole('button', { name: 'Play' })).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Start MPV' })).toBeVisible();
 
@@ -118,7 +118,7 @@ test('offline now playing offers start mpv when Jellyfin is connected', async ()
 test('media controls use shared icon buttons and primary text action', async () => {
   const cleanup = renderCard();
 
-  await waitFor(() => expect(screen.getByText('Player bridge offline')).toBeVisible());
+  await waitFor(() => expect(screen.getByText('Offline')).toBeVisible());
 
   const previous = screen.getByLabelText('Previous episode');
   expect(previous).toBeVisible();
@@ -139,7 +139,7 @@ test('offline now playing blocks start mpv when Jellyfin is disconnected', async
     .mockResolvedValue({ data: null, status: 'ok' });
   const cleanup = renderCard(offlineState, false);
 
-  await waitFor(() => expect(screen.getByText('Player bridge offline')).toBeVisible());
+  await waitFor(() => expect(screen.getByText('Offline')).toBeVisible());
 
   expect(screen.getByText('Reconnect Jellyfin before starting MPV')).toBeVisible();
   const button = screen.getByRole('button', {
@@ -237,7 +237,7 @@ test('idle and unknown states disable transport controls without exposing startu
   cleanup();
 
   const cleanupUnknown = renderCard(unknownState);
-  await waitFor(() => expect(screen.getByText('Playback state unknown')).toBeVisible());
+  await waitFor(() => expect(screen.getByText('Unknown')).toBeVisible());
   expect(screen.getByRole('button', { name: 'Play' })).toBeDisabled();
   expect(screen.getByLabelText('Stop playback')).toBeDisabled();
   expect(screen.queryByRole('button', { name: 'Start MPV' })).toBeNull();
