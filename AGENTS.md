@@ -61,8 +61,7 @@ bun tauri build     # Production desktop build
 - **2-space indent** in Rust (rustfmt.toml: `tab_spaces = 2`)
 - **Type-safe IPC**: All Rust↔TS via tauri-specta, never raw `invoke()`
 - **NO libmpv embed**: MPV spawned as external process, controlled via JSON IPC
-- **Solid.js reactivity**: Use `createSignal`, `createResource`, NOT React hooks
-- **Solid.js classes**: Prefer Solid's `classList` for conditional classes instead of building dynamic class strings. Keep `class` for static Tailwind utilities; use `classList={{ active: condition }}` when toggling classes so Solid can update individual class tokens efficiently. See https://docs.solidjs.com/concepts/components/class-style#classlist.
+- **Solid.js**: Use the `solidjs` skill for Solid primitives, JSX ownership, portals, conditional classes, async UI, and React-to-Solid pattern checks.
 - **Frontend file ownership**: Page-level `.tsx` route code belongs in the actual TanStack file-route entry under `src/routes/**`; do not split full route pages into ignored `-*.tsx` page-view modules. Reusable or non-page `.tsx` components belong under `src/components/**`; do not put frontend pages/components under `src/features/**`. Route-owned helper modules under `src/routes/**` may use TanStack Router's ignored `-` prefix when they are not route entries, but frontend Tauri data workflows belong under `src/effects/**`.
 - **Forms**: Always use `@tanstack/solid-form` with `createForm` for form handling
 - **Styling**: Use Tailwind utilities directly for atomic styling. Use vanilla-extract for design tokens (`src/styles/vars.css.ts`) and component-local CSS that Tailwind utilities cannot express cleanly. Do not add global `@layer components` classes for reusable UI; create or extend a component under `src/components/ui` instead.
@@ -70,18 +69,14 @@ bun tauri build     # Production desktop build
 - **Tauri data in frontend routes**: Keep frontend Tauri data workflows under `src/effects/**`, and keep route `.tsx` files focused on Solid UI state/rendering. Wrap generated `commands.*` calls with `runTauriCommand` / `runTauriCommandRaw` from `src/effects/commands.ts`; do not call raw `commands.*` from route components for reusable business/data workflows. Do not write fallback data objects for failures or missing values: use Effect for failures, `Option` for nullable values, and return success values like empty arrays/pages as data. When a helper returns an Effect `Exit`, unwrap it at the Solid boundary with `Exit.match` / `Exit.isSuccess`.
 - **Route data loading**: When route data is synthesized from multiple sources, differentiate fast/critical data from slow/non-critical data. Await only the data needed for first useful render; return slower values as deferred promises from the TanStack Router loader and render them in the component behind `<Suspense />` with a stable skeleton/fallback. For route loader design, follow TanStack Router deferred data loading: https://tanstack.com/router/latest/docs/guide/deferred-data-loading.
 - **Exit fallback pipelines**: Prefer pipeline-style helpers for unwrapping Effect `Exit` values at Solid/TanStack Router boundaries, for example `fetchThing().then(defaultTo(fallback))`. Keep fallback defaults at the boundary; do not hide command failures by fabricating success-shaped fallback objects inside `src/effects/**`.
-- **No JSX in Context/Signals**: Never store or pass fully instantiated JSX elements/views inside Context APIs or Signals. Instead, expose layout container DOM targets (e.g., `portalTarget` refs) through Context, and render components/controls declaratively from child templates using Solid's `<Portal>`.
 
 ## Anti-Patterns
 
 - **`bindings.ts` edits**: Auto-generated, changes will be overwritten on build
-- **React patterns in Solid**: No `useState`, `useEffect` – use Solid primitives
 - **Raw Tauri invoke**: Always use typed `commands.*` from bindings
 - **Thrown TypeScript errors**: Do not add `throw new Error(...)` or catch-and-rethrow paths for recoverable TypeScript failures. Model recoverable failures with Effect errors, model optional values with `Option`, and reserve thrown values only for framework-required control flow such as TanStack Router redirects or test assertion helpers.
 - **Fallback data workflows**: No raw `try/catch` in TypeScript business/data workflows, and no nullish `if` checks in `src/effects/**`; model those paths with Effect and Option.
-- **JSX elements in state/context**: Do not store dynamic JSX elements in signals or pass them via context APIs to render at parent nodes. Expose DOM mounting targets instead, keeping the layout template rendering declarative.
 - **Cross-component `.css.ts` imports**: Do not import another component's `.css.ts` style exports directly; consume the component API or move the needed behavior into a shared component.
-- **Blocking route render on slow data**: Do not make TanStack route loaders await slow/non-critical data when the page can render useful fast data first; defer the slow data and render it through `<Suspense />` with a skeleton or other stable fallback.
 
 ## Agent skills
 

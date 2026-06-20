@@ -11,13 +11,19 @@
       "source": "hewel/skills",
       "sourceType": "github",
       "skillPath": "effect-ts-extensions/SKILL.md",
-      "computedHash": "733a970935704e7df1818438a7476eb89709866269eba1eb0136a776c8f5f296"
+      "computedHash": "e51246b218df46019b1b06279df226e402ef648a15da3e01fff1c4fc2c36c89b"
     },
     "rust-best-practices": {
       "source": "apollographql/skills",
       "sourceType": "github",
       "skillPath": "skills/rust-best-practices/SKILL.md",
       "computedHash": "fd336f2f772eb46ddf8658de5f9dd8faa1f35615b316665307fc82eeb4b2e658"
+    },
+    "solidjs": {
+      "source": "hewel/skills",
+      "sourceType": "github",
+      "skillPath": "solidjs/SKILL.md",
+      "computedHash": "83910546ac08f3638f4f509b3ec71bc4b9af955a8b07c4835480a2ecea9e0f38"
     },
     "tanstack-router": {
       "source": "tanstack-skills/tanstack-skills",
