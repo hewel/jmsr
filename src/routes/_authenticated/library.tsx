@@ -1,11 +1,7 @@
 import LibraryNavbar from '@components/library/LibraryNavbar';
-import {
-  LibraryNavbarControlsContext,
-  type LibraryNavbarControlsApi,
-} from '@components/library/LibraryNavbarContext';
+import { LibraryNavbarControlsProvider } from '@components/library/LibraryNavbarContext';
 import { Outlet, createFileRoute, useLocation } from '@tanstack/solid-router';
-import { Show, createMemo, createSignal } from 'solid-js';
-import type { JSX } from 'solid-js';
+import { Show, createMemo } from 'solid-js';
 import { defaultTo } from '~effects/helper';
 import { fetchLibraryShortcuts } from '~effects/library';
 
@@ -30,24 +26,15 @@ function LibraryLayoutRoute() {
     const match = browsePathMatch();
     return match ? `${match[1]}:${match[2]}` : 'home';
   });
-  const [navbarControls, setNavbarControls] = createSignal<JSX.Element | null>(null);
-  const controlsApi: LibraryNavbarControlsApi = {
-    setControls: (controls) => setNavbarControls(() => controls),
-    clearControls: () => setNavbarControls(null),
-  };
 
   return (
-    <LibraryNavbarControlsContext.Provider value={controlsApi}>
+    <LibraryNavbarControlsProvider>
       <div class="space-y-6">
         <Show when={showNavbar()}>
-          <LibraryNavbar
-            shortcuts={loaderData().shortcuts}
-            activeValue={activeValue()}
-            controls={navbarControls()}
-          />
+          <LibraryNavbar shortcuts={loaderData().shortcuts} activeValue={activeValue()} />
         </Show>
         <Outlet />
       </div>
-    </LibraryNavbarControlsContext.Provider>
+    </LibraryNavbarControlsProvider>
   );
 }

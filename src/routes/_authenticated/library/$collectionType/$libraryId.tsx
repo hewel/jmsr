@@ -13,7 +13,8 @@ import { Button, Card, JmsrSelect } from '@components/ui';
 import { createFileRoute } from '@tanstack/solid-router';
 import { Exit } from 'effect';
 import { Check, RefreshCw } from 'lucide-solid';
-import { For, Show, Suspense, createResource, createSignal, onCleanup, onMount } from 'solid-js';
+import { For, Show, Suspense, createResource, createSignal } from 'solid-js';
+import { Portal } from 'solid-js/web';
 import { commandFailureMessage } from '~effects/commands';
 import { fetchVideoLibraryPage } from '~effects/library';
 import type { LibraryBrowseState, LibraryExit } from '~effects/library';
@@ -121,85 +122,84 @@ function LibraryBrowseRoute() {
   };
 
   const navbarControls = useLibraryNavbarControls();
-  const renderBrowseNavbarControls = () => (
-    <nav
-      class="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between"
-      aria-label="Library browse controls"
-    >
-      <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end">
-        <JmsrSelect
-          label="Sort By"
-          items={sortItems}
-          disabled={loading()}
-          value={sort()}
-          placeholder="Select sort..."
-          size="compact"
-          onValueChange={(value) => {
-            setSort(value);
-            reloadFromFirstPage();
-          }}
-          class="min-w-[12rem] flex-1 sm:max-w-[13rem]"
-        />
-
-        <fieldset class="min-w-0 space-y-2" aria-label="Played filter">
-          <legend class="text-on-surface-variant text-[12px] leading-[16px] font-bold tracking-[0.05em] uppercase">
-            Status
-          </legend>
-          <div class="flex flex-wrap gap-2">
-            <For each={['all', 'played', 'unplayed'] as VideoLibraryPlayedFilter[]}>
-              {(filter) => (
-                <Button
-                  type="button"
-                  variant="outlined"
-                  size="sm"
-                  class="h-10 rounded-xl px-4"
-                  classList={{
-                    'border-secondary bg-secondary-container/45 text-on-secondary-container':
-                      playedFilter() === filter,
-                  }}
-                  aria-pressed={playedFilter() === filter}
-                  disabled={loading()}
-                  onClick={() => {
-                    setPlayedFilter(filter);
-                    reloadFromFirstPage();
-                  }}
-                >
-                  {playedFilterLabel(filter)}
-                </Button>
-              )}
-            </For>
-          </div>
-        </fieldset>
-      </div>
-
-      <Checkbox.Root
-        checked={favoritesOnly()}
-        disabled={loading()}
-        onCheckedChange={(details) => {
-          setFavoritesOnly(details.checked === true);
-          reloadFromFirstPage();
-        }}
-        class="border-outline-variant bg-surface-container-high/50 text-on-surface hover:border-secondary/40 inline-flex h-10 cursor-pointer items-center gap-2.5 rounded-xl border px-3 align-top text-[14px] leading-[20px] font-semibold tracking-wide uppercase transition-colors transition-opacity select-none disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        <Checkbox.Control class="border-outline bg-surface-container-high text-on-primary hover:border-primary/60 data-[state=checked]:border-primary data-[state=checked]:from-primary data-[state=checked]:to-primary-gradient-end data-[state=indeterminate]:border-primary data-[state=indeterminate]:from-primary data-[state=indeterminate]:to-primary-gradient-end data-[focus-visible]:ring-primary/50 data-[focus-visible]:ring-offset-background inline-flex h-5.5 w-5.5 shrink-0 items-center justify-center rounded-lg border text-[11px] leading-none transition-all duration-200 data-[focus-visible]:ring-2 data-[focus-visible]:ring-offset-2 data-[focus-visible]:outline-none data-[state=checked]:bg-gradient-to-br data-[state=indeterminate]:bg-gradient-to-br">
-          <Checkbox.Indicator class="flex items-center justify-center font-black">
-            <Check class="h-3.5 w-3.5" stroke-width={4} />
-          </Checkbox.Indicator>
-        </Checkbox.Control>
-        <Checkbox.Label class="cursor-pointer select-none">Favorites Only</Checkbox.Label>
-        <Checkbox.HiddenInput />
-      </Checkbox.Root>
-    </nav>
-  );
-
-  onMount(() => {
-    navbarControls.setControls(renderBrowseNavbarControls());
-  });
-
-  onCleanup(() => navbarControls.clearControls());
 
   return (
     <div class="min-w-0">
+      <Show when={navbarControls.portalTarget()}>
+        {(target) => (
+          <Portal mount={target()}>
+            <nav
+              class="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between"
+              aria-label="Library browse controls"
+            >
+              <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end">
+                <JmsrSelect
+                  label="Sort By"
+                  items={sortItems}
+                  disabled={loading()}
+                  value={sort()}
+                  placeholder="Select sort..."
+                  size="compact"
+                  onValueChange={(value) => {
+                    setSort(value);
+                    reloadFromFirstPage();
+                  }}
+                  class="min-w-[12rem] flex-1 sm:max-w-[13rem]"
+                />
+
+                <fieldset class="min-w-0 space-y-2" aria-label="Played filter">
+                  <legend class="text-on-surface-variant text-[12px] leading-[16px] font-bold tracking-[0.05em] uppercase">
+                    Status
+                  </legend>
+                  <div class="flex flex-wrap gap-2">
+                    <For each={['all', 'played', 'unplayed'] as VideoLibraryPlayedFilter[]}>
+                      {(filter) => (
+                        <Button
+                          type="button"
+                          variant="outlined"
+                          size="sm"
+                          class="h-10 rounded-xl px-4"
+                          classList={{
+                            'border-secondary bg-secondary-container/45 text-on-secondary-container':
+                              playedFilter() === filter,
+                          }}
+                          aria-pressed={playedFilter() === filter}
+                          disabled={loading()}
+                          onClick={() => {
+                            setPlayedFilter(filter);
+                            reloadFromFirstPage();
+                          }}
+                        >
+                          {playedFilterLabel(filter)}
+                        </Button>
+                      )}
+                    </For>
+                  </div>
+                </fieldset>
+              </div>
+
+              <Checkbox.Root
+                checked={favoritesOnly()}
+                disabled={loading()}
+                onCheckedChange={(details) => {
+                  setFavoritesOnly(details.checked === true);
+                  reloadFromFirstPage();
+                }}
+                class="border-outline-variant bg-surface-container-high/50 text-on-surface hover:border-secondary/40 inline-flex h-10 cursor-pointer items-center gap-2.5 rounded-xl border px-3 align-top text-[14px] leading-[20px] font-semibold tracking-wide uppercase transition-colors transition-opacity select-none disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Checkbox.Control class="border-outline bg-surface-container-high text-on-primary hover:border-primary/60 data-[state=checked]:border-primary data-[state=checked]:from-primary data-[state=checked]:to-primary-gradient-end data-[state=indeterminate]:border-primary data-[state=indeterminate]:from-primary data-[state=indeterminate]:to-primary-gradient-end data-[focus-visible]:ring-primary/50 data-[focus-visible]:ring-offset-background inline-flex h-5.5 w-5.5 shrink-0 items-center justify-center rounded-lg border text-[11px] leading-none transition-all duration-200 data-[focus-visible]:ring-2 data-[focus-visible]:ring-offset-2 data-[focus-visible]:outline-none data-[state=checked]:bg-gradient-to-br data-[state=indeterminate]:bg-gradient-to-br">
+                  <Checkbox.Indicator class="flex items-center justify-center font-black">
+                    <Check class="h-3.5 w-3.5" stroke-width={4} />
+                  </Checkbox.Indicator>
+                </Checkbox.Control>
+                <Checkbox.Label class="cursor-pointer select-none">Favorites Only</Checkbox.Label>
+                <Checkbox.HiddenInput />
+              </Checkbox.Root>
+            </nav>
+          </Portal>
+        )}
+      </Show>
+
       <Suspense fallback={<LibraryBrowseSkeleton />}>
         <Show
           when={readyState()}
