@@ -6,24 +6,33 @@ on:
 
 jobs:
   changelog:
-    name: Generate Changelog
+    name: Load Local Agent Release Notes
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
-      release_body: ${{ steps.git-cliff.outputs.content }}
+      release_body: ${{ steps.release-notes.outputs.release_body }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Generate Changelog
-        uses: orhun/git-cliff-action@v4
-        id: git-cliff
-        with:
-          config: cliff.toml
-          args: --latest --strip header
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
+      - name: Load local agent release notes
+        run: |
+          body_file=".github/release-notes/${GITHUB_REF_NAME}.md"
+          if [ ! -s "$body_file" ]; then
+            echo "::error::Missing local-agent release notes at $body_file"
+            exit 1
+          fi
+          IFS= read -r first_line < "$body_file"
+          if [ "$first_line" != "## ${GITHUB_REF_NAME}" ]; then
+            echo "::error::$body_file must start with an exact '## ${GITHUB_REF_NAME}' heading"
+            exit 1
+          fi
+          delimiter="RELEASE_NOTES_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
+          {
+            echo "release_body<<$delimiter"
+            cat "$body_file"
+            echo "$delimiter"
+          } >> "$GITHUB_OUTPUT"
   build:
     name: Build (${{ matrix.platform }})
     strategy:
