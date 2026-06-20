@@ -48,7 +48,6 @@
   --color-surface-container-highest: #22293e;
   --color-surface-tint: #4f46e5;
   --color-brand-glow: #4f46e5;
-  --color-console-grid: #1a2240;
 
   --color-outline: #5c6c8c;
   --color-outline-variant: #262e42;
@@ -65,7 +64,6 @@ body {
 
 @layer components {
   .brand-type,
-  .text-display-large,
   .text-display-medium,
   .text-display-small,
   .text-headline-large,
@@ -75,9 +73,6 @@ body {
     @apply from-on-surface via-on-surface to-on-surface-variant bg-gradient-to-r bg-clip-text font-bold tracking-tight text-transparent;
   }
 
-  .text-display-large {
-    @apply text-[57px] leading-[64px] tracking-[-0.25px];
-  }
   .text-display-medium {
     @apply text-[45px] leading-[52px];
   }
@@ -124,7 +119,7 @@ body {
 
 @layer components {
   .console-shell {
-    @apply text-on-surface flex min-h-dvh flex-col justify-between p-4 sm:p-6 lg:p-8;
+    @apply text-on-surface flex min-h-dvh flex-col justify-between p-1 sm:p-2 lg:p-4;
   }
 
   .console-container {
@@ -134,27 +129,6 @@ body {
 
   .console-grid {
     @apply grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(330px,0.7fr)];
-  }
-
-  .status-grid {
-    @apply grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4;
-  }
-
-  .hero-panel {
-    @apply border-primary/20 bg-surface-container-low/40 relative overflow-hidden rounded-[2rem] border p-6 shadow-2xl backdrop-blur-xl transition-all duration-300;
-  }
-
-  .hero-panel::before {
-    content: '';
-    @apply pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgb(79_70_229/0.22),transparent_40%),radial-gradient(circle_at_90%_20%,rgb(57_213_255/0.16),transparent_35%)];
-  }
-
-  .status-tile {
-    @apply border-outline-variant bg-surface-container/50 hover:border-outline/40 hover:bg-surface-container/70 rounded-2xl border p-4 shadow-lg backdrop-blur-md transition-all duration-300;
-  }
-
-  .status-tile-icon {
-    @apply bg-surface-container-high border-outline-variant text-primary flex h-10 w-10 items-center justify-center rounded-2xl border shadow-inner;
   }
 
   .input-filled {
@@ -204,19 +178,6 @@ body {
 
   .ark-slider__thumb {
     @apply border-surface-container-lowest bg-on-surface data-[focus-visible]:ring-primary/50 flex h-5.5 w-5.5 cursor-grab items-center justify-center rounded-full border-2 shadow-lg shadow-black/50 transition-all duration-200 outline-none hover:scale-110 hover:shadow-[0_0_12px_rgba(255,255,255,0.4)] active:cursor-grabbing data-[focus-visible]:ring-2;
-  }
-
-  .btn-primary {
-    @apply from-primary text-on-primary shadow-primary/20 hover:shadow-primary/45 inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-2xl bg-gradient-to-r to-[#7a7eff] px-6 py-2.5 text-[14px] leading-[20px] font-bold shadow-lg transition-all duration-300 hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50;
-  }
-
-  .btn-secondary,
-  .btn-tonal {
-    @apply from-secondary-container text-on-secondary-container border-secondary/20 hover:border-secondary/40 inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-2xl border bg-gradient-to-r to-[#0b4b60] px-6 py-2.5 text-[14px] leading-[20px] font-bold shadow-md transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50;
-  }
-
-  .btn-outlined {
-    @apply border-outline/50 text-on-surface hover:border-primary hover:bg-primary/5 inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-2xl border bg-transparent px-6 py-2.5 text-[14px] leading-[20px] font-semibold transition-all duration-300 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50;
   }
 
   .btn-text {

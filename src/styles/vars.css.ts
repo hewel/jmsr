@@ -5,7 +5,6 @@ export const vars = createGlobalThemeContract(
     color: {
       background: 'color-background',
       brandGlow: 'color-brand-glow',
-      consoleGrid: 'color-console-grid',
       error: 'color-error',
       errorContainer: 'color-error-container',
       onBackground: 'color-on-background',

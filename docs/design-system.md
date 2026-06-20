@@ -49,7 +49,6 @@ All components use semantic tokens. `#4f46e5` is the JMSR brand seed and primary
 | Outline | `border-outline` | `#5c6c8c` | Strong borders/focus support |
 | Outline Variant | `border-outline-variant` | `#262e42` | Subtle dividers |
 | Brand Glow | `bg-brand-glow` | `#4f46e5` | Ambient indigo glow only |
-| Console Grid | `bg-console-grid` | `#1a2240` | Subtle shell/grid accents |
 
 ## Color Semantics
 
@@ -75,11 +74,9 @@ Use the shared text helpers: `text-display-*`, `text-headline-*`, `text-title-*`
 
 ### Buttons
 
-- `btn-primary`: primary purple filled action. One primary action per section or state.
-- `btn-secondary` / `btn-tonal`: medium-emphasis action.
-- `btn-outlined`: lower-emphasis action.
-- `btn-text`: inline/subtle action.
-- `btn-icon`: icon-only action with an accessible label.
+- Use the `<Button>` component (`src/components/ui/Button.tsx`) for `primary`, `secondary`, `tonal`, `outlined`, `text`, and `icon` variants. One primary action per section or state.
+- `btn-text`: inline/subtle action helper class for ad-hoc use (e.g. collapsible triggers).
+- `btn-icon`: icon-only action helper class with an accessible label.
 
 ### Inputs
 
