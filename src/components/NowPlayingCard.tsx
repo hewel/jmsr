@@ -35,7 +35,7 @@ function unavailableCopy(reason?: string | null): string {
 function statusLabel(status: NowPlayingState['status']): string {
   switch (status) {
     case 'offline': {
-      return 'Player bridge offline';
+      return 'Offline';
     }
     case 'idle': {
       return 'MPV idle';
@@ -47,7 +47,7 @@ function statusLabel(status: NowPlayingState['status']): string {
       return 'Paused';
     }
     default: {
-      return 'Playback state unknown';
+      return 'Unknown';
     }
   }
 }

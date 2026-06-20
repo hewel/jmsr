@@ -9,14 +9,13 @@ import type {
   VideoLibraryPlayRequest,
   VideoLibraryShortcut,
   VideoLibrarySort,
-  VideoSearchPage,
   VideoSeasonEpisodes,
   VideoSeasonEpisodesRequest,
   VideoShowDetail,
   VideoUserDataUpdate,
   VideoUserDataUpdateRequest,
 } from '@bindings';
-import { Effect, String as EffectString, Exit, Option } from 'effect';
+import { Effect, Exit } from 'effect';
 
 import { connection } from './auth';
 import { runTauriCommand } from './commands';
@@ -32,11 +31,6 @@ export interface LibraryBrowseState {
   items: VideoLibraryItem[];
 }
 
-export interface LibrarySearchState {
-  page: VideoSearchPage;
-  items: VideoLibraryItem[];
-}
-
 export type LibraryDetailState = VideoItemDetail;
 export type LibraryShowState = VideoShowDetail;
 
@@ -45,7 +39,6 @@ export interface SeasonEpisodesState {
 }
 
 export const LIBRARY_BROWSE_PAGE_SIZE = 24;
-export const LIBRARY_SEARCH_PAGE_SIZE = 24;
 
 const disconnectedError = () =>
   new CommandError({
@@ -58,22 +51,6 @@ const requireConnection = connection.pipe(
 
 function withConnection<T>(effect: Effect.Effect<T, CommandError>): Effect.Effect<T, CommandError> {
   return requireConnection.pipe(Effect.flatMap(() => effect));
-}
-
-function requiredSearchQuery(query: string): Effect.Effect<string, CommandError> {
-  return Effect.fromOption(
-    Option.fromNullishOr(query).pipe(
-      Option.map(EffectString.trim),
-      Option.filter(EffectString.isNonEmpty),
-    ),
-  ).pipe(
-    Effect.mapError(
-      () =>
-        new CommandError({
-          message: 'Search text is required',
-        }),
-    ),
-  );
 }
 
 export function fetchLibraryHome(): Promise<LibraryExit<LibraryHomeState>> {
@@ -109,26 +86,6 @@ export function fetchVideoLibraryPage(
       }),
     ).pipe(Effect.map((page) => ({ items: page.items, page }))),
   ).pipe(Effect.runPromiseExit);
-}
-
-export function fetchVideoSearchPage(
-  query: string,
-  startIndex: number,
-): Promise<LibraryExit<LibrarySearchState>> {
-  return requiredSearchQuery(query).pipe(
-    Effect.flatMap((trimmedQuery) =>
-      withConnection(
-        runTauriCommand(() =>
-          commands.librarySearchVideo({
-            limit: LIBRARY_SEARCH_PAGE_SIZE,
-            query: trimmedQuery,
-            startIndex,
-          }),
-        ).pipe(Effect.map((page) => ({ items: page.items, page }))),
-      ),
-    ),
-    Effect.runPromiseExit,
-  );
 }
 
 export function fetchVideoItemDetail(itemId: string): Promise<LibraryExit<LibraryDetailState>> {

@@ -11,7 +11,6 @@ import type {
   VideoItemDetail,
   VideoLibraryPage,
   VideoLibraryShortcut,
-  VideoSearchPage,
   VideoSeasonEpisodes,
   VideoShowDetail,
 } from '../src/bindings';
@@ -385,78 +384,6 @@ function videoLibraryPage(startIndex: number): VideoLibraryPage {
   };
 }
 
-function videoSearchPage(query: string, startIndex: number): VideoSearchPage {
-  if (startIndex === 0) {
-    return {
-      hasMore: true,
-      items: [
-        {
-          id: 'search-movie-1',
-          name: 'Search Movie',
-          itemType: 'Movie',
-          productionYear: 2024,
-          runtimeSeconds: 7200,
-          played: false,
-          favorite: false,
-          artworkUrl: null,
-          seasonNumber: null,
-          episodeNumber: null,
-          seriesId: null,
-          seriesName: null,
-          resumePositionSeconds: null,
-          playedPercentage: null,
-        },
-        {
-          id: 'search-show-1',
-          name: 'Search Show',
-          itemType: 'Series',
-          productionYear: null,
-          runtimeSeconds: null,
-          played: false,
-          favorite: true,
-          artworkUrl: null,
-          seasonNumber: null,
-          episodeNumber: null,
-          seriesId: null,
-          seriesName: null,
-          resumePositionSeconds: null,
-          playedPercentage: null,
-        },
-      ],
-      limit: 24,
-      query,
-      startIndex: 0,
-      totalRecordCount: 25,
-    };
-  }
-
-  return {
-    hasMore: false,
-    items: [
-      {
-        id: 'search-episode-25',
-        name: 'Search Episode 25',
-        itemType: 'Episode',
-        productionYear: null,
-        runtimeSeconds: null,
-        played: false,
-        favorite: false,
-        artworkUrl: null,
-        seasonNumber: null,
-        episodeNumber: null,
-        seriesId: null,
-        seriesName: null,
-        resumePositionSeconds: null,
-        playedPercentage: null,
-      },
-    ],
-    limit: 24,
-    query,
-    startIndex,
-    totalRecordCount: 25,
-  };
-}
-
 function mockShellCommands(state = connectedState) {
   rstest.spyOn(commands, 'jellyfinIsConnected').mockResolvedValue(true);
   rstest.spyOn(commands, 'jellyfinGetState').mockResolvedValue(state);
@@ -473,12 +400,6 @@ function mockShellCommands(state = connectedState) {
   rstest.spyOn(commands, 'libraryBrowseVideo').mockImplementation((request) =>
     Promise.resolve({
       data: videoLibraryPage(request.startIndex),
-      status: 'ok',
-    }),
-  );
-  rstest.spyOn(commands, 'librarySearchVideo').mockImplementation((request) =>
-    Promise.resolve({
-      data: videoSearchPage(request.query, request.startIndex),
       status: 'ok',
     }),
   );
@@ -576,7 +497,7 @@ test('authenticated shell exposes peer navigation areas', async () => {
   mockShellCommands();
   const cleanup = renderShell();
 
-  await screen.findByRole('heading', { name: 'Library' });
+  await screen.findByRole('navigation', { name: 'Library navigation' });
 
   const nav = screen.getByRole('navigation', { name: 'JMSR areas' });
   const libraryLink = screen.getByRole('link', { name: 'Library' });
@@ -597,21 +518,19 @@ test('library landing renders command-backed rows and drawer trigger', async () 
   mockShellCommands();
   const cleanup = renderShell();
 
-  await screen.findByRole('heading', { name: 'Library' });
+  await screen.findByRole('navigation', { name: 'Library navigation' });
 
+  const navigation = screen.getByRole('navigation', { name: 'Library navigation' });
+  expect(navigation).toBeVisible();
+  expect(navigation).toHaveClass('sticky');
+  expect(screen.getByRole('radio', { name: 'Home' })).toBeChecked();
+  expect(screen.getByRole('radio', { name: 'Movies' })).toBeVisible();
+  expect(screen.getByRole('radio', { name: 'Shows' })).toBeVisible();
   expect(await screen.findByRole('heading', { name: 'Continue Watching' })).toBeVisible();
   expect(screen.getByRole('link', { name: /Resume Movie/ })).toBeVisible();
   expect(screen.getByRole('link', { name: /Next Episode/ })).toBeVisible();
   expect(screen.getByRole('link', { name: /Latest Movie/ })).toBeVisible();
   expect(screen.getByRole('link', { name: /Latest Episode/ })).toBeVisible();
-  expect(screen.getByRole('link', { name: /Movies/ })).toHaveAttribute(
-    'href',
-    '/library/movies/movies',
-  );
-  expect(screen.getByRole('link', { name: /Shows/ })).toHaveAttribute(
-    'href',
-    '/library/tvshows/shows',
-  );
   const resumeArtwork = screen.getByAltText('Resume Movie artwork');
   expect(resumeArtwork).toHaveAttribute('src', videoHome.continueWatching[0]?.artworkUrl ?? '');
   expect(resumeArtwork.parentElement).toHaveClass('aspect-video');
@@ -629,116 +548,17 @@ test('library landing renders command-backed rows and drawer trigger', async () 
   cleanup();
 });
 
-test('library search loads paged video results and opens detail links without playback', async () => {
-  mockShellCommands();
-  const searchCommand = rstest.spyOn(commands, 'librarySearchVideo');
-  const mpvStart = rstest.spyOn(commands, 'mpvStart');
-  const cleanup = renderShell();
-
-  await screen.findByRole('heading', { name: 'Library' });
-  fireEvent.input(screen.getByLabelText('Search video library'), {
-    target: { value: 'pilot' },
-  });
-  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
-
-  expect(await screen.findByRole('link', { name: /Search Movie/ })).toHaveAttribute(
-    'href',
-    '/library/items/search-movie-1',
-  );
-  expect(screen.getByRole('link', { name: /Search Show/ })).toHaveAttribute(
-    'href',
-    '/library/shows/search-show-1',
-  );
-  expect(searchCommand).toHaveBeenCalledWith({
-    limit: 24,
-    query: 'pilot',
-    startIndex: 0,
-  });
-
-  const movieLink = screen.getByRole('link', { name: /Search Movie/ });
-  movieLink.addEventListener('click', (event) => event.preventDefault());
-  fireEvent.click(movieLink);
-  expect(mpvStart).not.toHaveBeenCalled();
-
-  fireEvent.click(screen.getByRole('button', { name: 'Load more results' }));
-  expect(await screen.findByRole('link', { name: /Search Episode 25/ })).toHaveAttribute(
-    'href',
-    '/library/items/search-episode-25',
-  );
-  expect(searchCommand).toHaveBeenLastCalledWith({
-    limit: 24,
-    query: 'pilot',
-    startIndex: 24,
-  });
-
-  cleanup();
-});
-
-test('library search exposes empty results and command errors with retry', async () => {
-  mockShellCommands();
-  const searchCommand = rstest
-    .spyOn(commands, 'librarySearchVideo')
-    .mockResolvedValueOnce({
-      data: {
-        hasMore: false,
-        items: [],
-        limit: 24,
-        query: 'missing',
-        startIndex: 0,
-        totalRecordCount: 0,
-      },
-      status: 'ok',
-    })
-    .mockResolvedValueOnce({
-      error: { code: 'network', message: 'Search unavailable' },
-      status: 'error',
-    })
-    .mockResolvedValueOnce({
-      data: videoSearchPage('missing', 0),
-      status: 'ok',
-    });
-  const cleanup = renderShell();
-
-  await screen.findByRole('heading', { name: 'Library' });
-  fireEvent.input(screen.getByLabelText('Search video library'), {
-    target: { value: 'missing' },
-  });
-  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
-  await screen.findByText('No video search results');
-
-  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
-  await screen.findByText('Search unavailable');
-  fireEvent.click(screen.getByRole('button', { name: 'Retry Search' }));
-  expect(await screen.findByRole('link', { name: /Search Movie/ })).toBeVisible();
-  expect(searchCommand).toHaveBeenCalledTimes(3);
-
-  cleanup();
-});
-
-test('library search stays disconnected without calling search command', async () => {
-  mockShellCommands(disconnectedState);
-  const searchCommand = rstest.spyOn(commands, 'librarySearchVideo');
-  const cleanup = renderShell();
-
-  await screen.findByRole('heading', { name: 'Library' });
-  fireEvent.input(screen.getByLabelText('Search video library'), {
-    target: { value: 'pilot' },
-  });
-  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
-
-  await screen.findByText('Library requires a live Jellyfin connection');
-  expect(screen.getByRole('button', { name: 'Retry Search' })).toBeVisible();
-  expect(searchCommand).not.toHaveBeenCalled();
-
-  cleanup();
-});
-
 test('library browse loads paged results and opens detail links without playback', async () => {
   mockShellCommands();
   const browseCommand = rstest.spyOn(commands, 'libraryBrowseVideo');
   const mpvStart = rstest.spyOn(commands, 'mpvStart');
   const cleanup = renderShell('/library/movies/movies');
 
+  const navigation = await screen.findByRole('navigation', { name: 'Library navigation' });
+  expect(navigation).toBeVisible();
+  expect(screen.getByRole('radio', { name: 'Movies' })).toBeChecked();
+  expect(screen.getByRole('radio', { name: 'Home' })).toBeVisible();
+  expect(screen.getByRole('radio', { name: 'Shows' })).toBeVisible();
   await screen.findByRole('heading', { name: 'Movies' });
   expect(await screen.findByRole('link', { name: /Paged Movie/ })).toHaveAttribute(
     'href',
@@ -1116,12 +936,13 @@ test('diagnostics shell area preserves diagnostics panel behavior', async () => 
   cleanup();
 });
 
-test('library landing keeps retry and skips video home when disconnected', async () => {
+test('library landing has no retry and skips video home when disconnected', async () => {
   mockShellCommands(disconnectedState);
   const videoHomeCommand = rstest.spyOn(commands, 'libraryVideoHome');
   const cleanup = renderShell();
 
-  expect(await screen.findByRole('button', { name: 'Retry Library' })).toBeVisible();
+  await screen.findByRole('navigation', { name: 'Library navigation' });
+  expect(screen.queryByRole('button', { name: 'Retry Library' })).toBeNull();
   expect(videoHomeCommand).not.toHaveBeenCalled();
 
   cleanup();
@@ -1145,7 +966,8 @@ test('library landing renders no fake content on command error', async () => {
   rstest.spyOn(events.nowPlayingChanged, 'listen').mockResolvedValue(() => {});
   const cleanup = renderShell();
 
-  expect(await screen.findByRole('button', { name: 'Retry Library' })).toBeVisible();
+  await screen.findByRole('navigation', { name: 'Library navigation' });
+  expect(screen.queryByRole('button', { name: 'Retry Library' })).toBeNull();
   expect(screen.queryByText('Continue Watching')).toBeNull();
 
   cleanup();
@@ -1164,7 +986,8 @@ test('library landing renders no rows for empty video home', async () => {
   });
   const cleanup = renderShell();
 
-  expect(await screen.findByRole('button', { name: 'Retry Library' })).toBeVisible();
+  await screen.findByRole('navigation', { name: 'Library navigation' });
+  expect(screen.queryByRole('button', { name: 'Retry Library' })).toBeNull();
   expect(screen.queryByText('No artwork')).toBeNull();
 
   cleanup();
@@ -1174,7 +997,7 @@ test('now playing drawer exposes full playback controls', async () => {
   mockShellCommands();
   const cleanup = renderShell();
 
-  await screen.findByRole('heading', { name: 'Library' });
+  await screen.findByRole('navigation', { name: 'Library navigation' });
 
   const trigger = screen.getByRole('button', { name: /Now Playing: Playing — The Pilot/ });
   fireEvent.click(trigger);

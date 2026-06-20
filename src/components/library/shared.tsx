@@ -1,5 +1,5 @@
 import { Exit } from 'effect';
-import { Check, Clapperboard, Film, Heart, Library, RefreshCw, Tv } from 'lucide-solid';
+import { Check, Clapperboard, Film, Heart, RefreshCw, Tv } from 'lucide-solid';
 import { For, Show, createSignal } from 'solid-js';
 
 import type {
@@ -8,7 +8,6 @@ import type {
   VideoLibraryItem,
   VideoLibraryKind,
   VideoLibraryPlayedFilter,
-  VideoLibraryShortcut,
   VideoLibrarySort,
   VideoSeason,
   VideoShowDetail,
@@ -80,44 +79,6 @@ export function VideoHomeRow(props: {
               <MediaInfoHoverCard id={item.id} itemType={item.itemType}>
                 <VideoHomeCard item={item} aspectClass={videoHomeAspectClass(props.kind)} />
               </MediaInfoHoverCard>
-            )}
-          </For>
-        </div>
-      </section>
-    </Show>
-  );
-}
-
-export function LibraryShortcutRow(props: {
-  shortcuts: VideoLibraryShortcut[];
-  layout?: 'grid' | 'list';
-}) {
-  const isList = () => props.layout === 'list';
-  return (
-    <Show when={props.shortcuts.length > 0}>
-      <section class="space-y-3" aria-labelledby="library-shortcuts">
-        <h2 id="library-shortcuts" class="text-on-surface text-[22px] leading-[28px] font-bold">
-          Video Libraries
-        </h2>
-        <div class={isList() ? 'flex flex-col gap-3' : 'grid gap-3 sm:grid-cols-4'}>
-          <For each={props.shortcuts}>
-            {(shortcut) => (
-              <CardLink
-                variant="filled"
-                href={`/library/${shortcut.collectionType}/${shortcut.id}`}
-                class="focus-visible:ring-secondary/70 flex items-center justify-between gap-4 focus-visible:ring-2 focus-visible:outline-none"
-              >
-                <div>
-                  <p class="text-on-surface text-[16px] leading-[24px] font-semibold">
-                    {shortcut.name}
-                  </p>
-                  <p class="text-on-surface-variant/80 text-[12px] leading-[16px]">
-                    {shortcut.collectionType === 'tvshows' ? 'Shows' : 'Movies'}{' '}
-                    {shortcut.itemCount !== null ? `· ${shortcut.itemCount} items` : ''}
-                  </p>
-                </div>
-                <Library class="text-secondary h-5 w-5 shrink-0" />
-              </CardLink>
             )}
           </For>
         </div>

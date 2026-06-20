@@ -14,6 +14,7 @@ import { Route as ConsoleRouteImport } from './routes/console'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedLibraryRouteImport } from './routes/_authenticated/library'
 import { Route as AuthenticatedDiagnosticsRouteImport } from './routes/_authenticated/diagnostics'
 import { Route as AuthenticatedLibraryIndexRouteImport } from './routes/_authenticated/library/index'
 import { Route as AuthenticatedLibraryShowsSeriesIdRouteImport } from './routes/_authenticated/library/shows/$seriesId'
@@ -44,6 +45,11 @@ const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedLibraryRoute = AuthenticatedLibraryRouteImport.update({
+  id: '/library',
+  path: '/library',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedDiagnosticsRoute =
   AuthenticatedDiagnosticsRouteImport.update({
     id: '/diagnostics',
@@ -52,27 +58,27 @@ const AuthenticatedDiagnosticsRoute =
   } as any)
 const AuthenticatedLibraryIndexRoute =
   AuthenticatedLibraryIndexRouteImport.update({
-    id: '/library/',
-    path: '/library/',
-    getParentRoute: () => AuthenticatedRoute,
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedLibraryRoute,
   } as any)
 const AuthenticatedLibraryShowsSeriesIdRoute =
   AuthenticatedLibraryShowsSeriesIdRouteImport.update({
-    id: '/library/shows/$seriesId',
-    path: '/library/shows/$seriesId',
-    getParentRoute: () => AuthenticatedRoute,
+    id: '/shows/$seriesId',
+    path: '/shows/$seriesId',
+    getParentRoute: () => AuthenticatedLibraryRoute,
   } as any)
 const AuthenticatedLibraryItemsItemIdRoute =
   AuthenticatedLibraryItemsItemIdRouteImport.update({
-    id: '/library/items/$itemId',
-    path: '/library/items/$itemId',
-    getParentRoute: () => AuthenticatedRoute,
+    id: '/items/$itemId',
+    path: '/items/$itemId',
+    getParentRoute: () => AuthenticatedLibraryRoute,
   } as any)
 const AuthenticatedLibraryCollectionTypeLibraryIdRoute =
   AuthenticatedLibraryCollectionTypeLibraryIdRouteImport.update({
-    id: '/library/$collectionType/$libraryId',
-    path: '/library/$collectionType/$libraryId',
-    getParentRoute: () => AuthenticatedRoute,
+    id: '/$collectionType/$libraryId',
+    path: '/$collectionType/$libraryId',
+    getParentRoute: () => AuthenticatedLibraryRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -80,6 +86,7 @@ export interface FileRoutesByFullPath {
   '/console': typeof ConsoleRoute
   '/login': typeof LoginRoute
   '/diagnostics': typeof AuthenticatedDiagnosticsRoute
+  '/library': typeof AuthenticatedLibraryRouteWithChildren
   '/settings': typeof AuthenticatedSettingsRoute
   '/library/': typeof AuthenticatedLibraryIndexRoute
   '/library/$collectionType/$libraryId': typeof AuthenticatedLibraryCollectionTypeLibraryIdRoute
@@ -104,6 +111,7 @@ export interface FileRoutesById {
   '/console': typeof ConsoleRoute
   '/login': typeof LoginRoute
   '/_authenticated/diagnostics': typeof AuthenticatedDiagnosticsRoute
+  '/_authenticated/library': typeof AuthenticatedLibraryRouteWithChildren
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/library/': typeof AuthenticatedLibraryIndexRoute
   '/_authenticated/library/$collectionType/$libraryId': typeof AuthenticatedLibraryCollectionTypeLibraryIdRoute
@@ -117,6 +125,7 @@ export interface FileRouteTypes {
     | '/console'
     | '/login'
     | '/diagnostics'
+    | '/library'
     | '/settings'
     | '/library/'
     | '/library/$collectionType/$libraryId'
@@ -140,6 +149,7 @@ export interface FileRouteTypes {
     | '/console'
     | '/login'
     | '/_authenticated/diagnostics'
+    | '/_authenticated/library'
     | '/_authenticated/settings'
     | '/_authenticated/library/'
     | '/_authenticated/library/$collectionType/$libraryId'
@@ -191,6 +201,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/library': {
+      id: '/_authenticated/library'
+      path: '/library'
+      fullPath: '/library'
+      preLoaderRoute: typeof AuthenticatedLibraryRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/diagnostics': {
       id: '/_authenticated/diagnostics'
       path: '/diagnostics'
@@ -200,53 +217,64 @@ declare module '@tanstack/solid-router' {
     }
     '/_authenticated/library/': {
       id: '/_authenticated/library/'
-      path: '/library'
+      path: '/'
       fullPath: '/library/'
       preLoaderRoute: typeof AuthenticatedLibraryIndexRouteImport
-      parentRoute: typeof AuthenticatedRoute
+      parentRoute: typeof AuthenticatedLibraryRoute
     }
     '/_authenticated/library/shows/$seriesId': {
       id: '/_authenticated/library/shows/$seriesId'
-      path: '/library/shows/$seriesId'
+      path: '/shows/$seriesId'
       fullPath: '/library/shows/$seriesId'
       preLoaderRoute: typeof AuthenticatedLibraryShowsSeriesIdRouteImport
-      parentRoute: typeof AuthenticatedRoute
+      parentRoute: typeof AuthenticatedLibraryRoute
     }
     '/_authenticated/library/items/$itemId': {
       id: '/_authenticated/library/items/$itemId'
-      path: '/library/items/$itemId'
+      path: '/items/$itemId'
       fullPath: '/library/items/$itemId'
       preLoaderRoute: typeof AuthenticatedLibraryItemsItemIdRouteImport
-      parentRoute: typeof AuthenticatedRoute
+      parentRoute: typeof AuthenticatedLibraryRoute
     }
     '/_authenticated/library/$collectionType/$libraryId': {
       id: '/_authenticated/library/$collectionType/$libraryId'
-      path: '/library/$collectionType/$libraryId'
+      path: '/$collectionType/$libraryId'
       fullPath: '/library/$collectionType/$libraryId'
       preLoaderRoute: typeof AuthenticatedLibraryCollectionTypeLibraryIdRouteImport
-      parentRoute: typeof AuthenticatedRoute
+      parentRoute: typeof AuthenticatedLibraryRoute
     }
   }
 }
 
-interface AuthenticatedRouteChildren {
-  AuthenticatedDiagnosticsRoute: typeof AuthenticatedDiagnosticsRoute
-  AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+interface AuthenticatedLibraryRouteChildren {
   AuthenticatedLibraryIndexRoute: typeof AuthenticatedLibraryIndexRoute
   AuthenticatedLibraryCollectionTypeLibraryIdRoute: typeof AuthenticatedLibraryCollectionTypeLibraryIdRoute
   AuthenticatedLibraryItemsItemIdRoute: typeof AuthenticatedLibraryItemsItemIdRoute
   AuthenticatedLibraryShowsSeriesIdRoute: typeof AuthenticatedLibraryShowsSeriesIdRoute
 }
 
-const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
-  AuthenticatedDiagnosticsRoute: AuthenticatedDiagnosticsRoute,
-  AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+const AuthenticatedLibraryRouteChildren: AuthenticatedLibraryRouteChildren = {
   AuthenticatedLibraryIndexRoute: AuthenticatedLibraryIndexRoute,
   AuthenticatedLibraryCollectionTypeLibraryIdRoute:
     AuthenticatedLibraryCollectionTypeLibraryIdRoute,
   AuthenticatedLibraryItemsItemIdRoute: AuthenticatedLibraryItemsItemIdRoute,
   AuthenticatedLibraryShowsSeriesIdRoute:
     AuthenticatedLibraryShowsSeriesIdRoute,
+}
+
+const AuthenticatedLibraryRouteWithChildren =
+  AuthenticatedLibraryRoute._addFileChildren(AuthenticatedLibraryRouteChildren)
+
+interface AuthenticatedRouteChildren {
+  AuthenticatedDiagnosticsRoute: typeof AuthenticatedDiagnosticsRoute
+  AuthenticatedLibraryRoute: typeof AuthenticatedLibraryRouteWithChildren
+  AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+}
+
+const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedDiagnosticsRoute: AuthenticatedDiagnosticsRoute,
+  AuthenticatedLibraryRoute: AuthenticatedLibraryRouteWithChildren,
+  AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
