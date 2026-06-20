@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "effect-best-practices": {
+      "source": "makisuo/skills",
+      "sourceType": "github",
+      "skillPath": "effect-best-practices/SKILL.md",
+      "computedHash": "241513d240f805e1651f86311089b521592cdf298eafaa3ba5ccc089ea0c97c6"
+    },
     "rust-best-practices": {
       "source": "apollographql/skills",
       "sourceType": "github",

@@ -1,4 +1,5 @@
 {
+  "$schema": "./node_modules/@effect/language-service/schema.json",
   "compilerOptions": {
     "lib": ["DOM", "ES2020"],
     "jsx": "preserve",
@@ -23,7 +24,12 @@
       "@components/*": ["./src/components/*"],
       "@bindings": ["./src/bindings.ts"],
       "~effects/*": ["./src/effects/*"]
-    }
+    },
+    "plugins": [
+      {
+        "name": "@effect/language-service"
+      }
+    ]
   },
   "include": ["src", "src/types/**/*.d.ts"]
 }
