@@ -9,7 +9,17 @@ class TestResizeObserver {
   disconnect() {}
 }
 
+class TestIntersectionObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+  takeRecords() {
+    return [];
+  }
+}
+
 Object.assign(window, {
+  IntersectionObserver: TestIntersectionObserver,
   ResizeObserver: TestResizeObserver,
 });
 
