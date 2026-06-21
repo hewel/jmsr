@@ -40,10 +40,9 @@ export default function SettingsModal() {
         aria-label="Open Settings"
         aria-expanded={open()}
         onClick={() => setOpen(true)}
-        class="shadow-primary/45 shadow-2xl"
+        class="shadow-primary/45 !h-[3.25rem] !w-[3.25rem] !p-0 shadow-2xl"
       >
         <Settings class="h-5 w-5" />
-        <span>Settings</span>
       </Button>
       <Show when={open()}>
         <div
