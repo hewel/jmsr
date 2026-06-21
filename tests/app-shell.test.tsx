@@ -1058,6 +1058,7 @@ test('Close Settings and standard dismissal close the Settings modal back to the
   // Standard dialog dismissal (Escape) via the headless primitive
   fireEvent.click(screen.getByRole('button', { name: 'Open Settings' }));
   const reopened = await screen.findByRole('dialog', { name: 'Settings' });
+  reopened.focus();
   fireEvent.keyDown(reopened, { code: 'Escape', key: 'Escape' });
   await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Settings' })).toBeNull());
 
