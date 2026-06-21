@@ -3,7 +3,7 @@ import { Outlet, createRootRoute } from '@tanstack/solid-router';
 import type { Component } from 'solid-js';
 
 const ScrollerWarpper: Component = () => (
-  <ScrollArea.Root class="relative flex h-screen w-screen overflow-hidden">
+  <ScrollArea.Root class="relative flex h-screen w-screen overflow-hidden has-[>[data-scrolling]]:select-none">
     <ScrollArea.Viewport class="h-full w-full scrollbar-none overscroll-contain">
       <ScrollArea.Content>
         <Outlet />
