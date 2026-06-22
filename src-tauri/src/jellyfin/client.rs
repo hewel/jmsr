@@ -40,6 +40,8 @@ pub struct JellyfinLibrary<'a> {
 /// Internal connection state.
 struct ClientState {
   provider: MediaServerProvider,
+  remote_control_available: bool,
+  remote_control_warning: Option<String>,
   server_url: Option<String>,
   access_token: Option<String>,
   user_id: Option<String>,
@@ -61,6 +63,8 @@ impl JellyfinClient {
         .expect("Failed to create HTTP client"),
       state: Arc::new(RwLock::new(ClientState {
         provider: MediaServerProvider::Jellyfin,
+        remote_control_available: false,
+        remote_control_warning: None,
         server_url: None,
         access_token: None,
         user_id: None,
@@ -347,6 +351,8 @@ impl JellyfinClient {
     {
       let mut state = self.state.write();
       state.provider = MediaServerProvider::Jellyfin;
+      state.remote_control_available = false;
+      state.remote_control_warning = None;
       state.server_url = Some(server_url);
       state.access_token = Some(auth.access_token.clone());
       state.user_id = Some(auth.user.id.clone());
@@ -380,6 +386,9 @@ impl JellyfinClient {
     {
       let mut state = self.state.write();
       state.provider = MediaServerProvider::Emby;
+      state.remote_control_available = false;
+      state.remote_control_warning =
+        Some("Remote control is not available for Emby connections yet.".to_string());
       state.server_url = Some(server_url);
       state.access_token = Some(auth.access_token.clone());
       state.user_id = Some(auth.user.id.clone());
@@ -568,6 +577,8 @@ impl JellyfinClient {
   pub fn disconnect(&self) {
     let mut state = self.state.write();
     state.provider = MediaServerProvider::Jellyfin;
+    state.remote_control_available = false;
+    state.remote_control_warning = None;
     state.server_url = None;
     state.access_token = None;
     state.user_id = None;
@@ -583,6 +594,13 @@ impl JellyfinClient {
     {
       let mut state = self.state.write();
       state.provider = session.provider;
+      state.remote_control_available = false;
+      state.remote_control_warning = match session.provider {
+        MediaServerProvider::Jellyfin => None,
+        MediaServerProvider::Emby => {
+          Some("Remote control is not available for Emby connections yet.".to_string())
+        }
+      };
       state.server_url = Some(session.server_url.clone());
       state.access_token = Some(session.access_token.clone());
       state.user_id = Some(session.user_id.clone());
@@ -651,6 +669,7 @@ impl JellyfinClient {
     let state = self.state.read();
     ConnectionState {
       provider: state.provider,
+      capabilities: Self::provider_capabilities(&state),
       connected: state.access_token.is_some(),
       server_url: state.server_url.clone(),
       server_name: state.server_name.clone(),
@@ -700,6 +719,30 @@ impl JellyfinClient {
     }
 
     Ok(candidates)
+  }
+
+  fn provider_capabilities(state: &ClientState) -> ProviderCapabilities {
+    match state.provider {
+      MediaServerProvider::Jellyfin => ProviderCapabilities {
+        quick_connect: true,
+        intro_skipper: true,
+        remote_control: true,
+        remote_control_available: state.remote_control_available,
+        remote_control_warning: state.remote_control_warning.clone(),
+      },
+      MediaServerProvider::Emby => ProviderCapabilities {
+        quick_connect: false,
+        intro_skipper: false,
+        remote_control: false,
+        remote_control_available: false,
+        remote_control_warning: state.remote_control_warning.clone(),
+      },
+    }
+  }
+
+  pub fn supports_remote_control(&self) -> bool {
+    let state = self.state.read();
+    Self::provider_capabilities(&state).remote_control
   }
 
   /// Get access token or error if not connected.
@@ -1150,8 +1193,17 @@ impl JellyfinClient {
           log::debug!("Session details: {:?}", session);
 
           if supports_media_control {
+            let mut state = self.state.write();
+            state.remote_control_available = true;
+            state.remote_control_warning = None;
             return Ok(());
           } else {
+            let mut state = self.state.write();
+            state.remote_control_available = false;
+            state.remote_control_warning = Some(
+              "Remote control is unavailable because the server did not grant media control."
+                .to_string(),
+            );
             return Err(JellyfinError::SessionNotFound);
           }
         }
@@ -1188,6 +1240,14 @@ impl JellyfinClient {
         sess_device_name,
         sess_client,
         supports_media
+      );
+    }
+    {
+      let mut state = self.state.write();
+      state.remote_control_available = false;
+      state.remote_control_warning = Some(
+        "Remote control is unavailable because the session is not visible to the server."
+          .to_string(),
       );
     }
     Err(JellyfinError::SessionNotFound)
@@ -2663,6 +2723,12 @@ mod tests {
     assert_eq!(session.server_url, format!("{server_url}/proxy/emby"));
     assert_eq!(session.server_name.as_deref(), Some("Emby Home"));
     assert_eq!(session.access_token, "emby-token");
+    let state = client.connection_state();
+    assert!(!state.capabilities.quick_connect);
+    assert!(!state.capabilities.intro_skipper);
+    assert!(!state.capabilities.remote_control);
+    assert!(!state.capabilities.remote_control_available);
+    assert!(state.capabilities.remote_control_warning.is_some());
 
     let captured = requests.lock();
     let auth_request = captured
@@ -3008,6 +3074,10 @@ mod tests {
       .validate_session()
       .await
       .expect("current session should be accepted");
+    let state = client.connection_state();
+    assert!(state.capabilities.remote_control);
+    assert!(state.capabilities.remote_control_available);
+    assert!(state.capabilities.remote_control_warning.is_none());
 
     let captured = requests.lock();
     let request = captured
@@ -3043,6 +3113,10 @@ mod tests {
       matches!(err, JellyfinError::SessionNotFound),
       "expected missing session, got {err:?}"
     );
+    let state = client.connection_state();
+    assert!(state.capabilities.remote_control);
+    assert!(!state.capabilities.remote_control_available);
+    assert!(state.capabilities.remote_control_warning.is_some());
   }
 
   #[tokio::test]

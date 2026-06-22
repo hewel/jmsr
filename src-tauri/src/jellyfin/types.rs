@@ -39,10 +39,22 @@ pub struct ServerInfo {
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionState {
   pub provider: MediaServerProvider,
+  pub capabilities: ProviderCapabilities,
   pub connected: bool,
   pub server_url: Option<String>,
   pub server_name: Option<String>,
   pub user_name: Option<String>,
+}
+
+/// Feature capabilities exposed by the active or selected media server provider.
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderCapabilities {
+  pub quick_connect: bool,
+  pub intro_skipper: bool,
+  pub remote_control: bool,
+  pub remote_control_available: bool,
+  pub remote_control_warning: Option<String>,
 }
 
 /// Media server provider selected for a connection or saved session.

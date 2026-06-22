@@ -23,6 +23,13 @@ Element.prototype.scrollTo = () => {};
 window.scrollTo = () => {};
 
 const connectedState = {
+  capabilities: {
+    introSkipper: true,
+    quickConnect: true,
+    remoteControl: true,
+    remoteControlAvailable: true,
+    remoteControlWarning: null,
+  },
   connected: true,
   provider: 'jellyfin' as const,
   serverName: 'Jellyfin Home',

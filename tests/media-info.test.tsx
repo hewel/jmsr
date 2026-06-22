@@ -12,6 +12,13 @@ import { queryKeys, runExit } from '../src/effects/query';
 import { createTestQueryClient, TestQueryProvider } from './query-client';
 
 const connectedState = {
+  capabilities: {
+    introSkipper: true,
+    quickConnect: true,
+    remoteControl: true,
+    remoteControlAvailable: true,
+    remoteControlWarning: null,
+  },
   connected: true,
   provider: 'jellyfin' as const,
   serverName: 'Jellyfin Home',

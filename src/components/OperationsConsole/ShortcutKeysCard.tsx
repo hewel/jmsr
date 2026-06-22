@@ -1,11 +1,13 @@
 import { Field as ArkField } from '@ark-ui/solid/field';
 import { Keyboard } from 'lucide-solid';
+import { Show } from 'solid-js';
 
 import { FieldControl, SectionCard } from '../ui';
 import type { OperationsConsoleForm } from './types';
 
 interface ShortcutKeysCardProps {
   form: OperationsConsoleForm;
+  showIntroSkipKey: boolean;
   onSaveTextSetting: (
     field: 'keybindNext' | 'keybindPrev' | 'keybindIntroSkip',
     value: string,
@@ -20,7 +22,9 @@ export default function ShortcutKeysCard(props: ShortcutKeysCardProps) {
     >
       <div class="space-y-4">
         <p class="text-on-surface-variant/80 text-[12px] leading-[16px]">
-          MPV input bindings for episode navigation and manual intro skipping.
+          {props.showIntroSkipKey
+            ? 'MPV input bindings for episode navigation and manual intro skipping.'
+            : 'MPV input bindings for episode navigation.'}
         </p>
 
         <props.form.Field
@@ -89,38 +93,40 @@ export default function ShortcutKeysCard(props: ShortcutKeysCardProps) {
           )}
         </props.form.Field>
 
-        <props.form.Field
-          name="keybindIntroSkip"
-          validators={{
-            onBlur: ({ value }) => (!value.trim() ? 'Keybinding is required' : undefined),
-          }}
-        >
-          {(field) => (
-            <ArkField.Root class="block" invalid={field().state.meta.errors.length > 0}>
-              <ArkField.Label class="text-on-surface-variant mb-1.5 block text-[12px] leading-[16px] font-bold tracking-[0.05em] uppercase">
-                Intro skip key
-              </ArkField.Label>
-              <ArkField.Input
-                asChild={(fieldProps) => (
-                  <FieldControl
-                    {...fieldProps()}
-                    variant="filled"
-                    name={field().name}
-                    type="text"
-                    value={field().state.value}
-                    onInput={(event) => field().handleChange(event.currentTarget.value)}
-                    onBlur={(event) => {
-                      field().handleBlur();
-                      props.onSaveTextSetting('keybindIntroSkip', event.currentTarget.value);
-                    }}
-                    class="text-secondary w-full font-mono font-semibold"
-                    placeholder="g"
-                  />
-                )}
-              />
-            </ArkField.Root>
-          )}
-        </props.form.Field>
+        <Show when={props.showIntroSkipKey}>
+          <props.form.Field
+            name="keybindIntroSkip"
+            validators={{
+              onBlur: ({ value }) => (!value.trim() ? 'Keybinding is required' : undefined),
+            }}
+          >
+            {(field) => (
+              <ArkField.Root class="block" invalid={field().state.meta.errors.length > 0}>
+                <ArkField.Label class="text-on-surface-variant mb-1.5 block text-[12px] leading-[16px] font-bold tracking-[0.05em] uppercase">
+                  Intro skip key
+                </ArkField.Label>
+                <ArkField.Input
+                  asChild={(fieldProps) => (
+                    <FieldControl
+                      {...fieldProps()}
+                      variant="filled"
+                      name={field().name}
+                      type="text"
+                      value={field().state.value}
+                      onInput={(event) => field().handleChange(event.currentTarget.value)}
+                      onBlur={(event) => {
+                        field().handleBlur();
+                        props.onSaveTextSetting('keybindIntroSkip', event.currentTarget.value);
+                      }}
+                      class="text-secondary w-full font-mono font-semibold"
+                      placeholder="g"
+                    />
+                  )}
+                />
+              </ArkField.Root>
+            )}
+          </props.form.Field>
+        </Show>
       </div>
     </SectionCard>
   );

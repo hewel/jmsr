@@ -4,7 +4,7 @@ import { Tabs } from '@ark-ui/solid/tabs';
 import { createForm } from '@tanstack/solid-form';
 import { Effect, Exit, Fiber } from 'effect';
 import { Check, CircleAlert, LoaderCircle, RadioTower } from 'lucide-solid';
-import { Show, createSignal, onCleanup, onMount } from 'solid-js';
+import { Show, createEffect, createSignal, onCleanup, onMount } from 'solid-js';
 
 import type { Credentials, MediaServerProvider } from '../bindings';
 import { commandFailureMessage } from '../effects/commands';
@@ -12,6 +12,7 @@ import { connectJellyfin } from '../effects/connection';
 import { CommandError } from '../effects/errors';
 import { runQuickConnectWorkflow } from '../effects/quickConnect';
 import { clearSavedCredentials, loadSavedCredentials, saveCredentials } from '../effects/session';
+import { capabilitiesForProvider } from '../providerCapabilities';
 import {
   buildServerUrlEffect,
   defaultSchemeForHost,
@@ -70,6 +71,7 @@ export default function LoginPage(props: LoginPageProps) {
   const formValues = form.useStore((state) => state.values);
 
   const isQuickConnectWaiting = () => quickConnectState() === 'waiting';
+  const selectedCapabilities = () => capabilitiesForProvider(formValues().provider);
   const submitButtonLabel = () => {
     if (loginMethod() !== 'quickConnect') {
       return 'Connect';
@@ -212,6 +214,13 @@ export default function LoginPage(props: LoginPageProps) {
     void form.handleSubmit();
   };
 
+  createEffect(() => {
+    if (!selectedCapabilities().quickConnect && loginMethod() === 'quickConnect') {
+      resetQuickConnect();
+      setLoginMethod('password');
+    }
+  });
+
   onMount(() => {
     const exit = Effect.runSyncExit(loadSavedCredentials());
     if (!Exit.isSuccess(exit)) {
@@ -346,6 +355,37 @@ export default function LoginPage(props: LoginPageProps) {
               </p>
             </div>
 
+            <form.Field name="provider">
+              {(field) => (
+                <fieldset>
+                  <legend class="text-on-surface-variant mb-1.5 block text-[12px] leading-[16px] font-bold tracking-[0.05em] uppercase">
+                    Media Server
+                  </legend>
+                  <div
+                    class="border-outline-variant bg-surface-container-high/40 grid grid-cols-2 rounded-2xl border p-1"
+                    aria-label="Media server provider"
+                  >
+                    <button
+                      type="button"
+                      class={`cursor-pointer rounded-xl px-4 py-3 text-[14px] leading-[20px] font-semibold tracking-wide uppercase transition-[background-color,color,box-shadow,transform] duration-300 active:scale-[0.96] ${field().state.value === 'jellyfin' ? 'from-primary to-primary-gradient-end text-on-primary shadow-primary/25 bg-gradient-to-r font-bold shadow-lg' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest/40'}`}
+                      disabled={isQuickConnectWaiting()}
+                      onClick={() => field().handleChange('jellyfin')}
+                    >
+                      Jellyfin
+                    </button>
+                    <button
+                      type="button"
+                      class={`cursor-pointer rounded-xl px-4 py-3 text-[14px] leading-[20px] font-semibold tracking-wide uppercase transition-[background-color,color,box-shadow,transform] duration-300 active:scale-[0.96] ${field().state.value === 'emby' ? 'from-primary to-primary-gradient-end text-on-primary shadow-primary/25 bg-gradient-to-r font-bold shadow-lg' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest/40'}`}
+                      disabled={isQuickConnectWaiting()}
+                      onClick={() => field().handleChange('emby')}
+                    >
+                      Emby
+                    </button>
+                  </div>
+                </fieldset>
+              )}
+            </form.Field>
+
             <Tabs.Root
               value={loginMethod()}
               activationMode="manual"
@@ -361,16 +401,18 @@ export default function LoginPage(props: LoginPageProps) {
               }}
             >
               <Tabs.List
-                class="border-outline-variant bg-surface-container-high/40 mb-6 grid grid-cols-2 rounded-2xl border p-1"
+                class={`border-outline-variant bg-surface-container-high/40 mb-6 grid rounded-2xl border p-1 ${selectedCapabilities().quickConnect ? 'grid-cols-2' : 'grid-cols-1'}`}
                 aria-label="Login Method"
               >
-                <Tabs.Trigger
-                  value="quickConnect"
-                  disabled={isQuickConnectWaiting()}
-                  class={`cursor-pointer rounded-xl px-4 py-3 text-[14px] leading-[20px] font-semibold tracking-wide uppercase transition-[background-color,color,box-shadow,transform] duration-300 active:scale-[0.96] ${loginMethod() === 'quickConnect' ? 'from-primary to-primary-gradient-end text-on-primary shadow-primary/25 bg-gradient-to-r font-bold shadow-lg' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest/40'}`}
-                >
-                  Quick Connect
-                </Tabs.Trigger>
+                <Show when={selectedCapabilities().quickConnect}>
+                  <Tabs.Trigger
+                    value="quickConnect"
+                    disabled={isQuickConnectWaiting()}
+                    class={`cursor-pointer rounded-xl px-4 py-3 text-[14px] leading-[20px] font-semibold tracking-wide uppercase transition-[background-color,color,box-shadow,transform] duration-300 active:scale-[0.96] ${loginMethod() === 'quickConnect' ? 'from-primary to-primary-gradient-end text-on-primary shadow-primary/25 bg-gradient-to-r font-bold shadow-lg' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest/40'}`}
+                  >
+                    Quick Connect
+                  </Tabs.Trigger>
+                </Show>
                 <Tabs.Trigger
                   value="password"
                   disabled={isQuickConnectWaiting()}
@@ -380,86 +422,60 @@ export default function LoginPage(props: LoginPageProps) {
                 </Tabs.Trigger>
               </Tabs.List>
 
-              <Tabs.Content value="quickConnect">
-                <div class="border-secondary/25 bg-secondary-container/20 relative overflow-hidden rounded-3xl border p-6 text-center backdrop-blur-sm transition-colors">
-                  <div class="from-secondary/5 pointer-events-none absolute inset-0 bg-gradient-to-b to-transparent" />
+              <Show when={selectedCapabilities().quickConnect}>
+                <Tabs.Content value="quickConnect">
+                  <div class="border-secondary/25 bg-secondary-container/20 relative overflow-hidden rounded-3xl border p-6 text-center backdrop-blur-sm transition-colors">
+                    <div class="from-secondary/5 pointer-events-none absolute inset-0 bg-gradient-to-b to-transparent" />
 
-                  {/* Decorative radar background */}
-                  <div class="border-secondary/20 bg-secondary/5 relative mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full border">
-                    <Show when={isQuickConnectWaiting()}>
-                      <div class="border-secondary/40 absolute inset-0 animate-[radar-pulse_2.2s_cubic-bezier(0.2,0.8,0.2,1)_infinite] rounded-full border" />
-                      <div
-                        class="border-secondary/30 absolute inset-0 animate-[radar-pulse_2.2s_cubic-bezier(0.2,0.8,0.2,1)_infinite] rounded-full border"
-                        style="animation-delay: 0.7s"
+                    {/* Decorative radar background */}
+                    <div class="border-secondary/20 bg-secondary/5 relative mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full border">
+                      <Show when={isQuickConnectWaiting()}>
+                        <div class="border-secondary/40 absolute inset-0 animate-[radar-pulse_2.2s_cubic-bezier(0.2,0.8,0.2,1)_infinite] rounded-full border" />
+                        <div
+                          class="border-secondary/30 absolute inset-0 animate-[radar-pulse_2.2s_cubic-bezier(0.2,0.8,0.2,1)_infinite] rounded-full border"
+                          style="animation-delay: 0.7s"
+                        />
+                        <div
+                          class="border-secondary/20 absolute inset-0 animate-[radar-pulse_2.2s_cubic-bezier(0.2,0.8,0.2,1)_infinite] rounded-full border"
+                          style="animation-delay: 1.4s"
+                        />
+                      </Show>
+                      <RadioTower
+                        class={`text-secondary h-9 w-9 ${isQuickConnectWaiting() ? 'animate-pulse' : ''} drop-shadow-[0_0_8px_rgba(129,140,248,0.4)]`}
                       />
-                      <div
-                        class="border-secondary/20 absolute inset-0 animate-[radar-pulse_2.2s_cubic-bezier(0.2,0.8,0.2,1)_infinite] rounded-full border"
-                        style="animation-delay: 1.4s"
-                      />
+                    </div>
+
+                    <p class="text-on-secondary-container text-[14px] leading-[20px] font-medium">
+                      Approve this code from another signed-in Jellyfin client. JellyPilot will
+                      finish login automatically after approval.
+                    </p>
+                    <p class="text-on-surface-variant/80 mt-2 text-[12px] leading-[16px]">
+                      You are authorizing this Playback Target.
+                    </p>
+
+                    <Show when={quickConnectCode()}>
+                      <div class="bg-surface-container-lowest/80 border-outline-variant mt-6 inline-flex flex-col items-center justify-center rounded-2xl border px-6 py-3.5 shadow-inner">
+                        <span class="text-on-surface-variant/80 mb-1 text-[10px] font-bold tracking-[0.2em] uppercase">
+                          Verification Code
+                        </span>
+                        <p class="font-display text-secondary pl-[0.25em] font-mono text-[36px] leading-[44px] font-bold tracking-[0.25em] tracking-tight tabular-nums drop-shadow-[0_0_10px_rgba(129,140,248,0.55)]">
+                          {quickConnectCode()}
+                        </p>
+                      </div>
                     </Show>
-                    <RadioTower
-                      class={`text-secondary h-9 w-9 ${isQuickConnectWaiting() ? 'animate-pulse' : ''} drop-shadow-[0_0_8px_rgba(129,140,248,0.4)]`}
-                    />
+
+                    <Show when={isQuickConnectWaiting()}>
+                      <div class="text-secondary mt-5 flex animate-pulse items-center justify-center gap-2 text-[12px] leading-[16px] font-bold tracking-[0.05em] uppercase">
+                        <span class="bg-secondary h-2 w-2 rounded-full shadow-[0_0_8px_#818cf8]" />
+                        Awaiting Quick Connect Approval…
+                      </div>
+                    </Show>
                   </div>
-
-                  <p class="text-on-secondary-container text-[14px] leading-[20px] font-medium">
-                    Approve this code from another signed-in Jellyfin client. JellyPilot will finish
-                    login automatically after approval.
-                  </p>
-                  <p class="text-on-surface-variant/80 mt-2 text-[12px] leading-[16px]">
-                    You are authorizing this Playback Target.
-                  </p>
-
-                  <Show when={quickConnectCode()}>
-                    <div class="bg-surface-container-lowest/80 border-outline-variant mt-6 inline-flex flex-col items-center justify-center rounded-2xl border px-6 py-3.5 shadow-inner">
-                      <span class="text-on-surface-variant/80 mb-1 text-[10px] font-bold tracking-[0.2em] uppercase">
-                        Verification Code
-                      </span>
-                      <p class="font-display text-secondary pl-[0.25em] font-mono text-[36px] leading-[44px] font-bold tracking-[0.25em] tracking-tight tabular-nums drop-shadow-[0_0_10px_rgba(129,140,248,0.55)]">
-                        {quickConnectCode()}
-                      </p>
-                    </div>
-                  </Show>
-
-                  <Show when={isQuickConnectWaiting()}>
-                    <div class="text-secondary mt-5 flex animate-pulse items-center justify-center gap-2 text-[12px] leading-[16px] font-bold tracking-[0.05em] uppercase">
-                      <span class="bg-secondary h-2 w-2 rounded-full shadow-[0_0_8px_#818cf8]" />
-                      Awaiting Quick Connect Approval…
-                    </div>
-                  </Show>
-                </div>
-              </Tabs.Content>
+                </Tabs.Content>
+              </Show>
 
               <Tabs.Content value="password">
                 <div class="space-y-4">
-                  <form.Field name="provider">
-                    {(field) => (
-                      <fieldset>
-                        <legend class="text-on-surface-variant mb-1.5 block text-[12px] leading-[16px] font-bold tracking-[0.05em] uppercase">
-                          Media Server
-                        </legend>
-                        <div
-                          class="border-outline-variant bg-surface-container-high/40 grid grid-cols-2 rounded-2xl border p-1"
-                          aria-label="Media server provider"
-                        >
-                          <button
-                            type="button"
-                            class={`cursor-pointer rounded-xl px-4 py-3 text-[14px] leading-[20px] font-semibold tracking-wide uppercase transition-[background-color,color,box-shadow,transform] duration-300 active:scale-[0.96] ${field().state.value === 'jellyfin' ? 'from-primary to-primary-gradient-end text-on-primary shadow-primary/25 bg-gradient-to-r font-bold shadow-lg' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest/40'}`}
-                            onClick={() => field().handleChange('jellyfin')}
-                          >
-                            Jellyfin
-                          </button>
-                          <button
-                            type="button"
-                            class={`cursor-pointer rounded-xl px-4 py-3 text-[14px] leading-[20px] font-semibold tracking-wide uppercase transition-[background-color,color,box-shadow,transform] duration-300 active:scale-[0.96] ${field().state.value === 'emby' ? 'from-primary to-primary-gradient-end text-on-primary shadow-primary/25 bg-gradient-to-r font-bold shadow-lg' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest/40'}`}
-                            onClick={() => field().handleChange('emby')}
-                          >
-                            Emby
-                          </button>
-                        </div>
-                      </fieldset>
-                    )}
-                  </form.Field>
                   <form.Field name="username">
                     {(field) => (
                       <ArkField.Root class="block">

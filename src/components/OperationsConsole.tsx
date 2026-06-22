@@ -1,7 +1,7 @@
 import { createForm } from '@tanstack/solid-form';
 import { createMutation, createQuery, useQueryClient } from '@tanstack/solid-query';
 import { Exit, Option } from 'effect';
-import { createEffect } from 'solid-js';
+import { Show, createEffect } from 'solid-js';
 
 import type { AppConfig, IntroSkipperMode } from '../bindings';
 import { commandFailureMessage } from '../effects/commands';
@@ -132,6 +132,7 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
     connectionQuery.data && Exit.isSuccess(connectionQuery.data)
       ? connectionQuery.data.value
       : undefined;
+  const capabilities = () => state()?.capabilities;
   const config = () =>
     configQuery.data && Exit.isSuccess(configQuery.data) ? configQuery.data.value : null;
   const introSkipperMode = () => ui.introSkipperDraft ?? config()?.introSkipperMode ?? 'automatic';
@@ -463,11 +464,17 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
           <aside class="space-y-6">
             <DiagnosticsCard />
 
-            <IntroSkipCard
-              currentMode={introSkipperMode()}
-              onModeChange={handleIntroSkipperModeChange}
+            <Show when={capabilities()?.introSkipper ?? true}>
+              <IntroSkipCard
+                currentMode={introSkipperMode()}
+                onModeChange={handleIntroSkipperModeChange}
+              />
+            </Show>
+            <ShortcutKeysCard
+              form={form}
+              showIntroSkipKey={capabilities()?.introSkipper ?? true}
+              onSaveTextSetting={saveTextSetting}
             />
-            <ShortcutKeysCard form={form} onSaveTextSetting={saveTextSetting} />
 
             <SessionCard onSignOut={handleSignOut} />
 

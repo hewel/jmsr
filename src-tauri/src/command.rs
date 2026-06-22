@@ -194,6 +194,35 @@ fn jellyfin_err(e: JellyfinError) -> CommandError {
   }
 }
 
+async fn start_remote_control_session_if_supported(
+  app: &tauri::AppHandle,
+  state: &JellyfinState,
+  config_state: &ConfigState,
+) -> Result<(), CommandError> {
+  if !state.client.supports_remote_control() {
+    playback_control::emit_now_playing_changed(app, state).await;
+    return Ok(());
+  }
+
+  let new_session = Arc::new(SessionManager::new(
+    state.client.clone(),
+    state.mpv.clone(),
+    config_state.0.clone(),
+    app.clone(),
+  ));
+  new_session.start().await.map_err(internal_err)?;
+
+  let old_session = state.session.write().replace(new_session);
+  if let Some(old) = old_session {
+    if let Err(e) = old.stop().await {
+      log::warn!("Failed to stop old session: {}", e);
+    }
+  }
+  playback_control::emit_now_playing_changed(app, state).await;
+
+  Ok(())
+}
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -480,25 +509,7 @@ pub async fn jellyfin_connect(
     .await
     .map_err(jellyfin_err)?;
 
-  // Create and start session manager
-  let new_session = Arc::new(SessionManager::new(
-    state.client.clone(),
-    state.mpv.clone(),
-    config_state.0.clone(),
-    app.clone(),
-  ));
-  new_session.start().await.map_err(internal_err)?;
-
-  // Stop existing session before replacing (idempotent connect)
-  let old_session = state.session.write().replace(new_session);
-  if let Some(old) = old_session {
-    if let Err(e) = old.stop().await {
-      log::warn!("Failed to stop old session: {}", e);
-    }
-  }
-  playback_control::emit_now_playing_changed(&app, &state).await;
-
-  Ok(())
+  start_remote_control_session_if_supported(&app, &state, &config_state).await
 }
 
 /// Start a Jellyfin Quick Connect request.
@@ -549,25 +560,7 @@ pub async fn jellyfin_quick_connect_authenticate(
     .await
     .map_err(jellyfin_err)?;
 
-  // Create and start session manager
-  let new_session = Arc::new(SessionManager::new(
-    state.client.clone(),
-    state.mpv.clone(),
-    config_state.0.clone(),
-    app.clone(),
-  ));
-  new_session.start().await.map_err(internal_err)?;
-
-  // Stop existing session before replacing (idempotent connect)
-  let old_session = state.session.write().replace(new_session);
-  if let Some(old) = old_session {
-    if let Err(e) = old.stop().await {
-      log::warn!("Failed to stop old session: {}", e);
-    }
-  }
-  playback_control::emit_now_playing_changed(&app, &state).await;
-
-  Ok(())
+  start_remote_control_session_if_supported(&app, &state, &config_state).await
 }
 
 /// Disconnect from Jellyfin server.
@@ -768,25 +761,7 @@ pub async fn jellyfin_restore_session(
     .await
     .map_err(jellyfin_err)?;
 
-  // Create and start session manager
-  let new_session = Arc::new(SessionManager::new(
-    state.client.clone(),
-    state.mpv.clone(),
-    config_state.0.clone(),
-    app.clone(),
-  ));
-  new_session.start().await.map_err(internal_err)?;
-
-  // Stop existing session before replacing (idempotent restore)
-  let old_session = state.session.write().replace(new_session);
-  if let Some(old) = old_session {
-    if let Err(e) = old.stop().await {
-      log::warn!("Failed to stop old session: {}", e);
-    }
-  }
-  playback_control::emit_now_playing_changed(&app, &state).await;
-
-  Ok(())
+  start_remote_control_session_if_supported(&app, &state, &config_state).await
 }
 
 /// Clear/logout from the current session.

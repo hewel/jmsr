@@ -16,7 +16,7 @@ function isSavedSession(value: unknown): value is PersistedSavedSession {
   }
   const obj = value as Record<string, unknown>;
   return (
-    (obj.provider === undefined || obj.provider === 'jellyfin') &&
+    (obj.provider === undefined || obj.provider === 'jellyfin' || obj.provider === 'emby') &&
     typeof obj.serverUrl === 'string' &&
     typeof obj.accessToken === 'string' &&
     typeof obj.userId === 'string' &&

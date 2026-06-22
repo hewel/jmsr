@@ -1,4 +1,4 @@
-import { Activity, Link, Power, RefreshCw, Server, User } from 'lucide-solid';
+import { Activity, AlertTriangle, Link, Power, RefreshCw, Server, User } from 'lucide-solid';
 import { Show } from 'solid-js';
 
 import type { ConnectionState } from '../../bindings';
@@ -15,6 +15,12 @@ interface ConnectionCardProps {
 
 export default function ConnectionCard(props: ConnectionCardProps) {
   const [ui] = useOperationsConsoleStore();
+  const capabilities = () => props.state?.capabilities;
+  const remoteControlLabel = () => {
+    const caps = capabilities();
+    if (!caps?.remoteControl) return 'Unavailable';
+    return caps.remoteControlAvailable ? 'Available' : 'Pending';
+  };
 
   return (
     <SectionCard
@@ -63,6 +69,25 @@ export default function ConnectionCard(props: ConnectionCardProps) {
           >
             {props.state?.userName ?? 'No active user'}
           </p>
+        </div>
+        <div class="bg-surface-container-high/30 border-outline-variant/60 relative overflow-hidden rounded-2xl border p-4 backdrop-blur-sm md:col-span-2">
+          <div class="absolute top-0 right-0 p-3 opacity-5">
+            <Activity class="h-12 w-12" />
+          </div>
+          <p class="text-on-surface-variant text-[11px] leading-[16px] font-bold tracking-[0.08em] uppercase">
+            Remote Control
+          </p>
+          <p class="text-on-surface mt-1.5 text-[16px] leading-[24px] font-bold font-semibold">
+            {remoteControlLabel()}
+          </p>
+          <Show when={capabilities()?.remoteControlWarning}>
+            {(message) => (
+              <p class="text-warning mt-2 flex items-start gap-2 text-[12px] leading-[16px] font-semibold">
+                <AlertTriangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>{message()}</span>
+              </p>
+            )}
+          </Show>
         </div>
       </div>
 

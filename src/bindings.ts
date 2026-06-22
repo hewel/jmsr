@@ -182,6 +182,7 @@ export type CommandErrorCode =
 /**  Connection state exposed to frontend. */
 export type ConnectionState = {
 	provider: MediaServerProvider,
+	capabilities: ProviderCapabilities,
 	connected: boolean,
 	serverUrl: string | null,
 	serverName: string | null,
@@ -248,6 +249,15 @@ export type PlayerState = {
 export type PropertyValue = boolean | number | null | string | 
 /**  Arrays serialized as JSON string for specta compatibility. */
 string | "Null";
+
+/**  Feature capabilities exposed by the active or selected media server provider. */
+export type ProviderCapabilities = {
+	quickConnect: boolean,
+	introSkipper: boolean,
+	remoteControl: boolean,
+	remoteControlAvailable: boolean,
+	remoteControlWarning: string | null,
+};
 
 /**  Quick Connect request created by the server. */
 export type QuickConnectRequest = {

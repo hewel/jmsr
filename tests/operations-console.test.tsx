@@ -9,11 +9,32 @@ import { ToastProvider } from '../src/components/ToastProvider';
 import { TestQueryProvider } from './query-client';
 
 const connectedState = {
+  capabilities: {
+    introSkipper: true,
+    quickConnect: true,
+    remoteControl: true,
+    remoteControlAvailable: true,
+    remoteControlWarning: null,
+  },
   connected: true,
   provider: 'jellyfin' as const,
   serverName: 'Jellyfin Home',
   serverUrl: 'https://jellyfin.example.com',
   userName: 'Ada',
+};
+
+const embyConnectedState = {
+  ...connectedState,
+  capabilities: {
+    introSkipper: false,
+    quickConnect: false,
+    remoteControl: false,
+    remoteControlAvailable: false,
+    remoteControlWarning: 'Remote control is not available for Emby connections yet.',
+  },
+  provider: 'emby' as const,
+  serverName: 'Emby Home',
+  serverUrl: 'https://media.example.com/emby',
 };
 
 const config: AppConfig = {
@@ -101,6 +122,20 @@ test('operations console loads intro skipper mode from config', async () => {
 
   await screen.findByRole('heading', { name: 'Connection' });
   expect(screen.getByRole('button', { name: /Automatic/ })).toHaveAttribute('aria-pressed', 'true');
+
+  cleanup();
+});
+
+test('operations console renders Emby capabilities without Intro Skipper controls', async () => {
+  const cleanup = renderConsole(() => {}, config, embyConnectedState);
+
+  expect(await screen.findByText('Emby Home')).toBeVisible();
+  expect(
+    screen.getByText('Remote control is not available for Emby connections yet.'),
+  ).toBeVisible();
+  expect(screen.queryByRole('heading', { name: 'Intro Skip' })).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('Intro skip key')).not.toBeInTheDocument();
+  expect(screen.getByLabelText('Next episode key')).toBeVisible();
 
   cleanup();
 });
@@ -565,6 +600,7 @@ test('reconnect restores a live Jellyfin connection from a Saved Session', async
     status: 'ok',
   });
   const cleanup = renderConsole(() => {}, config, {
+    ...connectedState,
     connected: false,
     serverName: null,
     serverUrl: null,
@@ -588,6 +624,7 @@ test('reconnect failure clears the Saved Session and signs out', async () => {
   });
   const onSignedOut = rstest.fn();
   const cleanup = renderConsole(onSignedOut, config, {
+    ...connectedState,
     connected: false,
     serverName: null,
     serverUrl: null,

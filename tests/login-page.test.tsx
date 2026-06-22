@@ -202,6 +202,21 @@ test('login page shows password login after method selection', async () => {
   cleanup();
 });
 
+test('login page shows only password login for Emby', async () => {
+  const cleanup = renderLoginPage();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Emby' }));
+
+  await waitFor(() => expect(screen.getByText('Username')).toBeVisible());
+  expect(screen.queryByRole('tab', { name: 'Quick Connect' })).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole('button', { name: 'Request Quick Connect code' }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Connect' })).toBeVisible();
+
+  cleanup();
+});
+
 test('login page completes quick connect when approval is observed', async () => {
   rstest.useFakeTimers();
   rstest.spyOn(commands, 'jellyfinQuickConnectStart').mockResolvedValue({
