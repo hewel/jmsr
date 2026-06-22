@@ -13,6 +13,7 @@ import { createTestQueryClient, TestQueryProvider } from './query-client';
 
 const connectedState = {
   connected: true,
+  provider: 'jellyfin' as const,
   serverName: 'Jellyfin Home',
   serverUrl: 'https://jellyfin.example.com',
   userName: 'Ada',
@@ -78,7 +79,7 @@ function mediaValue<A, E>(exit: Exit.Exit<A, E>): A | null {
 }
 
 beforeEach(() => {
-  rstest.spyOn(commands, 'jellyfinGetState').mockResolvedValue(connectedState);
+  rstest.spyOn(commands, 'serverGetState').mockResolvedValue(connectedState);
 });
 
 afterEach(() => {

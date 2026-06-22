@@ -41,7 +41,7 @@ export function runQuickConnectWorkflow(
       commands.jellyfinQuickConnectAuthenticate(serverUrl, request.secret),
     );
 
-    const session = yield* runTauriCommandRaw(() => commands.jellyfinGetSession());
+    const session = yield* runTauriCommandRaw(() => commands.serverGetSession());
     if (session) {
       yield* saveSession(session);
     }

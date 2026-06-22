@@ -6,12 +6,17 @@ import { StorageParseError } from './errors';
 export const SESSION_STORAGE_KEY = 'jellypilot_auth_session';
 export const LEGACY_SESSION_STORAGE_KEY = 'jmsr_auth_session';
 
-function isSavedSession(value: unknown): value is SavedSession {
+type PersistedSavedSession = Omit<SavedSession, 'provider'> & {
+  provider?: SavedSession['provider'];
+};
+
+function isSavedSession(value: unknown): value is PersistedSavedSession {
   if (value === null || typeof value !== 'object') {
     return false;
   }
   const obj = value as Record<string, unknown>;
   return (
+    (obj.provider === undefined || obj.provider === 'jellyfin') &&
     typeof obj.serverUrl === 'string' &&
     typeof obj.accessToken === 'string' &&
     typeof obj.userId === 'string' &&
@@ -24,7 +29,7 @@ function isSavedSession(value: unknown): value is SavedSession {
 function parseSavedSession(
   raw: string,
   key: string,
-): Effect.Effect<SavedSession, StorageParseError> {
+): Effect.Effect<PersistedSavedSession, StorageParseError> {
   return Effect.gen(function* () {
     const parsed: unknown = yield* Effect.try({
       catch: () =>
@@ -48,15 +53,19 @@ function parseSavedSession(
   });
 }
 
-function normalizeLegacySession(session: SavedSession): SavedSession {
-  return session.deviceId?.startsWith('jmsr-') ? { ...session, deviceId: null } : session;
+function normalizeSavedSession(session: PersistedSavedSession): SavedSession {
+  return {
+    ...session,
+    provider: session.provider ?? 'jellyfin',
+    deviceId: session.deviceId?.startsWith('jmsr-') ? null : session.deviceId,
+  };
 }
 
 export function loadSavedSession() {
   const legacySession = Effect.sync(() => localStorage.getItem(LEGACY_SESSION_STORAGE_KEY)).pipe(
     Effect.flatMap(Effect.fromNullishOr),
     Effect.flatMap((value) => parseSavedSession(value, LEGACY_SESSION_STORAGE_KEY)),
-    Effect.map(normalizeLegacySession),
+    Effect.map(normalizeSavedSession),
     Effect.tap((session) =>
       Effect.sync(() => {
         localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
@@ -68,7 +77,8 @@ export function loadSavedSession() {
     Effect.flatMap(Effect.fromNullishOr),
     Effect.matchEffect({
       onFailure: () => legacySession,
-      onSuccess: (value) => parseSavedSession(value, SESSION_STORAGE_KEY),
+      onSuccess: (value) =>
+        parseSavedSession(value, SESSION_STORAGE_KEY).pipe(Effect.map(normalizeSavedSession)),
     }),
   );
 }

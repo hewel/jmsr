@@ -17,6 +17,7 @@ import { TestQueryProvider } from './query-client';
 const sampleSession = {
   accessToken: 'token-1',
   deviceId: 'device-1',
+  provider: 'jellyfin' as const,
   serverName: 'Jellyfin Home',
   serverUrl: 'https://jellyfin.example.com',
   userId: 'user-1',
@@ -215,7 +216,7 @@ test('login page completes quick connect when approval is observed', async () =>
     data: null,
     status: 'ok',
   });
-  rstest.spyOn(commands, 'jellyfinGetSession').mockResolvedValue(sampleSession);
+  rstest.spyOn(commands, 'serverGetSession').mockResolvedValue(sampleSession);
   const onConnected = rstest.fn();
   const cleanup = renderLoginPage(onConnected);
 
@@ -416,7 +417,7 @@ test('quick connect can request a new code after timeout with a poll in flight',
     data: null,
     status: 'ok',
   });
-  rstest.spyOn(commands, 'jellyfinGetSession').mockResolvedValue(sampleSession);
+  rstest.spyOn(commands, 'serverGetSession').mockResolvedValue(sampleSession);
   const onConnected = rstest.fn();
   const cleanup = renderLoginPage(onConnected);
 
@@ -508,11 +509,11 @@ test('quick connect authentication status errors fail and unlock request', async
 });
 
 test('password login saves the authenticated session', async () => {
-  rstest.spyOn(commands, 'jellyfinConnect').mockResolvedValue({
+  rstest.spyOn(commands, 'serverConnect').mockResolvedValue({
     data: null,
     status: 'ok',
   });
-  rstest.spyOn(commands, 'jellyfinGetSession').mockResolvedValue(sampleSession);
+  rstest.spyOn(commands, 'serverGetSession').mockResolvedValue(sampleSession);
   const onConnected = rstest.fn();
   const cleanup = renderLoginPage(onConnected);
 
@@ -536,7 +537,7 @@ test('password login saves the authenticated session', async () => {
   cleanup();
 });
 test('password login stays locked while saving the authenticated session', async () => {
-  const connect = rstest.spyOn(commands, 'jellyfinConnect').mockResolvedValue({
+  const connect = rstest.spyOn(commands, 'serverConnect').mockResolvedValue({
     data: null,
     status: 'ok',
   });
@@ -544,7 +545,7 @@ test('password login stays locked while saving the authenticated session', async
   const session = new Promise<typeof sampleSession>((resolve) => {
     resolveSession = resolve;
   });
-  rstest.spyOn(commands, 'jellyfinGetSession').mockReturnValue(session);
+  rstest.spyOn(commands, 'serverGetSession').mockReturnValue(session);
   const onConnected = rstest.fn();
   const cleanup = renderLoginPage(onConnected);
 
@@ -560,11 +561,11 @@ test('password login stays locked while saving the authenticated session', async
   cleanup();
 });
 test('password login session-save failures show an error and unlock submit', async () => {
-  rstest.spyOn(commands, 'jellyfinConnect').mockResolvedValue({
+  rstest.spyOn(commands, 'serverConnect').mockResolvedValue({
     data: null,
     status: 'ok',
   });
-  rstest.spyOn(commands, 'jellyfinGetSession').mockRejectedValue(new Error('Session unavailable'));
+  rstest.spyOn(commands, 'serverGetSession').mockRejectedValue(new Error('Session unavailable'));
   const onConnected = rstest.fn();
   const cleanup = renderLoginPage(onConnected);
 
@@ -578,11 +579,11 @@ test('password login session-save failures show an error and unlock submit', asy
   cleanup();
 });
 test('password login saves remembered Login Prefill when remember me is checked', async () => {
-  rstest.spyOn(commands, 'jellyfinConnect').mockResolvedValue({
+  rstest.spyOn(commands, 'serverConnect').mockResolvedValue({
     data: null,
     status: 'ok',
   });
-  rstest.spyOn(commands, 'jellyfinGetSession').mockResolvedValue(sampleSession);
+  rstest.spyOn(commands, 'serverGetSession').mockResolvedValue(sampleSession);
   const cleanup = renderLoginPage();
 
   await fillPasswordLogin();
@@ -609,11 +610,11 @@ test('password login clears Login Prefill when remember me is unchecked', async 
       username: 'old',
     }),
   );
-  rstest.spyOn(commands, 'jellyfinConnect').mockResolvedValue({
+  rstest.spyOn(commands, 'serverConnect').mockResolvedValue({
     data: null,
     status: 'ok',
   });
-  rstest.spyOn(commands, 'jellyfinGetSession').mockResolvedValue(sampleSession);
+  rstest.spyOn(commands, 'serverGetSession').mockResolvedValue(sampleSession);
   const cleanup = renderLoginPage();
 
   await fillPasswordLogin();
@@ -628,7 +629,7 @@ test('password login clears Login Prefill when remember me is unchecked', async 
 });
 
 test('password login status errors show the command message and unlock submit', async () => {
-  rstest.spyOn(commands, 'jellyfinConnect').mockResolvedValue({
+  rstest.spyOn(commands, 'serverConnect').mockResolvedValue({
     error: { code: 'authFailed', message: 'Invalid username or password' },
     status: 'error',
   });
@@ -646,7 +647,7 @@ test('password login status errors show the command message and unlock submit', 
 });
 
 test('password login rejected commands show an error and unlock submit', async () => {
-  rstest.spyOn(commands, 'jellyfinConnect').mockRejectedValue(new Error('IPC unavailable'));
+  rstest.spyOn(commands, 'serverConnect').mockRejectedValue(new Error('IPC unavailable'));
   const onConnected = rstest.fn();
   const cleanup = renderLoginPage(onConnected);
 

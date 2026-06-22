@@ -10,6 +10,7 @@ import { TestQueryProvider } from './query-client';
 
 const connectedState = {
   connected: true,
+  provider: 'jellyfin' as const,
   serverName: 'Jellyfin Home',
   serverUrl: 'https://jellyfin.example.com',
   userName: 'Ada',
@@ -31,6 +32,7 @@ const config: AppConfig = {
 const validSavedSession: SavedSession = {
   accessToken: 'token-1',
   deviceId: 'device-1',
+  provider: 'jellyfin',
   serverName: 'Jellyfin Home',
   serverUrl: 'https://jellyfin.example.com',
   userId: 'user-1',
@@ -38,7 +40,7 @@ const validSavedSession: SavedSession = {
 };
 
 function mockCommon(appConfig = config, state = connectedState) {
-  rstest.spyOn(commands, 'jellyfinGetState').mockResolvedValue(state);
+  rstest.spyOn(commands, 'serverGetState').mockResolvedValue(state);
   rstest.spyOn(commands, 'mpvIsConnected').mockResolvedValue(false);
   rstest.spyOn(commands, 'configGet').mockResolvedValue(appConfig);
 }
@@ -496,7 +498,7 @@ test('final console structure covers all operational areas in order', async () =
 
 test('disconnect keeps saved session and stays on console', async () => {
   localStorage.setItem('jellypilot_auth_session', JSON.stringify({ serverUrl: 'x' }));
-  const disconnect = rstest.spyOn(commands, 'jellyfinDisconnect').mockResolvedValue({
+  const disconnect = rstest.spyOn(commands, 'serverDisconnect').mockResolvedValue({
     data: null,
     status: 'ok',
   });
@@ -520,7 +522,7 @@ test('disconnect keeps saved session and stays on console', async () => {
   cleanup();
 });
 test('disconnect failure stays on console and unlocks the action', async () => {
-  rstest.spyOn(commands, 'jellyfinDisconnect').mockResolvedValue({
+  rstest.spyOn(commands, 'serverDisconnect').mockResolvedValue({
     error: { code: 'network', message: 'disconnect offline' },
     status: 'error',
   });
@@ -540,7 +542,7 @@ test('disconnect failure stays on console and unlocks the action', async () => {
 
 test('disconnect rejected commands stay on console and unlock the action', async () => {
   rstest
-    .spyOn(commands, 'jellyfinDisconnect')
+    .spyOn(commands, 'serverDisconnect')
     .mockRejectedValue(new Error('disconnect ipc unavailable'));
   const cleanup = renderConsole();
 
@@ -558,7 +560,7 @@ test('disconnect rejected commands stay on console and unlock the action', async
 
 test('reconnect restores a live Jellyfin connection from a Saved Session', async () => {
   localStorage.setItem('jellypilot_auth_session', JSON.stringify(validSavedSession));
-  const restore = rstest.spyOn(commands, 'jellyfinRestoreSession').mockResolvedValue({
+  const restore = rstest.spyOn(commands, 'serverRestoreSession').mockResolvedValue({
     data: null,
     status: 'ok',
   });
@@ -580,7 +582,7 @@ test('reconnect restores a live Jellyfin connection from a Saved Session', async
 
 test('reconnect failure clears the Saved Session and signs out', async () => {
   localStorage.setItem('jellypilot_auth_session', JSON.stringify(validSavedSession));
-  rstest.spyOn(commands, 'jellyfinRestoreSession').mockResolvedValue({
+  rstest.spyOn(commands, 'serverRestoreSession').mockResolvedValue({
     error: { code: 'authFailed', message: 'expired' },
     status: 'error',
   });
@@ -603,7 +605,7 @@ test('reconnect failure clears the Saved Session and signs out', async () => {
 
 test('sign out confirms and clears saved session', async () => {
   localStorage.setItem('jellypilot_auth_session', JSON.stringify({ serverUrl: 'x' }));
-  const clearSession = rstest.spyOn(commands, 'jellyfinClearSession').mockResolvedValue({
+  const clearSession = rstest.spyOn(commands, 'serverClearSession').mockResolvedValue({
     data: null,
     status: 'ok',
   });
@@ -627,7 +629,7 @@ test('sign out confirms and clears saved session', async () => {
 
 test('sign out failure preserves the Saved Session and stays on console', async () => {
   localStorage.setItem('jellypilot_auth_session', JSON.stringify(validSavedSession));
-  const clearSession = rstest.spyOn(commands, 'jellyfinClearSession').mockResolvedValue({
+  const clearSession = rstest.spyOn(commands, 'serverClearSession').mockResolvedValue({
     error: { code: 'network', message: 'offline' },
     status: 'error',
   });
@@ -650,7 +652,7 @@ test('sign out failure preserves the Saved Session and stays on console', async 
 test('sign out rejected commands preserve the Saved Session and close the dialog', async () => {
   localStorage.setItem('jellypilot_auth_session', JSON.stringify(validSavedSession));
   rstest
-    .spyOn(commands, 'jellyfinClearSession')
+    .spyOn(commands, 'serverClearSession')
     .mockRejectedValue(new Error('sign out ipc unavailable'));
   const onSignedOut = rstest.fn();
   const cleanup = renderConsole(onSignedOut);
@@ -699,9 +701,9 @@ test('sign out dialog uses Ark dialog dismissal semantics', async () => {
 
 test('sign out dialog locks dismissal while signing out', async () => {
   let resolveClearSession:
-    | ((result: Awaited<ReturnType<typeof commands.jellyfinClearSession>>) => void)
+    | ((result: Awaited<ReturnType<typeof commands.serverClearSession>>) => void)
     | undefined;
-  rstest.spyOn(commands, 'jellyfinClearSession').mockImplementation(
+  rstest.spyOn(commands, 'serverClearSession').mockImplementation(
     () =>
       new Promise((resolve) => {
         resolveClearSession = resolve;
@@ -801,6 +803,7 @@ import { StorageParseError } from '../src/effects/errors';
 const sampleSession = {
   accessToken: 'token-1',
   deviceId: 'device-1',
+  provider: 'jellyfin' as const,
   serverName: 'Jellyfin Home',
   serverUrl: 'https://jellyfin.example.com',
   userId: 'user-1',

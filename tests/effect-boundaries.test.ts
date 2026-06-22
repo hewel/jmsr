@@ -24,9 +24,11 @@ test('Saved Session restore and route checks use typed command helpers', () => {
     "import { runTauriCommand, runTauriCommandRaw } from './effects/commands';",
   );
   expect(sessionAccessSource).toContain(
-    'runTauriCommand(() => commands.jellyfinRestoreSession(savedSession))',
+    'runTauriCommand(() => commands.serverRestoreSession(savedSession))',
   );
-  expect(sessionAccessSource).toContain('runTauriCommandRaw(() => commands.jellyfinIsConnected())');
+  expect(sessionAccessSource).toContain('runTauriCommandRaw(() => commands.serverIsConnected())');
+  expect(sessionAccessSource).not.toContain('commands.jellyfinRestoreSession');
+  expect(sessionAccessSource).not.toContain('commands.jellyfinIsConnected');
 });
 test('Password Login connect command uses typed command helper', () => {
   const loginSource = readFileSync('src/components/LoginPage.tsx', 'utf8');
@@ -45,10 +47,24 @@ test('Quick Connect commands use typed command helpers', () => {
   expect(qcSource).toContain(
     'commands.jellyfinQuickConnectAuthenticate(serverUrl, request.secret)',
   );
+  expect(qcSource).toContain('runTauriCommandRaw(() => commands.serverGetSession())');
   expect(qcSource).not.toContain(
     'const result = await commands.jellyfinQuickConnectStart(serverUrl);',
   );
+  expect(qcSource).not.toContain('commands.jellyfinGetSession');
 });
+
+test('generated bindings expose provider-neutral DTOs instead of Jellyfin OpenAPI models', () => {
+  const bindingsSource = readFileSync('src/bindings.ts', 'utf8');
+
+  expect(bindingsSource).toContain('export type MediaServerProvider = "jellyfin";');
+  expect(bindingsSource).toContain('serverGetState');
+  expect(bindingsSource).toContain('serverRestoreSession');
+  expect(bindingsSource).not.toContain('AuthenticationResult');
+  expect(bindingsSource).not.toContain('BaseItemDto');
+  expect(bindingsSource).not.toContain('jellyfin_api');
+});
+
 test('Operations Console and Shell use refactored connection/config effects', () => {
   const consoleSource = readFileSync('src/components/OperationsConsole.tsx', 'utf8');
   const shellSource = readFileSync('src/components/AuthenticatedShell.tsx', 'utf8');

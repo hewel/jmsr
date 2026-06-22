@@ -218,6 +218,10 @@ impl JellyfinClient {
 
   /// Authenticate with Jellyfin server.
   pub async fn authenticate(&self, creds: &Credentials) -> Result<AuthResponse, JellyfinError> {
+    match creds.provider {
+      MediaServerProvider::Jellyfin => {}
+    }
+
     let server_url = Self::normalize_server_url(&creds.server_url)?;
     let configuration = self.openapi_configuration(&server_url, None)?;
 
@@ -381,6 +385,10 @@ impl JellyfinClient {
   ///
   /// Validates the token by making a test API call.
   pub async fn restore_session(&self, session: &SavedSession) -> Result<(), JellyfinError> {
+    match session.provider {
+      MediaServerProvider::Jellyfin => {}
+    }
+
     // Set the state first
     {
       let mut state = self.state.write();
@@ -426,6 +434,7 @@ impl JellyfinClient {
       state.user_name.clone(),
     ) {
       Some(SavedSession {
+        provider: MediaServerProvider::Jellyfin,
         server_url,
         access_token,
         user_id,
@@ -448,6 +457,7 @@ impl JellyfinClient {
   pub fn connection_state(&self) -> ConnectionState {
     let state = self.state.read();
     ConnectionState {
+      provider: MediaServerProvider::Jellyfin,
       connected: state.access_token.is_some(),
       server_url: state.server_url.clone(),
       server_name: state.server_name.clone(),
@@ -2372,6 +2382,7 @@ mod tests {
 
     client
       .authenticate(&Credentials {
+        provider: MediaServerProvider::Jellyfin,
         server_url: server_url.clone(),
         username: "Ada".to_string(),
         password: "correct horse battery staple".to_string(),
@@ -2414,6 +2425,7 @@ mod tests {
 
     client
       .restore_session(&SavedSession {
+        provider: MediaServerProvider::Jellyfin,
         server_url,
         access_token: "token-1".to_string(),
         user_id: "00000000-0000-0000-0000-000000000001".to_string(),
@@ -2444,6 +2456,7 @@ mod tests {
 
     let err = client
       .restore_session(&SavedSession {
+        provider: MediaServerProvider::Jellyfin,
         server_url,
         access_token: "token-1".to_string(),
         user_id: "00000000-0000-0000-0000-000000000001".to_string(),

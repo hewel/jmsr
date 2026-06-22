@@ -59,6 +59,7 @@ export const commands = {
 	jellyfinIsConnected: () => __TAURI_INVOKE<boolean>("jellyfin_is_connected"),
 	/**  Get the current session data for saving. */
 	jellyfinGetSession: () => __TAURI_INVOKE<{
+	provider?: MediaServerProvider,
 	serverUrl: string,
 	accessToken: string,
 	userId: string,
@@ -85,6 +86,28 @@ export const commands = {
 	jellyfinQuickConnectCheck: (serverUrl: string, secret: string) => typedError<QuickConnectStatus, CommandError>(__TAURI_INVOKE("jellyfin_quick_connect_check", { serverUrl, secret })),
 	/**  Complete Jellyfin Quick Connect authentication. */
 	jellyfinQuickConnectAuthenticate: (serverUrl: string, secret: string) => typedError<null, CommandError>(__TAURI_INVOKE("jellyfin_quick_connect_authenticate", { serverUrl, secret })),
+	/**  Connect to the selected media server provider. */
+	serverConnect: (credentials: Credentials) => typedError<null, CommandError>(__TAURI_INVOKE("server_connect", { credentials })),
+	/**  Disconnect from the active media server provider. */
+	serverDisconnect: () => typedError<null, CommandError>(__TAURI_INVOKE("server_disconnect")),
+	/**  Get current media server connection state. */
+	serverGetState: () => __TAURI_INVOKE<ConnectionState>("server_get_state"),
+	/**  Check if a media server provider is connected. */
+	serverIsConnected: () => __TAURI_INVOKE<boolean>("server_is_connected"),
+	/**  Get the current media server session data for saving. */
+	serverGetSession: () => __TAURI_INVOKE<{
+	provider?: MediaServerProvider,
+	serverUrl: string,
+	accessToken: string,
+	userId: string,
+	userName: string,
+	serverName: string | null,
+	deviceId: string | null,
+} | null>("server_get_session"),
+	/**  Restore a media server session from saved data. */
+	serverRestoreSession: (session: SavedSession) => typedError<null, CommandError>(__TAURI_INVOKE("server_restore_session", { session })),
+	/**  Clear/logout from the current media server session. */
+	serverClearSession: () => typedError<null, CommandError>(__TAURI_INVOKE("server_clear_session")),
 	/**  Get the current app configuration. */
 	configGet: () => __TAURI_INVOKE<AppConfig>("config_get"),
 	/**  Update the app configuration, apply changes live, and persist to disk. */
@@ -158,6 +181,7 @@ export type CommandErrorCode =
 
 /**  Connection state exposed to frontend. */
 export type ConnectionState = {
+	provider: MediaServerProvider,
 	connected: boolean,
 	serverUrl: string | null,
 	serverName: string | null,
@@ -166,6 +190,7 @@ export type ConnectionState = {
 
 /**  Credentials for authentication. */
 export type Credentials = {
+	provider?: MediaServerProvider,
 	serverUrl: string,
 	username: string,
 	password: string,
@@ -173,6 +198,9 @@ export type Credentials = {
 
 /**  Intro Skipper behavior mode. */
 export type IntroSkipperMode = "automatic" | "manual" | "off";
+
+/**  Media server provider selected for a connection or saved session. */
+export type MediaServerProvider = "jellyfin";
 
 /**  Notification level for UI display. */
 export type NotificationLevel = "error" | "warning" | "info" | "success";
@@ -232,6 +260,7 @@ export type QuickConnectStatus = "waiting" | "approved";
 
 /**  Saved session data for persistence. */
 export type SavedSession = {
+	provider?: MediaServerProvider,
 	serverUrl: string,
 	accessToken: string,
 	userId: string,

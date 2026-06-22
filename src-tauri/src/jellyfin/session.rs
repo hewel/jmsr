@@ -1771,6 +1771,7 @@ mod tests {
     client
       .login()
       .restore_session(&SavedSession {
+        provider: MediaServerProvider::Jellyfin,
         server_url,
         access_token: "token-1".to_string(),
         user_id: "00000000-0000-0000-0000-000000000001".to_string(),

@@ -15,6 +15,7 @@ import {
 const sampleSession: SavedSession = {
   accessToken: 'token-1',
   deviceId: 'device-1',
+  provider: 'jellyfin',
   serverName: 'Jellyfin Home',
   serverUrl: 'https://jellyfin.example.com',
   userId: 'user-1',
@@ -27,26 +28,26 @@ afterEach(() => {
 });
 
 test('canAccessConsole allows connected users without a Saved Session', async () => {
-  rstest.spyOn(commands, 'jellyfinIsConnected').mockResolvedValue(true);
+  rstest.spyOn(commands, 'serverIsConnected').mockResolvedValue(true);
 
   await expect(canAccessConsole()).resolves.toBe(true);
 });
 
 test('canAccessConsole allows disconnected users with a Saved Session', async () => {
-  rstest.spyOn(commands, 'jellyfinIsConnected').mockResolvedValue(false);
+  rstest.spyOn(commands, 'serverIsConnected').mockResolvedValue(false);
   saveSession(sampleSession);
 
   await expect(canAccessConsole()).resolves.toBe(true);
 });
 
 test('canAccessConsole denies disconnected users without a Saved Session', async () => {
-  rstest.spyOn(commands, 'jellyfinIsConnected').mockResolvedValue(false);
+  rstest.spyOn(commands, 'serverIsConnected').mockResolvedValue(false);
 
   await expect(canAccessConsole()).resolves.toBe(false);
 });
 
 test('canAccessConsole falls back to Saved Session lookup when connected check throws', async () => {
-  rstest.spyOn(commands, 'jellyfinIsConnected').mockRejectedValue(new Error('ipc unavailable'));
+  rstest.spyOn(commands, 'serverIsConnected').mockRejectedValue(new Error('ipc unavailable'));
   saveSession(sampleSession);
 
   await expect(canAccessConsole()).resolves.toBe(true);
@@ -54,7 +55,7 @@ test('canAccessConsole falls back to Saved Session lookup when connected check t
 
 test('restoreSavedSession restores the live connection from a Saved Session', async () => {
   const restore = rstest
-    .spyOn(commands, 'jellyfinRestoreSession')
+    .spyOn(commands, 'serverRestoreSession')
     .mockResolvedValue({ data: null, status: 'ok' });
   saveSession(sampleSession);
 
@@ -64,7 +65,7 @@ test('restoreSavedSession restores the live connection from a Saved Session', as
 });
 
 test('restoreSavedSession clears a Saved Session after restore failure', async () => {
-  rstest.spyOn(commands, 'jellyfinRestoreSession').mockResolvedValue({
+  rstest.spyOn(commands, 'serverRestoreSession').mockResolvedValue({
     error: { code: 'authFailed', message: 'expired' },
     status: 'error',
   });
@@ -75,7 +76,7 @@ test('restoreSavedSession clears a Saved Session after restore failure', async (
 });
 
 test('restoreSavedSession clears a Saved Session after restore command throws', async () => {
-  rstest.spyOn(commands, 'jellyfinRestoreSession').mockRejectedValue(new Error('ipc unavailable'));
+  rstest.spyOn(commands, 'serverRestoreSession').mockRejectedValue(new Error('ipc unavailable'));
   saveSession(sampleSession);
 
   await expect(restoreSavedSession()).resolves.toBe(false);
@@ -83,9 +84,9 @@ test('restoreSavedSession clears a Saved Session after restore command throws', 
 });
 
 test('checkAuthWithRestore attempts restore before denying root route access', async () => {
-  rstest.spyOn(commands, 'jellyfinIsConnected').mockResolvedValue(false);
+  rstest.spyOn(commands, 'serverIsConnected').mockResolvedValue(false);
   const restore = rstest
-    .spyOn(commands, 'jellyfinRestoreSession')
+    .spyOn(commands, 'serverRestoreSession')
     .mockResolvedValue({ data: null, status: 'ok' });
   saveSession(sampleSession);
 
@@ -94,7 +95,7 @@ test('checkAuthWithRestore attempts restore before denying root route access', a
 });
 
 test('checkAuthWithRestore denies access when command checks throw', async () => {
-  rstest.spyOn(commands, 'jellyfinIsConnected').mockRejectedValue(new Error('ipc unavailable'));
+  rstest.spyOn(commands, 'serverIsConnected').mockRejectedValue(new Error('ipc unavailable'));
   saveSession(sampleSession);
 
   await expect(checkAuthWithRestore()).resolves.toBe(false);
@@ -117,6 +118,14 @@ test('migrates legacy Saved Session storage and clears the old key', () => {
   expect(loadSavedSession()).toEqual({ ...sampleSession, deviceId: null });
   expect(localStorage.getItem(LEGACY_SESSION_STORAGE_KEY)).toBeNull();
   expect(localStorage.getItem(SESSION_STORAGE_KEY)).not.toBeNull();
+});
+
+test('loads Saved Sessions without provider as Jellyfin sessions', () => {
+  const { provider: _provider, ...legacySession } = sampleSession;
+
+  localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(legacySession));
+
+  expect(loadSavedSession()).toEqual({ ...sampleSession, provider: 'jellyfin' });
 });
 
 test('clearSavedSession clears Saved Session legacy storage', () => {

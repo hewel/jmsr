@@ -171,6 +171,7 @@ export default function LoginPage(props: LoginPageProps) {
     const finalServerUrl = validation.result.url;
     const credentials: Credentials = {
       password: value.password,
+      provider: 'jellyfin',
       serverUrl: finalServerUrl,
       username: value.username,
     };

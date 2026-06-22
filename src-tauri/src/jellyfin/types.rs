@@ -38,10 +38,24 @@ pub struct ServerInfo {
 #[derive(Debug, Clone, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionState {
+  pub provider: MediaServerProvider,
   pub connected: bool,
   pub server_url: Option<String>,
   pub server_name: Option<String>,
   pub user_name: Option<String>,
+}
+
+/// Media server provider selected for a connection or saved session.
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, Type, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum MediaServerProvider {
+  Jellyfin,
+}
+
+impl MediaServerProvider {
+  pub const fn jellyfin() -> Self {
+    Self::Jellyfin
+  }
 }
 
 /// Library Browser landing data exposed to the frontend.
@@ -337,6 +351,8 @@ pub struct VideoUserDataUpdate {
 #[derive(Debug, Clone, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Credentials {
+  #[serde(default = "MediaServerProvider::jellyfin")]
+  pub provider: MediaServerProvider,
   pub server_url: String,
   pub username: String,
   pub password: String,
@@ -585,6 +601,8 @@ pub fn ticks_to_seconds(ticks: i64) -> f64 {
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SavedSession {
+  #[serde(default = "MediaServerProvider::jellyfin")]
+  pub provider: MediaServerProvider,
   pub server_url: String,
   pub access_token: String,
   pub user_id: String,
@@ -724,6 +742,33 @@ pub fn select_subtitle_stream_index(
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn saved_session_defaults_missing_provider_to_jellyfin() {
+    let session: SavedSession = serde_json::from_value(serde_json::json!({
+      "serverUrl": "https://jellyfin.example.com",
+      "accessToken": "token-1",
+      "userId": "user-1",
+      "userName": "Ada",
+      "serverName": "Jellyfin Home",
+      "deviceId": "device-1"
+    }))
+    .expect("legacy saved session should deserialize");
+
+    assert_eq!(session.provider, MediaServerProvider::Jellyfin);
+  }
+
+  #[test]
+  fn credentials_default_missing_provider_to_jellyfin() {
+    let credentials: Credentials = serde_json::from_value(serde_json::json!({
+      "serverUrl": "https://jellyfin.example.com",
+      "username": "Ada",
+      "password": "secret"
+    }))
+    .expect("legacy credentials should deserialize");
+
+    assert_eq!(credentials.provider, MediaServerProvider::Jellyfin);
+  }
 
   fn stream(index: i32, stream_type: &str, language: Option<&str>) -> MediaStream {
     MediaStream {

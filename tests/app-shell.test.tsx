@@ -24,6 +24,7 @@ window.scrollTo = () => {};
 
 const connectedState = {
   connected: true,
+  provider: 'jellyfin' as const,
   serverName: 'Jellyfin Home',
   serverUrl: 'https://jellyfin.example.com',
   userName: 'Ada',
@@ -419,8 +420,8 @@ function largeVideoLibraryPage(startIndex: number): VideoLibraryPage {
 }
 
 function mockShellCommands(state = connectedState) {
-  rstest.spyOn(commands, 'jellyfinIsConnected').mockResolvedValue(true);
-  rstest.spyOn(commands, 'jellyfinGetState').mockResolvedValue(state);
+  rstest.spyOn(commands, 'serverIsConnected').mockResolvedValue(true);
+  rstest.spyOn(commands, 'serverGetState').mockResolvedValue(state);
   rstest.spyOn(commands, 'mpvIsConnected').mockResolvedValue(false);
   rstest.spyOn(commands, 'configGet').mockResolvedValue(config);
   rstest.spyOn(commands, 'libraryVideoHome').mockResolvedValue({
@@ -1221,8 +1222,8 @@ test('library landing has no retry and skips video home when disconnected', asyn
 });
 
 test('library landing renders no fake content on command error', async () => {
-  rstest.spyOn(commands, 'jellyfinIsConnected').mockResolvedValue(true);
-  rstest.spyOn(commands, 'jellyfinGetState').mockResolvedValue(connectedState);
+  rstest.spyOn(commands, 'serverIsConnected').mockResolvedValue(true);
+  rstest.spyOn(commands, 'serverGetState').mockResolvedValue(connectedState);
   rstest.spyOn(commands, 'libraryVideoHome').mockResolvedValue({
     error: { code: 'network', message: 'Jellyfin unavailable' },
     status: 'error',

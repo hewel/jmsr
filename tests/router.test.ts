@@ -14,6 +14,7 @@ import { saveSession } from '../src/sessionAccess';
 const sampleSession: SavedSession = {
   accessToken: 'token-1',
   deviceId: 'device-1',
+  provider: 'jellyfin',
   serverName: 'Jellyfin Home',
   serverUrl: 'https://jellyfin.example.com',
   userId: 'user-1',
@@ -35,14 +36,14 @@ afterEach(() => {
 });
 
 test('login guard redirects authenticated users to Library', async () => {
-  rstest.spyOn(commands, 'jellyfinIsConnected').mockResolvedValue(true);
+  rstest.spyOn(commands, 'serverIsConnected').mockResolvedValue(true);
 
   await expectRedirect(redirectLoggedInUsersToLibrary, '/library');
 });
 
 test('root guard restores a Saved Session into Library', async () => {
-  rstest.spyOn(commands, 'jellyfinIsConnected').mockResolvedValue(false);
-  rstest.spyOn(commands, 'jellyfinRestoreSession').mockResolvedValue({
+  rstest.spyOn(commands, 'serverIsConnected').mockResolvedValue(false);
+  rstest.spyOn(commands, 'serverRestoreSession').mockResolvedValue({
     data: null,
     status: 'ok',
   });
@@ -52,13 +53,13 @@ test('root guard restores a Saved Session into Library', async () => {
 });
 
 test('legacy console redirects authenticated users to Library', async () => {
-  rstest.spyOn(commands, 'jellyfinIsConnected').mockResolvedValue(true);
+  rstest.spyOn(commands, 'serverIsConnected').mockResolvedValue(true);
 
   await expectRedirect(redirectLegacyConsoleRoute, '/library');
 });
 
 test('shell guard redirects unauthenticated users to Login', async () => {
-  rstest.spyOn(commands, 'jellyfinIsConnected').mockResolvedValue(false);
+  rstest.spyOn(commands, 'serverIsConnected').mockResolvedValue(false);
 
   await expectRedirect(requireAuthenticatedShell, '/login');
 });

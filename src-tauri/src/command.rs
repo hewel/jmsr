@@ -842,6 +842,75 @@ pub async fn jellyfin_play_previous_episode(
 }
 
 // ============================================================================
+// Provider-neutral media server commands
+// ============================================================================
+
+/// Connect to the selected media server provider.
+#[tauri::command]
+#[specta]
+pub async fn server_connect(
+  app: tauri::AppHandle,
+  state: State<'_, JellyfinState>,
+  config_state: State<'_, ConfigState>,
+  credentials: Credentials,
+) -> Result<(), CommandError> {
+  jellyfin_connect(app, state, config_state, credentials).await
+}
+
+/// Disconnect from the active media server provider.
+#[tauri::command]
+#[specta]
+pub async fn server_disconnect(
+  app: tauri::AppHandle,
+  state: State<'_, JellyfinState>,
+) -> Result<(), CommandError> {
+  jellyfin_disconnect(app, state).await
+}
+
+/// Get current media server connection state.
+#[tauri::command]
+#[specta]
+pub fn server_get_state(state: State<'_, JellyfinState>) -> ConnectionState {
+  jellyfin_get_state(state)
+}
+
+/// Check if a media server provider is connected.
+#[tauri::command]
+#[specta]
+pub fn server_is_connected(state: State<'_, JellyfinState>) -> bool {
+  jellyfin_is_connected(state)
+}
+
+/// Get the current media server session data for saving.
+#[tauri::command]
+#[specta]
+pub fn server_get_session(state: State<'_, JellyfinState>) -> Option<SavedSession> {
+  jellyfin_get_session(state)
+}
+
+/// Restore a media server session from saved data.
+#[tauri::command]
+#[specta]
+pub async fn server_restore_session(
+  app: tauri::AppHandle,
+  state: State<'_, JellyfinState>,
+  config_state: State<'_, ConfigState>,
+  session: SavedSession,
+) -> Result<(), CommandError> {
+  jellyfin_restore_session(app, state, config_state, session).await
+}
+
+/// Clear/logout from the current media server session.
+#[tauri::command]
+#[specta]
+pub async fn server_clear_session(
+  app: tauri::AppHandle,
+  state: State<'_, JellyfinState>,
+) -> Result<(), CommandError> {
+  jellyfin_clear_session(app, state).await
+}
+
+// ============================================================================
 // Config Commands
 // ============================================================================
 
@@ -1008,6 +1077,14 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
       jellyfin_quick_connect_start,
       jellyfin_quick_connect_check,
       jellyfin_quick_connect_authenticate,
+      // Provider-neutral server commands
+      server_connect,
+      server_disconnect,
+      server_get_state,
+      server_is_connected,
+      server_get_session,
+      server_restore_session,
+      server_clear_session,
       // Config commands
       config_get,
       config_set,

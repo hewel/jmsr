@@ -28,7 +28,7 @@ export function clearSavedSession(): void {
 }
 
 export async function saveCurrentSession(): Promise<void> {
-  const session = await Effect.runPromise(runTauriCommandRaw(() => commands.jellyfinGetSession()));
+  const session = await Effect.runPromise(runTauriCommandRaw(() => commands.serverGetSession()));
   Option.match(Option.fromNullishOr(session), {
     onNone: () => undefined,
     onSome: (value) => saveSession(value),
@@ -39,7 +39,7 @@ export async function restoreSavedSession(): Promise<boolean> {
   const exit = await Effect.runPromiseExit(
     loadSessionEffect().pipe(
       Effect.flatMap((savedSession) =>
-        runTauriCommand(() => commands.jellyfinRestoreSession(savedSession)),
+        runTauriCommand(() => commands.serverRestoreSession(savedSession)),
       ),
     ),
   );
@@ -56,7 +56,7 @@ export async function restoreSavedSession(): Promise<boolean> {
 
 export async function checkAuthWithRestore(): Promise<boolean> {
   const connected = await Effect.runPromiseExit(
-    runTauriCommandRaw(() => commands.jellyfinIsConnected()),
+    runTauriCommandRaw(() => commands.serverIsConnected()),
   );
   if (!Exit.isSuccess(connected)) {
     return false;
@@ -69,7 +69,7 @@ export async function checkAuthWithRestore(): Promise<boolean> {
 
 export async function canAccessConsole(): Promise<boolean> {
   const connected = await Effect.runPromiseExit(
-    runTauriCommandRaw(() => commands.jellyfinIsConnected()),
+    runTauriCommandRaw(() => commands.serverIsConnected()),
   );
   if (Exit.isSuccess(connected) && connected.value) {
     return true;

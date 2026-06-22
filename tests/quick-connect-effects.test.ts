@@ -8,6 +8,7 @@ import { loadSavedSession } from '../src/sessionAccess';
 const sampleSession = {
   accessToken: 'token-123',
   deviceId: 'device-123',
+  provider: 'jellyfin' as const,
   serverName: 'Jellyfin Home',
   serverUrl: 'https://jellyfin.example.com',
   userId: 'user-1',
@@ -69,7 +70,7 @@ test('successful approval, authentication, and session save', async () => {
     data: null,
     status: 'ok',
   });
-  const sessionMock = rstest.spyOn(commands, 'jellyfinGetSession').mockResolvedValue(sampleSession);
+  const sessionMock = rstest.spyOn(commands, 'serverGetSession').mockResolvedValue(sampleSession);
 
   const onCode = rstest.fn();
   const runPromise = Effect.runPromiseExit(
