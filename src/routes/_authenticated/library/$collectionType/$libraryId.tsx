@@ -47,8 +47,7 @@ const LIBRARY_BROWSE_GRID_GAP_PX = 12;
 const LIBRARY_BROWSE_GRID_OVERSCAN_ROWS = 3;
 
 function libraryBrowseColumnCount(width: number): number {
-  if (width >= 1280) return 5;
-  if (width >= 1024) return 4;
+  if (width >= 1024) return 5;
   if (width >= 768) return 3;
   if (width >= 640) return 2;
   return 1;

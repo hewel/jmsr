@@ -23,13 +23,6 @@ export interface CardProps extends JSX.HTMLAttributes<HTMLElement> {
   children: JSX.Element;
 }
 
-export interface CardLinkProps extends JSX.AnchorHTMLAttributes<HTMLAnchorElement> {
-  variant?: CardVariant;
-  surfaceTint?: boolean;
-  class?: string;
-  children: JSX.Element;
-}
-
 const tintOverlay = (
   <div class="bg-surface-tint/[0.03] pointer-events-none absolute inset-0 rounded-[inherit]" />
 ) as JSX.Element;
@@ -53,26 +46,6 @@ export function Card(props: CardProps) {
       <Show when={showTint()}>{tintOverlay}</Show>
       <div class="relative z-10">{local.children}</div>
     </Dynamic>
-  );
-}
-
-/**
- * Card-styled anchor for navigational cards.
- * @param surfaceTint - render the subtle brand tint overlay (default false)
- */
-export function CardLink(props: CardLinkProps) {
-  const [local, rest] = splitProps(props, ['variant', 'surfaceTint', 'class', 'children']);
-  const variant = () => local.variant ?? 'filled';
-  const showTint = () => local.surfaceTint ?? false;
-
-  return (
-    <a
-      class={`${variantClass[variant()]} ${styles.cardSurface[variant()]} relative ${local.class ?? ''}`}
-      {...rest}
-    >
-      <Show when={showTint()}>{tintOverlay}</Show>
-      <div class="relative z-10">{local.children}</div>
-    </a>
   );
 }
 
