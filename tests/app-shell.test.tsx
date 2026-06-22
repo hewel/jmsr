@@ -567,7 +567,7 @@ test('library landing renders command-backed rows and drawer trigger', async () 
   cleanup();
 });
 
-test('library browse loads paged results and opens detail links without playback', async () => {
+test('library browse auto-loads paged results and opens detail links without playback', async () => {
   mockShellCommands();
   const browseCommand = rstest.spyOn(commands, 'libraryBrowseVideo');
   const mpvStart = rstest.spyOn(commands, 'mpvStart');
@@ -599,7 +599,8 @@ test('library browse loads paged results and opens detail links without playback
   fireEvent.click(movieLink);
   expect(mpvStart).not.toHaveBeenCalled();
 
-  fireEvent.click(screen.getByRole('button', { name: 'Load more' }));
+  expect(screen.queryByRole('button', { name: 'Load more' })).toBeNull();
+  window.__TEST_INTERSECTION_OBSERVER__.trigger(true);
   expect(await screen.findByRole('link', { name: /Paged Movie 25/ })).toHaveAttribute(
     'href',
     '/library/items/movie-25',
@@ -614,6 +615,40 @@ test('library browse loads paged results and opens detail links without playback
     startIndex: 24,
   });
   expect(screen.queryByRole('button', { name: 'Load more' })).toBeNull();
+
+  cleanup();
+});
+
+test('library browse retries failed auto-loaded page', async () => {
+  mockShellCommands();
+  let nextPageShouldFail = true;
+  rstest.spyOn(commands, 'libraryBrowseVideo').mockImplementation((request) => {
+    if (request.startIndex === 24 && nextPageShouldFail) {
+      return Promise.resolve({
+        error: { code: 'internal', message: 'Next page failed' },
+        status: 'error',
+      });
+    }
+
+    return Promise.resolve({
+      data: videoLibraryPage(request.startIndex),
+      status: 'ok',
+    });
+  });
+  const cleanup = renderShell('/library/movies/movies');
+
+  await screen.findByRole('link', { name: /Paged Movie/ });
+  window.__TEST_INTERSECTION_OBSERVER__.trigger(true);
+
+  expect(await screen.findByText('Next page failed')).toBeVisible();
+  const retryButton = screen.getByRole('button', { name: 'Retry loading more' });
+  expect(retryButton).toBeVisible();
+
+  nextPageShouldFail = false;
+  fireEvent.click(retryButton);
+
+  expect(await screen.findByRole('link', { name: /Paged Movie 25/ })).toBeVisible();
+  await waitFor(() => expect(screen.queryByText('Next page failed')).toBeNull());
 
   cleanup();
 });

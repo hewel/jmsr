@@ -11,7 +11,7 @@ import {
   sortItems,
 } from '@components/library/shared';
 import { Button, Card } from '@components/ui';
-import { createInfiniteQuery } from '@tanstack/solid-query';
+import { createInfiniteQuery, useQueryClient } from '@tanstack/solid-query';
 import { createFileRoute } from '@tanstack/solid-router';
 import { Exit } from 'effect';
 import {
@@ -22,7 +22,7 @@ import {
   ArrowDownWideNarrowIcon,
   ArrowUpWideNarrowIcon,
 } from 'lucide-solid';
-import { For, Show, Suspense, createSignal } from 'solid-js';
+import { For, Show, Suspense, createEffect, createSignal, onCleanup } from 'solid-js';
 import { Portal } from 'solid-js/web';
 import { commandFailureMessage } from '~effects/commands';
 import { fetchVideoLibraryPage } from '~effects/library';
@@ -32,6 +32,12 @@ import { queryKeys, runExit } from '~effects/query';
 const INITIAL_SORT: VideoLibrarySort = 'title';
 const INITIAL_PLAYED_FILTER: VideoLibraryPlayedFilter = 'all';
 const INITIAL_FAVORITES_ONLY = false;
+const LIBRARY_BROWSE_SKELETON_CARD_KEYS = Array.from({ length: 10 }, (_, index) => index);
+
+interface LibraryBrowseInfiniteData {
+  pages: LibraryExit<LibraryBrowseState>[];
+  pageParams: number[];
+}
 
 function collectionTypeFromParam(collectionType: string): VideoLibraryKind {
   return collectionType === 'tvshows' ? 'tvshows' : 'movies';
@@ -43,22 +49,27 @@ export const Route = createFileRoute('/_authenticated/library/$collectionType/$l
 
 function LibraryBrowseRoute() {
   const params = Route.useParams();
+  const queryClient = useQueryClient();
   const [sort, setSort] = createSignal<VideoLibrarySort>(INITIAL_SORT);
   const [playedFilter, setPlayedFilter] =
     createSignal<VideoLibraryPlayedFilter>(INITIAL_PLAYED_FILTER);
   const [favoritesOnly, setFavoritesOnly] = createSignal(INITIAL_FAVORITES_ONLY);
   const [sortDirection, setSortDirection] = createSignal<'asc' | 'desc'>('asc');
+  const [autoLoadSentinel, setAutoLoadSentinel] = createSignal<HTMLDivElement | null>(null);
+  const [autoLoadSentinelVisible, setAutoLoadSentinelVisible] = createSignal(false);
 
   const collectionType = () => collectionTypeFromParam(params().collectionType);
-  const browseQuery = createInfiniteQuery(() => ({
-    queryKey: queryKeys.libraryBrowse(
+  const browseQueryKey = () =>
+    queryKeys.libraryBrowse(
       collectionType(),
       params().libraryId,
       sort(),
       playedFilter(),
       favoritesOnly(),
       sortDirection(),
-    ),
+    );
+  const browseQuery = createInfiniteQuery(() => ({
+    queryKey: browseQueryKey(),
     queryFn: ({ pageParam }) => {
       const startIndex = typeof pageParam === 'number' ? pageParam : 0;
       return runExit(
@@ -86,8 +97,15 @@ function LibraryBrowseRoute() {
       (page): page is LibraryExit<LibraryBrowseState> & { _tag: 'Success' } => Exit.isSuccess(page),
     ) ?? [];
   const firstPage = () => browseQuery.data?.pages[0] ?? null;
-  const laterPageFailure = () =>
-    browseQuery.data?.pages.slice(1).find((page) => !Exit.isSuccess(page)) ?? null;
+  const laterPageFailure = () => {
+    const pages = browseQuery.data?.pages ?? [];
+    const index = pages.findIndex((page, pageIndex) => pageIndex > 0 && !Exit.isSuccess(page));
+    if (index === -1) {
+      return null;
+    }
+    const page = pages[index];
+    return page && !Exit.isSuccess(page) ? { index, page } : null;
+  };
   const readyState = () => {
     const pages = successfulPages();
     if (pages.length === 0) {
@@ -131,10 +149,56 @@ function LibraryBrowseRoute() {
   };
   const loadMoreErrorDescription = () => {
     const failure = laterPageFailure();
-    return failure && !Exit.isSuccess(failure)
-      ? commandFailureMessage(failure.cause, 'Could not load Library page')
+    return failure
+      ? commandFailureMessage(failure.page.cause, 'Could not load Library page')
       : null;
   };
+  const retryFailedPage = () => {
+    const failure = laterPageFailure();
+    if (!failure || browseQuery.isFetching) {
+      return;
+    }
+    queryClient.setQueryData<LibraryBrowseInfiniteData>(browseQueryKey(), (data) => {
+      if (!data) {
+        return data;
+      }
+      return {
+        pages: data.pages.filter((_, index) => index !== failure.index),
+        pageParams: data.pageParams.filter((_, index) => index !== failure.index),
+      };
+    });
+    void browseQuery.fetchNextPage({ cancelRefetch: false });
+  };
+
+  createEffect(() => {
+    const sentinel = autoLoadSentinel();
+    if (!sentinel || typeof IntersectionObserver === 'undefined') {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        setAutoLoadSentinelVisible(entries.some((entry) => entry.isIntersecting));
+      },
+      {
+        root: null,
+        rootMargin: '400px 0px',
+        threshold: 0,
+      },
+    );
+    observer.observe(sentinel);
+    onCleanup(() => observer.disconnect());
+  });
+
+  createEffect(() => {
+    if (!autoLoadSentinelVisible()) {
+      return;
+    }
+    if (!browseQuery.hasNextPage || browseQuery.isFetching || laterPageFailure()) {
+      return;
+    }
+    void browseQuery.fetchNextPage({ cancelRefetch: false });
+  });
 
   return (
     <div class="min-w-0">
@@ -181,31 +245,33 @@ function LibraryBrowseRoute() {
                   </MediaInfoHoverCard>
                 )}
               </For>
+              <Show when={browseQuery.isFetchingNextPage}>
+                <LibraryBrowseSkeletonCards />
+              </Show>
             </div>
             <Show when={loadMoreErrorDescription()}>
               {(message) => (
-                <p class="text-error text-center text-[12px] leading-[16px]">{message()}</p>
+                <div class="flex flex-col items-center gap-3 pt-2">
+                  <p class="text-error text-center text-[12px] leading-[16px]">{message()}</p>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    class="rounded-full"
+                    disabled={browseQuery.isFetchingNextPage}
+                    onClick={retryFailedPage}
+                    leadingIcon={
+                      <RefreshCw
+                        class="h-4 w-4"
+                        classList={{ 'animate-spin': browseQuery.isFetchingNextPage }}
+                      />
+                    }
+                  >
+                    Retry loading more
+                  </Button>
+                </div>
               )}
             </Show>
-            <Show when={browseQuery.hasNextPage || laterPageFailure()}>
-              <div class="flex justify-center pt-2">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  class="rounded-full"
-                  disabled={browseQuery.isFetchingNextPage}
-                  onClick={() => void browseQuery.fetchNextPage()}
-                  leadingIcon={
-                    <RefreshCw
-                      class="h-4 w-4"
-                      classList={{ 'animate-spin': browseQuery.isFetchingNextPage }}
-                    />
-                  }
-                >
-                  {browseQuery.isFetchingNextPage ? 'Loading more' : 'Load more'}
-                </Button>
-              </div>
-            </Show>
+            <div ref={setAutoLoadSentinel} aria-hidden="true" class="h-px w-full" />
           </section>
         </Show>
       </Suspense>
@@ -377,6 +443,23 @@ function LibraryBrowseNavbarControls(props: LibraryBrowseNavbarControlsProps) {
   );
 }
 
+function LibraryBrowseSkeletonCards() {
+  return (
+    <For each={LIBRARY_BROWSE_SKELETON_CARD_KEYS}>
+      {() => (
+        <Card variant="filled" surfaceTint={false} class="overflow-hidden !p-0">
+          <div class="border-outline-variant bg-surface-container-lowest/60 aspect-[2/3] animate-pulse border-b" />
+          <div class="space-y-2 p-4">
+            <div class="bg-surface-container-high/80 h-4 w-4/5 animate-pulse rounded" />
+            <div class="bg-surface-container-high/60 h-3 w-3/5 animate-pulse rounded" />
+            <div class="bg-surface-container-high/50 h-3 w-1/3 animate-pulse rounded" />
+          </div>
+        </Card>
+      )}
+    </For>
+  );
+}
+
 function LibraryBrowseSkeleton() {
   return (
     <section class="space-y-4" aria-hidden="true">
@@ -385,18 +468,7 @@ function LibraryBrowseSkeleton() {
         <div class="bg-surface-container-high/60 h-4 w-24 animate-pulse rounded" />
       </div>
       <div class="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-        <For each={[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]}>
-          {() => (
-            <Card variant="filled" surfaceTint={false} class="overflow-hidden !p-0">
-              <div class="border-outline-variant bg-surface-container-lowest/60 aspect-[2/3] animate-pulse border-b" />
-              <div class="space-y-2 p-4">
-                <div class="bg-surface-container-high/80 h-4 w-4/5 animate-pulse rounded" />
-                <div class="bg-surface-container-high/60 h-3 w-3/5 animate-pulse rounded" />
-                <div class="bg-surface-container-high/50 h-3 w-1/3 animate-pulse rounded" />
-              </div>
-            </Card>
-          )}
-        </For>
+        <LibraryBrowseSkeletonCards />
       </div>
     </section>
   );
