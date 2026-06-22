@@ -14,6 +14,7 @@ class TestIntersectionObserver implements IntersectionObserver {
 
   readonly root = null;
   readonly rootMargin = '';
+  readonly scrollMargin = '';
   readonly thresholds = [];
   private readonly callback: IntersectionObserverCallback;
   private readonly elements = new Set<Element>();
@@ -56,9 +57,56 @@ class TestIntersectionObserver implements IntersectionObserver {
   }
 }
 
+const storePathsByRid = new Map<number, string>();
+const storeRidsByPath = new Map<string, number>();
+const storeValuesByPath = new Map<string, Map<string, unknown>>();
+let nextStoreRid = 1;
+
+function record(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+}
+
+function storeForPath(path: string) {
+  let store = storeValuesByPath.get(path);
+  if (!store) {
+    store = new Map();
+    storeValuesByPath.set(path, store);
+  }
+  return store;
+}
+
+function loadTestStore(path: string) {
+  const existingRid = storeRidsByPath.get(path);
+  if (existingRid) {
+    return existingRid;
+  }
+  const rid = nextStoreRid;
+  nextStoreRid += 1;
+  storeRidsByPath.set(path, rid);
+  storePathsByRid.set(rid, path);
+  storeForPath(path);
+  return rid;
+}
+
+const testTauriStore = {
+  reset() {
+    storePathsByRid.clear();
+    storeRidsByPath.clear();
+    storeValuesByPath.clear();
+    nextStoreRid = 1;
+  },
+  get(path: string, key: string) {
+    return storeValuesByPath.get(path)?.get(key);
+  },
+  set(path: string, key: string, value: unknown) {
+    storeForPath(path).set(key, value);
+  },
+};
+
 declare global {
   interface Window {
     __TEST_INTERSECTION_OBSERVER__: typeof TestIntersectionObserver;
+    __TEST_TAURI_STORE__: typeof testTauriStore;
   }
 }
 
@@ -69,16 +117,47 @@ Object.assign(window, {
 });
 
 Object.assign(window, {
+  __TEST_TAURI_STORE__: testTauriStore,
   __TAURI_EVENT_PLUGIN_INTERNALS__: {
     unregisterListener: () => {},
   },
   __TAURI_INTERNALS__: {
-    invoke: async (cmd: string) => {
+    invoke: async (cmd: string, args?: unknown) => {
       if (cmd === 'plugin:app|version') {
         return 'test';
       }
       if (cmd === 'plugin:event|listen') {
         return 1;
+      }
+      if (cmd === 'plugin:store|load') {
+        const path = record(args).path;
+        return typeof path === 'string' ? loadTestStore(path) : 0;
+      }
+      if (cmd === 'plugin:store|get_store') {
+        const path = record(args).path;
+        return typeof path === 'string' ? (storeRidsByPath.get(path) ?? null) : null;
+      }
+      if (cmd === 'plugin:store|get') {
+        const argsRecord = record(args);
+        const path = typeof argsRecord.rid === 'number' ? storePathsByRid.get(argsRecord.rid) : null;
+        const key = argsRecord.key;
+        if (!path || typeof key !== 'string') {
+          return [null, false];
+        }
+        const store = storeForPath(path);
+        return store.has(key) ? [store.get(key), true] : [null, false];
+      }
+      if (cmd === 'plugin:store|set') {
+        const argsRecord = record(args);
+        const path = typeof argsRecord.rid === 'number' ? storePathsByRid.get(argsRecord.rid) : null;
+        const key = argsRecord.key;
+        if (path && typeof key === 'string') {
+          storeForPath(path).set(key, argsRecord.value);
+        }
+        return null;
+      }
+      if (cmd === 'plugin:store|save') {
+        return null;
       }
       return null;
     },

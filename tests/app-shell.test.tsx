@@ -1,4 +1,4 @@
-import { afterEach, expect, rstest, test } from '@rstest/core';
+import { afterEach, beforeEach, expect, rstest, test } from '@rstest/core';
 import { RouterProvider, createMemoryHistory } from '@tanstack/solid-router';
 import { fireEvent, screen, waitFor, within } from '@testing-library/dom';
 import { render } from 'solid-js/web';
@@ -491,9 +491,16 @@ async function selectArkOption(label: string, name: RegExp | string) {
   fireEvent.click(await screen.findByRole('option', { name }));
 }
 
+beforeEach(async () => {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  window.__TEST_TAURI_STORE__.reset();
+});
+
 afterEach(() => {
   rstest.restoreAllMocks();
   document.body.innerHTML = '';
+  localStorage.clear();
+  window.__TEST_TAURI_STORE__.reset();
 });
 
 test('authenticated shell removes top header chrome and exposes floating controls', async () => {
@@ -713,6 +720,105 @@ test('library browse controls reload paged results from the first page', async (
       startIndex: 0,
     }),
   );
+
+  cleanup();
+});
+
+test('library browse controls are shared across libraries', async () => {
+  mockShellCommands();
+  const browseCommand = rstest.spyOn(commands, 'libraryBrowseVideo');
+  const cleanup = renderShell('/library/movies/movies');
+
+  await screen.findByRole('link', { name: /Paged Movie/ });
+  fireEvent.click(screen.getByRole('button', { name: 'Sort By' }));
+  fireEvent.click(screen.getByText('Recently added', { selector: 'span' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Status' }));
+  fireEvent.click(screen.getByText('Unplayed', { selector: 'span' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Status' }));
+  fireEvent.click(screen.getByText('Favorites Only', { selector: 'span' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Sort ascending' }));
+
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: 'Sort descending' })).toBeVisible(),
+  );
+  await waitFor(() =>
+    expect(window.__TEST_TAURI_STORE__.get('preferences.json', 'library_filters')).toEqual({
+      sort: 'recentlyAdded',
+      playedFilter: 'unplayed',
+      favoritesOnly: true,
+      sortDirection: 'desc',
+    }),
+  );
+  fireEvent.click(screen.getByRole('radio', { name: 'Shows' }));
+
+  await waitFor(() =>
+    expect(browseCommand).toHaveBeenLastCalledWith({
+      collectionType: 'tvshows',
+      favoritesOnly: true,
+      libraryId: 'shows',
+      limit: 24,
+      playedFilter: 'unplayed',
+      sort: 'recentlyAdded',
+      startIndex: 0,
+    }),
+  );
+  expect(screen.getByRole('button', { name: 'Sort descending' })).toBeVisible();
+
+  cleanup();
+});
+
+test('library browse hydrates filters from migrated Tauri Store preferences', async () => {
+  mockShellCommands();
+  window.__TEST_TAURI_STORE__.set('preferences.json', 'library_filters', {
+    sort: 'releaseDate',
+    playedFilter: 'played',
+    favoritesOnly: true,
+    sortDirection: 'desc',
+  });
+  const browseCommand = rstest.spyOn(commands, 'libraryBrowseVideo');
+  const cleanup = renderShell('/library/movies/movies');
+
+  const expectedRequest = {
+    collectionType: 'movies',
+    favoritesOnly: true,
+    libraryId: 'movies',
+    limit: 24,
+    playedFilter: 'played',
+    sort: 'releaseDate',
+    startIndex: 0,
+  };
+  await waitFor(() => expect(browseCommand).toHaveBeenCalledWith(expectedRequest));
+  expect(browseCommand.mock.calls[0]?.[0]).toEqual(expectedRequest);
+
+  cleanup();
+});
+
+test('library browse migrates legacy localStorage filters into Tauri Store', async () => {
+  mockShellCommands();
+  localStorage.setItem('jellypilot_library_filters', 'recentlyAdded|unplayed|1|desc');
+  const browseCommand = rstest.spyOn(commands, 'libraryBrowseVideo');
+  const cleanup = renderShell('/library/movies/movies');
+
+  const expectedRequest = {
+    collectionType: 'movies',
+    favoritesOnly: true,
+    libraryId: 'movies',
+    limit: 24,
+    playedFilter: 'unplayed',
+    sort: 'recentlyAdded',
+    startIndex: 0,
+  };
+  await waitFor(() => expect(browseCommand).toHaveBeenCalledWith(expectedRequest));
+  expect(browseCommand.mock.calls[0]?.[0]).toEqual(expectedRequest);
+  await waitFor(() =>
+    expect(window.__TEST_TAURI_STORE__.get('preferences.json', 'library_filters')).toEqual({
+      sort: 'recentlyAdded',
+      playedFilter: 'unplayed',
+      favoritesOnly: true,
+      sortDirection: 'desc',
+    }),
+  );
+  expect(localStorage.getItem('jellypilot_library_filters')).toBeNull();
 
   cleanup();
 });

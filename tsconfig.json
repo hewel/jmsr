@@ -24,7 +24,8 @@
     "paths": {
       "@components/*": ["./src/components/*"],
       "@bindings": ["./src/bindings.ts"],
-      "~effects/*": ["./src/effects/*"]
+      "~effects/*": ["./src/effects/*"],
+      "~utils/*": ["./src/utils/*"]
     },
     "plugins": [
       {

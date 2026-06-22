@@ -28,10 +28,9 @@ import { commandFailureMessage } from '~effects/commands';
 import { fetchVideoLibraryPage } from '~effects/library';
 import type { LibraryBrowseState, LibraryExit } from '~effects/library';
 import { queryKeys, runExit } from '~effects/query';
+import { createSharedLibraryFilters } from '~utils/createSharedLibraryFilters';
+import type { LibrarySortDirection } from '~utils/createSharedLibraryFilters';
 
-const INITIAL_SORT: VideoLibrarySort = 'title';
-const INITIAL_PLAYED_FILTER: VideoLibraryPlayedFilter = 'all';
-const INITIAL_FAVORITES_ONLY = false;
 const LIBRARY_BROWSE_SKELETON_CARD_KEYS = Array.from({ length: 10 }, (_, index) => index);
 
 interface LibraryBrowseInfiniteData {
@@ -50,11 +49,8 @@ export const Route = createFileRoute('/_authenticated/library/$collectionType/$l
 function LibraryBrowseRoute() {
   const params = Route.useParams();
   const queryClient = useQueryClient();
-  const [sort, setSort] = createSignal<VideoLibrarySort>(INITIAL_SORT);
-  const [playedFilter, setPlayedFilter] =
-    createSignal<VideoLibraryPlayedFilter>(INITIAL_PLAYED_FILTER);
-  const [favoritesOnly, setFavoritesOnly] = createSignal(INITIAL_FAVORITES_ONLY);
-  const [sortDirection, setSortDirection] = createSignal<'asc' | 'desc'>('asc');
+  const libraryFilters = createSharedLibraryFilters();
+  const filterSort = libraryFilters.sort;
   const [autoLoadSentinel, setAutoLoadSentinel] = createSignal<HTMLDivElement | null>(null);
   const [autoLoadSentinelVisible, setAutoLoadSentinelVisible] = createSignal(false);
 
@@ -63,13 +59,14 @@ function LibraryBrowseRoute() {
     queryKeys.libraryBrowse(
       collectionType(),
       params().libraryId,
-      sort(),
-      playedFilter(),
-      favoritesOnly(),
-      sortDirection(),
+      filterSort(),
+      libraryFilters.playedFilter(),
+      libraryFilters.favoritesOnly(),
+      libraryFilters.sortDirection(),
     );
   const browseQuery = createInfiniteQuery(() => ({
     queryKey: browseQueryKey(),
+    enabled: libraryFilters.ready(),
     queryFn: ({ pageParam }) => {
       const startIndex = typeof pageParam === 'number' ? pageParam : 0;
       return runExit(
@@ -77,9 +74,9 @@ function LibraryBrowseRoute() {
           collectionType(),
           params().libraryId,
           startIndex,
-          sort(),
-          playedFilter(),
-          favoritesOnly(),
+          filterSort(),
+          libraryFilters.playedFilter(),
+          libraryFilters.favoritesOnly(),
         ),
       );
     },
@@ -116,8 +113,10 @@ function LibraryBrowseRoute() {
       return null;
     }
     const items = pages.flatMap((page) => page.value.items);
-    const isDefaultAsc = sort() === 'title';
-    const needsReverse = isDefaultAsc ? sortDirection() === 'desc' : sortDirection() === 'asc';
+    const isDefaultAsc = filterSort() === 'title';
+    const needsReverse = isDefaultAsc
+      ? libraryFilters.sortDirection() === 'desc'
+      : libraryFilters.sortDirection() === 'asc';
 
     return {
       items: needsReverse ? [...items].toReversed() : items,
@@ -204,21 +203,21 @@ function LibraryBrowseRoute() {
     <div class="min-w-0">
       <LibraryBrowseNavbarControls
         loading={() => browseQuery.isFetching}
-        sortedValue={sort}
-        sortDirection={sortDirection}
-        playedFilter={playedFilter}
-        favoritesOnly={favoritesOnly}
-        onSortChange={setSort}
-        onSortDirectionChange={setSortDirection}
-        onPlayedFilterChange={setPlayedFilter}
-        onFavoritesOnlyChange={setFavoritesOnly}
+        sortedValue={libraryFilters.sort}
+        sortDirection={libraryFilters.sortDirection}
+        playedFilter={libraryFilters.playedFilter}
+        favoritesOnly={libraryFilters.favoritesOnly}
+        onSortChange={libraryFilters.setSort}
+        onSortDirectionChange={libraryFilters.setSortDirection}
+        onPlayedFilterChange={libraryFilters.setPlayedFilter}
+        onFavoritesOnlyChange={libraryFilters.setFavoritesOnly}
       />
 
       <Suspense fallback={<LibraryBrowseSkeleton />}>
         <Show
           when={readyState()}
           fallback={
-            browseQuery.isPending ? (
+            !libraryFilters.ready() || browseQuery.isPending ? (
               <LibraryBrowseSkeleton />
             ) : (
               <LibraryStatusPanel title={statusTitle()} description={statusDescription()} />
@@ -389,11 +388,11 @@ function LibraryStatusMenu(props: LibraryStatusMenuProps) {
 interface LibraryBrowseNavbarControlsProps {
   loading: () => boolean;
   sortedValue: () => VideoLibrarySort;
-  sortDirection: () => 'asc' | 'desc';
+  sortDirection: () => LibrarySortDirection;
   playedFilter: () => VideoLibraryPlayedFilter;
   favoritesOnly: () => boolean;
   onSortChange: (sort: VideoLibrarySort) => void;
-  onSortDirectionChange: (direction: 'asc' | 'desc') => void;
+  onSortDirectionChange: (direction: LibrarySortDirection) => void;
   onPlayedFilterChange: (filter: VideoLibraryPlayedFilter) => void;
   onFavoritesOnlyChange: (favoritesOnly: boolean) => void;
 }
