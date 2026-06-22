@@ -108,8 +108,7 @@ export function MediaInfoHoverCard(props: { id: string; itemType: string; childr
 
   return (
     <HoverCard.Root
-      openDelay={500}
-      closeDelay={150}
+      lazyMount
       unmountOnExit
       positioning={{ gutter: 10, placement: 'top' }}
       onOpenChange={(details) => setOpen(details.open)}
