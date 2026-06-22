@@ -1,7 +1,7 @@
 //! Jellyfin HTTP client for REST API calls.
 
 use parking_lot::RwLock;
-use reqwest::{header, Client};
+use reqwest::{header, Client, Method};
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -745,6 +745,10 @@ impl JellyfinClient {
     Self::provider_capabilities(&state).remote_control
   }
 
+  fn provider(&self) -> MediaServerProvider {
+    self.state.read().provider
+  }
+
   /// Get access token or error if not connected.
   fn access_token(&self) -> Result<String, JellyfinError> {
     self
@@ -784,6 +788,63 @@ impl JellyfinClient {
       return Err(JellyfinError::HttpError(format!(
         "GET {} failed: HTTP {} - {}",
         path, status, body
+      )));
+    }
+
+    Ok(response.json().await?)
+  }
+
+  async fn get_with_query<T: serde::de::DeserializeOwned>(
+    &self,
+    path: &str,
+    query: &[(&str, String)],
+  ) -> Result<T, JellyfinError> {
+    let server_url = self.server_url()?;
+    let token = self.access_token()?;
+    let url = format!("{}{}", server_url, path);
+
+    let response = self
+      .http
+      .get(&url)
+      .header("X-Emby-Authorization", self.auth_header(Some(&token)))
+      .query(query)
+      .send()
+      .await?;
+
+    let status = response.status();
+    if !status.is_success() {
+      let body = response.text().await.unwrap_or_default();
+      return Err(JellyfinError::HttpError(format!(
+        "GET {} failed: HTTP {} - {}",
+        path, status, body
+      )));
+    }
+
+    Ok(response.json().await?)
+  }
+
+  async fn request_without_body<T: serde::de::DeserializeOwned>(
+    &self,
+    method: Method,
+    path: &str,
+  ) -> Result<T, JellyfinError> {
+    let server_url = self.server_url()?;
+    let token = self.access_token()?;
+    let url = format!("{}{}", server_url, path);
+
+    let response = self
+      .http
+      .request(method.clone(), &url)
+      .header("X-Emby-Authorization", self.auth_header(Some(&token)))
+      .send()
+      .await?;
+
+    let status = response.status();
+    if !status.is_success() {
+      let body = response.text().await.unwrap_or_default();
+      return Err(JellyfinError::HttpError(format!(
+        "{} {} failed: HTTP {} - {}",
+        method, path, status, body
       )));
     }
 
@@ -1393,6 +1454,10 @@ impl<'a> JellyfinPlayback<'a> {
 
 impl<'a> JellyfinLibrary<'a> {
   pub async fn video_home(&self) -> Result<VideoHome, JellyfinError> {
+    if self.client.provider() == MediaServerProvider::Emby {
+      return self.emby_video_home().await;
+    }
+
     let server_url = self.client.server_url()?;
     let token = self.client.access_token()?;
     let user_id = self.client.user_id()?;
@@ -1428,6 +1493,10 @@ impl<'a> JellyfinLibrary<'a> {
   }
 
   pub async fn library_shortcuts(&self) -> Result<Vec<VideoLibraryShortcut>, JellyfinError> {
+    if self.client.provider() == MediaServerProvider::Emby {
+      return self.emby_library_shortcuts().await;
+    }
+
     let server_url = self.client.server_url()?;
     let token = self.client.access_token()?;
     let user_id = self.client.user_id()?;
@@ -1442,6 +1511,10 @@ impl<'a> JellyfinLibrary<'a> {
     &self,
     request: VideoLibraryPageRequest,
   ) -> Result<VideoLibraryPage, JellyfinError> {
+    if self.client.provider() == MediaServerProvider::Emby {
+      return self.emby_browse_video(request).await;
+    }
+
     if request.library_id.trim().is_empty() {
       return Err(JellyfinError::HttpError(
         "Library id is required for video browsing".to_string(),
@@ -1505,6 +1578,10 @@ impl<'a> JellyfinLibrary<'a> {
     &self,
     request: VideoSearchRequest,
   ) -> Result<VideoSearchPage, JellyfinError> {
+    if self.client.provider() == MediaServerProvider::Emby {
+      return self.emby_search_video(request).await;
+    }
+
     let query = request.query.trim().to_string();
     if query.is_empty() {
       return Err(JellyfinError::HttpError(
@@ -1553,6 +1630,10 @@ impl<'a> JellyfinLibrary<'a> {
   }
 
   pub async fn item_detail(&self, item_id: String) -> Result<VideoItemDetail, JellyfinError> {
+    if self.client.provider() == MediaServerProvider::Emby {
+      return self.emby_item_detail(item_id).await;
+    }
+
     if item_id.trim().is_empty() {
       return Err(JellyfinError::HttpError(
         "Item id is required for video details".to_string(),
@@ -1576,6 +1657,10 @@ impl<'a> JellyfinLibrary<'a> {
   }
 
   pub async fn show_detail(&self, series_id: String) -> Result<VideoShowDetail, JellyfinError> {
+    if self.client.provider() == MediaServerProvider::Emby {
+      return self.emby_show_detail(series_id).await;
+    }
+
     let series_id = series_id.trim().to_string();
     if series_id.is_empty() {
       return Err(JellyfinError::HttpError(
@@ -1664,6 +1749,10 @@ impl<'a> JellyfinLibrary<'a> {
     &self,
     request: VideoSeasonEpisodesRequest,
   ) -> Result<VideoSeasonEpisodes, JellyfinError> {
+    if self.client.provider() == MediaServerProvider::Emby {
+      return self.emby_season_episodes(request).await;
+    }
+
     let series_id = request.series_id.trim().to_string();
     if series_id.is_empty() {
       return Err(JellyfinError::HttpError(
@@ -1775,6 +1864,10 @@ impl<'a> JellyfinLibrary<'a> {
     &self,
     request: VideoUserDataUpdateRequest,
   ) -> Result<VideoUserDataUpdate, JellyfinError> {
+    if self.client.provider() == MediaServerProvider::Emby {
+      return self.emby_update_user_data(request).await;
+    }
+
     let item_id = request.item_id.trim().to_string();
     if item_id.is_empty() {
       return Err(JellyfinError::HttpError(
@@ -1832,6 +1925,300 @@ impl<'a> JellyfinLibrary<'a> {
     };
 
     Ok(map_video_user_data_update(item_id, user_data))
+  }
+}
+
+impl<'a> JellyfinLibrary<'a> {
+  async fn emby_video_home(&self) -> Result<VideoHome, JellyfinError> {
+    let server_url = self.client.server_url()?;
+    let user_id = self.client.user_id()?;
+
+    let (continue_watching, next_up, latest_movies, latest_episodes) = tokio::try_join!(
+      emby_continue_watching_items(self.client, &server_url, &user_id),
+      emby_next_up_items(self.client, &server_url, &user_id, None, 12),
+      emby_latest_video_items(self.client, &server_url, &user_id, "Movie"),
+      emby_latest_video_items(self.client, &server_url, &user_id, "Episode"),
+    )?;
+
+    Ok(VideoHome {
+      continue_watching,
+      next_up,
+      latest_movies,
+      latest_episodes,
+    })
+  }
+
+  async fn emby_library_shortcuts(&self) -> Result<Vec<VideoLibraryShortcut>, JellyfinError> {
+    let server_url = self.client.server_url()?;
+    let user_id = self.client.user_id()?;
+    let query = vec![("IncludeExternalContent", "false".to_string())];
+    let response = self
+      .client
+      .get_with_query::<emby_api::models::QueryResultBaseItemDto>(
+        &format!("/Users/{user_id}/Views"),
+        &query,
+      )
+      .await?;
+
+    Ok(
+      response
+        .items
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|item| map_emby_video_library_shortcut(&server_url, item))
+        .collect(),
+    )
+  }
+
+  async fn emby_browse_video(
+    &self,
+    request: VideoLibraryPageRequest,
+  ) -> Result<VideoLibraryPage, JellyfinError> {
+    if request.library_id.trim().is_empty() {
+      return Err(JellyfinError::HttpError(
+        "Library id is required for video browsing".to_string(),
+      ));
+    }
+
+    let server_url = self.client.server_url()?;
+    let user_id = self.client.user_id()?;
+    let start_index = request.start_index.max(0);
+    let limit = request.limit.clamp(1, 100);
+    let response = self
+      .client
+      .get_with_query::<emby_api::models::QueryResultBaseItemDto>(
+        &format!("/Users/{user_id}/Items"),
+        &emby_browse_items_query(EmbyBrowseItemsQuery {
+          library_id: Some(request.library_id.clone()),
+          collection_type: request.collection_type,
+          search_term: None,
+          start_index,
+          limit,
+          sort: request.sort,
+          played_filter: request.played_filter,
+          favorites_only: request.favorites_only,
+        }),
+      )
+      .await?;
+
+    let total_record_count = response.total_record_count.unwrap_or(0).max(0);
+    let items = response
+      .items
+      .unwrap_or_default()
+      .into_iter()
+      .filter_map(|item| map_emby_video_library_item(&server_url, item))
+      .collect::<Vec<_>>();
+    let returned_count = i32::try_from(items.len()).unwrap_or(i32::MAX);
+
+    Ok(VideoLibraryPage {
+      library_id: request.library_id,
+      collection_type: request.collection_type,
+      start_index,
+      limit,
+      total_record_count,
+      has_more: start_index.saturating_add(returned_count) < total_record_count,
+      items,
+    })
+  }
+
+  async fn emby_search_video(
+    &self,
+    request: VideoSearchRequest,
+  ) -> Result<VideoSearchPage, JellyfinError> {
+    let query = request.query.trim().to_string();
+    if query.is_empty() {
+      return Err(JellyfinError::HttpError(
+        "Search text is required for video search".to_string(),
+      ));
+    }
+
+    let server_url = self.client.server_url()?;
+    let user_id = self.client.user_id()?;
+    let start_index = request.start_index.max(0);
+    let limit = request.limit.clamp(1, 100);
+    let response = self
+      .client
+      .get_with_query::<emby_api::models::QueryResultBaseItemDto>(
+        &format!("/Users/{user_id}/Items"),
+        &emby_search_items_query(EmbySearchItemsQuery {
+          query: query.clone(),
+          start_index,
+          limit,
+        }),
+      )
+      .await?;
+
+    let total_record_count = response.total_record_count.unwrap_or(0).max(0);
+    let items = response
+      .items
+      .unwrap_or_default()
+      .into_iter()
+      .filter_map(|item| map_emby_video_library_item(&server_url, item))
+      .collect::<Vec<_>>();
+    let returned_count = i32::try_from(items.len()).unwrap_or(i32::MAX);
+
+    Ok(VideoSearchPage {
+      query,
+      start_index,
+      limit,
+      total_record_count,
+      has_more: start_index.saturating_add(returned_count) < total_record_count,
+      items,
+    })
+  }
+
+  async fn emby_item_detail(&self, item_id: String) -> Result<VideoItemDetail, JellyfinError> {
+    let item_id = item_id.trim().to_string();
+    if item_id.is_empty() {
+      return Err(JellyfinError::HttpError(
+        "Item id is required for video details".to_string(),
+      ));
+    }
+
+    let server_url = self.client.server_url()?;
+    let user_id = self.client.user_id()?;
+    let item = self
+      .client
+      .get_with_query::<emby_api::models::BaseItemDto>(
+        &format!("/Users/{user_id}/Items/{item_id}"),
+        &emby_detail_query(),
+      )
+      .await?;
+
+    map_emby_video_item_detail(&server_url, item).ok_or_else(|| {
+      JellyfinError::HttpError(
+        "Only Movie and Episode details are supported by the Library Browser".to_string(),
+      )
+    })
+  }
+
+  async fn emby_show_detail(&self, series_id: String) -> Result<VideoShowDetail, JellyfinError> {
+    let series_id = series_id.trim().to_string();
+    if series_id.is_empty() {
+      return Err(JellyfinError::HttpError(
+        "Series id is required for show details".to_string(),
+      ));
+    }
+
+    let server_url = self.client.server_url()?;
+    let user_id = self.client.user_id()?;
+    let show_item = self
+      .client
+      .get_with_query::<emby_api::models::BaseItemDto>(
+        &format!("/Users/{user_id}/Items/{series_id}"),
+        &emby_detail_query(),
+      )
+      .await?;
+    let mut detail = map_emby_video_show_detail(&server_url, show_item).ok_or_else(|| {
+      JellyfinError::HttpError(
+        "Only Series details are supported by the Show Library Browser".to_string(),
+      )
+    })?;
+
+    detail.seasons = self
+      .client
+      .get_with_query::<emby_api::models::QueryResultBaseItemDto>(
+        &format!("/Shows/{series_id}/Seasons"),
+        &emby_season_query(&user_id),
+      )
+      .await?
+      .items
+      .unwrap_or_default()
+      .into_iter()
+      .filter_map(|item| map_emby_video_season(&server_url, item))
+      .collect();
+
+    detail.next_episode =
+      emby_next_up_items(self.client, &server_url, &user_id, Some(&series_id), 1)
+        .await?
+        .into_iter()
+        .next()
+        .map(video_home_item_to_library_item);
+
+    detail.can_play = detail.next_episode.is_some();
+
+    Ok(detail)
+  }
+
+  async fn emby_season_episodes(
+    &self,
+    request: VideoSeasonEpisodesRequest,
+  ) -> Result<VideoSeasonEpisodes, JellyfinError> {
+    let series_id = request.series_id.trim().to_string();
+    if series_id.is_empty() {
+      return Err(JellyfinError::HttpError(
+        "Series id is required for episode browsing".to_string(),
+      ));
+    }
+    let season_id = request.season_id.and_then(|id| {
+      let trimmed = id.trim().to_string();
+      (!trimmed.is_empty()).then_some(trimmed)
+    });
+    if season_id.is_none() && request.season_number.is_none() {
+      return Err(JellyfinError::HttpError(
+        "Season id or number is required for episode browsing".to_string(),
+      ));
+    }
+
+    let server_url = self.client.server_url()?;
+    let user_id = self.client.user_id()?;
+    let episodes = self
+      .client
+      .get_with_query::<emby_api::models::QueryResultBaseItemDto>(
+        &format!("/Shows/{series_id}/Episodes"),
+        &emby_episodes_query(&user_id, season_id.as_deref(), request.season_number),
+      )
+      .await?
+      .items
+      .unwrap_or_default()
+      .into_iter()
+      .filter_map(|item| map_emby_video_library_item(&server_url, item))
+      .collect();
+
+    Ok(VideoSeasonEpisodes {
+      series_id,
+      season_id,
+      season_number: request.season_number,
+      episodes,
+    })
+  }
+
+  async fn emby_update_user_data(
+    &self,
+    request: VideoUserDataUpdateRequest,
+  ) -> Result<VideoUserDataUpdate, JellyfinError> {
+    let item_id = request.item_id.trim().to_string();
+    if item_id.is_empty() {
+      return Err(JellyfinError::HttpError(
+        "Item id is required for user data updates".to_string(),
+      ));
+    }
+
+    let user_id = self.client.user_id()?;
+    let (method, path) = match request.action {
+      VideoUserDataAction::Favorite => (
+        Method::POST,
+        format!("/Users/{user_id}/FavoriteItems/{item_id}"),
+      ),
+      VideoUserDataAction::Unfavorite => (
+        Method::DELETE,
+        format!("/Users/{user_id}/FavoriteItems/{item_id}"),
+      ),
+      VideoUserDataAction::MarkPlayed => (
+        Method::POST,
+        format!("/Users/{user_id}/PlayedItems/{item_id}"),
+      ),
+      VideoUserDataAction::MarkUnplayed => (
+        Method::DELETE,
+        format!("/Users/{user_id}/PlayedItems/{item_id}"),
+      ),
+    };
+    let user_data = self
+      .client
+      .request_without_body::<emby_api::models::UserItemDataDto>(method, &path)
+      .await?;
+
+    Ok(map_emby_video_user_data_update(item_id, user_data))
   }
 }
 
@@ -2518,6 +2905,587 @@ fn artwork_url(
 fn ticks_to_seconds(ticks: i64) -> f64 {
   ticks as f64 / 10_000_000.0
 }
+
+struct EmbyBrowseItemsQuery {
+  library_id: Option<String>,
+  collection_type: VideoLibraryKind,
+  search_term: Option<String>,
+  start_index: i32,
+  limit: i32,
+  sort: VideoLibrarySort,
+  played_filter: VideoLibraryPlayedFilter,
+  favorites_only: bool,
+}
+
+struct EmbySearchItemsQuery {
+  query: String,
+  start_index: i32,
+  limit: i32,
+}
+
+async fn emby_continue_watching_items(
+  client: &JellyfinClient,
+  server_url: &str,
+  user_id: &str,
+) -> Result<Vec<VideoHomeItem>, JellyfinError> {
+  let query = vec![
+    ("StartIndex", "0".to_string()),
+    ("Limit", "12".to_string()),
+    ("MediaTypes", "Video".to_string()),
+    ("IncludeItemTypes", "Movie,Episode".to_string()),
+    ("Fields", emby_home_fields()),
+    ("EnableUserData", "true".to_string()),
+    ("EnableImages", "true".to_string()),
+    ("ImageTypeLimit", "1".to_string()),
+    ("EnableImageTypes", "Thumb,Primary".to_string()),
+  ];
+  let response = client
+    .get_with_query::<emby_api::models::QueryResultBaseItemDto>(
+      &format!("/Users/{user_id}/Items/Resume"),
+      &query,
+    )
+    .await?;
+
+  Ok(
+    response
+      .items
+      .unwrap_or_default()
+      .into_iter()
+      .filter_map(|item| map_emby_continue_watching_item(server_url, item))
+      .collect(),
+  )
+}
+
+async fn emby_next_up_items(
+  client: &JellyfinClient,
+  server_url: &str,
+  user_id: &str,
+  series_id: Option<&str>,
+  limit: i32,
+) -> Result<Vec<VideoHomeItem>, JellyfinError> {
+  let mut query = vec![
+    ("UserId", user_id.to_string()),
+    ("StartIndex", "0".to_string()),
+    ("Limit", limit.to_string()),
+    ("Fields", emby_home_fields()),
+    ("EnableImages", "true".to_string()),
+    ("ImageTypeLimit", "1".to_string()),
+    ("EnableImageTypes", "Primary".to_string()),
+    ("EnableUserData", "true".to_string()),
+    ("EnableResumable", "true".to_string()),
+    ("EnableRewatching", "false".to_string()),
+  ];
+  if let Some(series_id) = series_id {
+    query.push(("SeriesId", series_id.to_string()));
+  }
+
+  let response = client
+    .get_with_query::<emby_api::models::QueryResultBaseItemDto>("/Shows/NextUp", &query)
+    .await?;
+
+  Ok(
+    response
+      .items
+      .unwrap_or_default()
+      .into_iter()
+      .filter_map(|item| map_emby_video_home_item(server_url, item, "Primary"))
+      .collect(),
+  )
+}
+
+async fn emby_latest_video_items(
+  client: &JellyfinClient,
+  server_url: &str,
+  user_id: &str,
+  item_type: &str,
+) -> Result<Vec<VideoHomeItem>, JellyfinError> {
+  let query = vec![
+    ("Limit", "12".to_string()),
+    ("Fields", emby_home_fields()),
+    ("IncludeItemTypes", item_type.to_string()),
+    ("MediaTypes", "Video".to_string()),
+    ("EnableImages", "true".to_string()),
+    ("ImageTypeLimit", "1".to_string()),
+    ("EnableImageTypes", "Primary".to_string()),
+    ("EnableUserData", "true".to_string()),
+    ("GroupItems", "false".to_string()),
+  ];
+  let response = client
+    .get_with_query::<emby_api::models::QueryResultBaseItemDto>(
+      &format!("/Users/{user_id}/Items/Latest"),
+      &query,
+    )
+    .await?;
+
+  Ok(
+    response
+      .items
+      .unwrap_or_default()
+      .into_iter()
+      .filter_map(|item| map_emby_video_home_item(server_url, item, "Primary"))
+      .collect(),
+  )
+}
+
+fn emby_browse_items_query(query: EmbyBrowseItemsQuery) -> Vec<(&'static str, String)> {
+  let (sort_by, sort_order) = match query.sort {
+    VideoLibrarySort::Title => ("SortName", "Ascending"),
+    VideoLibrarySort::RecentlyAdded => ("DateCreated", "Descending"),
+    VideoLibrarySort::ReleaseDate => ("PremiereDate", "Descending"),
+  };
+  let include_item_types = match query.collection_type {
+    VideoLibraryKind::Movies => "Movie",
+    VideoLibraryKind::TvShows => "Series",
+  };
+  let mut params = vec![
+    ("StartIndex", query.start_index.to_string()),
+    ("Limit", query.limit.to_string()),
+    ("Recursive", "true".to_string()),
+    ("IncludeItemTypes", include_item_types.to_string()),
+    ("SortBy", sort_by.to_string()),
+    ("SortOrder", sort_order.to_string()),
+    ("Fields", emby_home_fields()),
+    ("EnableUserData", "true".to_string()),
+    ("EnableImages", "true".to_string()),
+    ("ImageTypeLimit", "1".to_string()),
+    ("EnableImageTypes", "Primary".to_string()),
+    ("EnableTotalRecordCount", "true".to_string()),
+    ("GroupItemsIntoCollections", "false".to_string()),
+  ];
+  if let Some(library_id) = query.library_id {
+    params.push(("ParentId", library_id));
+  }
+  if matches!(query.collection_type, VideoLibraryKind::Movies) {
+    params.push(("MediaTypes", "Video".to_string()));
+  }
+  if let Some(search_term) = query.search_term {
+    params.push(("SearchTerm", search_term));
+  }
+  match query.played_filter {
+    VideoLibraryPlayedFilter::All => {}
+    VideoLibraryPlayedFilter::Played => params.push(("IsPlayed", "true".to_string())),
+    VideoLibraryPlayedFilter::Unplayed => params.push(("IsPlayed", "false".to_string())),
+  }
+  if query.favorites_only {
+    params.push(("IsFavorite", "true".to_string()));
+  }
+  params
+}
+
+fn emby_search_items_query(query: EmbySearchItemsQuery) -> Vec<(&'static str, String)> {
+  vec![
+    ("StartIndex", query.start_index.to_string()),
+    ("Limit", query.limit.to_string()),
+    ("Recursive", "true".to_string()),
+    ("SearchTerm", query.query),
+    ("IncludeItemTypes", "Movie,Series,Episode".to_string()),
+    ("SortBy", "SortName".to_string()),
+    ("SortOrder", "Ascending".to_string()),
+    ("Fields", emby_home_fields()),
+    ("EnableUserData", "true".to_string()),
+    ("EnableImages", "true".to_string()),
+    ("ImageTypeLimit", "1".to_string()),
+    ("EnableImageTypes", "Primary".to_string()),
+    ("EnableTotalRecordCount", "true".to_string()),
+  ]
+}
+
+fn emby_detail_query() -> Vec<(&'static str, String)> {
+  vec![
+    (
+      "Fields",
+      "MediaStreams,Overview,Genres,PrimaryImageAspectRatio".to_string(),
+    ),
+    ("EnableUserData", "true".to_string()),
+    ("EnableImages", "true".to_string()),
+    ("ImageTypeLimit", "1".to_string()),
+    ("EnableImageTypes", "Primary".to_string()),
+  ]
+}
+
+fn emby_season_query(user_id: &str) -> Vec<(&'static str, String)> {
+  vec![
+    ("UserId", user_id.to_string()),
+    ("Fields", emby_home_fields()),
+    ("IsMissing", "false".to_string()),
+    ("EnableImages", "true".to_string()),
+    ("ImageTypeLimit", "1".to_string()),
+    ("EnableImageTypes", "Primary".to_string()),
+    ("EnableUserData", "true".to_string()),
+    ("IncludeItemTypes", "Season".to_string()),
+  ]
+}
+
+fn emby_episodes_query(
+  user_id: &str,
+  season_id: Option<&str>,
+  season_number: Option<i32>,
+) -> Vec<(&'static str, String)> {
+  let mut params = vec![
+    ("UserId", user_id.to_string()),
+    ("Fields", emby_home_fields()),
+    ("IsMissing", "false".to_string()),
+    ("EnableImages", "true".to_string()),
+    ("ImageTypeLimit", "1".to_string()),
+    ("EnableImageTypes", "Primary".to_string()),
+    ("EnableUserData", "true".to_string()),
+    ("IncludeItemTypes", "Episode".to_string()),
+    ("SortBy", "ParentIndexNumber,IndexNumber".to_string()),
+    ("SortOrder", "Ascending".to_string()),
+  ];
+  if let Some(season_id) = season_id {
+    params.push(("SeasonId", season_id.to_string()));
+    params.push(("ParentId", season_id.to_string()));
+  }
+  if let Some(season_number) = season_number {
+    params.push(("Season", season_number.to_string()));
+  }
+  params
+}
+
+fn emby_home_fields() -> String {
+  "PrimaryImageAspectRatio,Overview,DateCreated".to_string()
+}
+
+fn map_emby_continue_watching_item(
+  server_url: &str,
+  item: emby_api::models::BaseItemDto,
+) -> Option<VideoHomeItem> {
+  let image_type = match item.r#type.as_deref()? {
+    "Episode" | "Series" => "Primary",
+    _ => "Thumb",
+  };
+
+  map_emby_video_home_item(server_url, item, image_type)
+}
+
+fn map_emby_video_home_item(
+  server_url: &str,
+  item: emby_api::models::BaseItemDto,
+  image_type: &str,
+) -> Option<VideoHomeItem> {
+  let id = item.id?;
+  let item_type = item.r#type?;
+  let user_data = item.user_data.as_deref();
+  let artwork_url = emby_artwork_url(
+    server_url,
+    &id,
+    item.image_tags,
+    item.primary_image_item_id,
+    item.primary_image_tag,
+    image_type,
+  );
+
+  Some(VideoHomeItem {
+    id,
+    name: item.name.unwrap_or_else(|| "Untitled".to_string()),
+    item_type,
+    series_id: item.series_id,
+    series_name: item.series_name,
+    season_number: item.parent_index_number.flatten(),
+    episode_number: item.index_number.flatten(),
+    production_year: item.production_year.flatten(),
+    runtime_seconds: item.run_time_ticks.flatten().map(ticks_to_seconds),
+    resume_position_seconds: user_data
+      .and_then(|data| data.playback_position_ticks)
+      .map(ticks_to_seconds),
+    played_percentage: user_data.and_then(|data| data.played_percentage.flatten()),
+    played: user_data.and_then(|data| data.played).unwrap_or(false),
+    favorite: user_data.and_then(|data| data.is_favorite).unwrap_or(false),
+    artwork_url,
+  })
+}
+
+fn map_emby_video_library_item(
+  server_url: &str,
+  item: emby_api::models::BaseItemDto,
+) -> Option<VideoLibraryItem> {
+  let id = item.id?;
+  let item_type = item.r#type?;
+  let user_data = item.user_data.as_deref();
+  let artwork_url = emby_artwork_url(
+    server_url,
+    &id,
+    item.image_tags,
+    item.primary_image_item_id,
+    item.primary_image_tag,
+    "Primary",
+  );
+
+  let played = user_data.and_then(|data| data.played).unwrap_or(false);
+  let resume_ticks = user_data
+    .and_then(|data| data.playback_position_ticks)
+    .filter(|&ticks| ticks > 0);
+  let resume_position_seconds = if played {
+    None
+  } else {
+    resume_ticks.map(ticks_to_seconds)
+  };
+
+  Some(VideoLibraryItem {
+    id,
+    name: item.name.unwrap_or_else(|| "Untitled".to_string()),
+    item_type,
+    production_year: item.production_year.flatten(),
+    runtime_seconds: item.run_time_ticks.flatten().map(ticks_to_seconds),
+    played,
+    favorite: user_data.and_then(|data| data.is_favorite).unwrap_or(false),
+    artwork_url,
+    season_number: item.parent_index_number.flatten(),
+    episode_number: item.index_number.flatten(),
+    series_id: item.series_id,
+    series_name: item.series_name,
+    resume_position_seconds,
+    played_percentage: user_data.and_then(|data| data.played_percentage.flatten()),
+  })
+}
+
+fn map_emby_video_show_detail(
+  server_url: &str,
+  item: emby_api::models::BaseItemDto,
+) -> Option<VideoShowDetail> {
+  if item.r#type.as_deref()? != "Series" {
+    return None;
+  }
+
+  let id = item.id?;
+  let user_data = item.user_data.as_deref();
+  let artwork_url = emby_artwork_url(
+    server_url,
+    &id,
+    item.image_tags,
+    item.primary_image_item_id,
+    item.primary_image_tag,
+    "Primary",
+  );
+
+  Some(VideoShowDetail {
+    id,
+    name: item.name.unwrap_or_else(|| "Untitled".to_string()),
+    overview: item.overview,
+    production_year: item.production_year.flatten(),
+    genres: item.genres.unwrap_or_default(),
+    played: user_data.and_then(|data| data.played).unwrap_or(false),
+    favorite: user_data.and_then(|data| data.is_favorite).unwrap_or(false),
+    can_play: false,
+    artwork_url,
+    next_episode: None,
+    seasons: Vec::new(),
+  })
+}
+
+fn map_emby_video_season(
+  server_url: &str,
+  item: emby_api::models::BaseItemDto,
+) -> Option<VideoSeason> {
+  let id = item.id?;
+  let user_data = item.user_data.as_deref();
+  let artwork_url = emby_artwork_url(
+    server_url,
+    &id,
+    item.image_tags,
+    item.primary_image_item_id,
+    item.primary_image_tag,
+    "Primary",
+  );
+
+  Some(VideoSeason {
+    id,
+    name: item.name.unwrap_or_else(|| "Untitled".to_string()),
+    season_number: item.index_number.flatten(),
+    played: user_data.and_then(|data| data.played).unwrap_or(false),
+    favorite: user_data.and_then(|data| data.is_favorite).unwrap_or(false),
+    artwork_url,
+  })
+}
+
+fn map_emby_video_item_detail(
+  server_url: &str,
+  item: emby_api::models::BaseItemDto,
+) -> Option<VideoItemDetail> {
+  let item_type = item.r#type?;
+  if !matches!(item_type.as_str(), "Movie" | "Episode") {
+    return None;
+  }
+
+  let id = item.id?;
+  let user_data = item.user_data.as_deref();
+  let (audio_streams, subtitle_streams) =
+    map_emby_video_playback_streams(item.media_streams.unwrap_or_default());
+  let resume_position_seconds = user_data
+    .and_then(|data| data.playback_position_ticks)
+    .map(ticks_to_seconds);
+  let played = user_data.and_then(|data| data.played).unwrap_or(false);
+  let artwork_url = emby_artwork_url(
+    server_url,
+    &id,
+    item.image_tags,
+    item.primary_image_item_id,
+    item.primary_image_tag,
+    "Primary",
+  );
+
+  Some(VideoItemDetail {
+    id,
+    name: item.name.unwrap_or_else(|| "Untitled".to_string()),
+    item_type,
+    overview: item.overview,
+    production_year: item.production_year.flatten(),
+    runtime_seconds: item.run_time_ticks.flatten().map(ticks_to_seconds),
+    series_id: item.series_id,
+    series_name: item.series_name,
+    season_number: item.parent_index_number.flatten(),
+    episode_number: item.index_number.flatten(),
+    genres: item.genres.unwrap_or_default(),
+    played,
+    favorite: user_data.and_then(|data| data.is_favorite).unwrap_or(false),
+    played_percentage: user_data.and_then(|data| data.played_percentage.flatten()),
+    resume_position_seconds,
+    can_resume: resume_position_seconds.unwrap_or(0.0) > 0.0 && !played,
+    can_play: true,
+    artwork_url,
+    audio_streams,
+    subtitle_streams,
+  })
+}
+
+fn map_emby_video_playback_streams(
+  streams: Vec<emby_api::models::MediaStream>,
+) -> (
+  Vec<VideoPlaybackStreamOption>,
+  Vec<VideoPlaybackStreamOption>,
+) {
+  let mut audio_streams = Vec::new();
+  let mut subtitle_streams = Vec::new();
+
+  for stream in streams {
+    match stream.r#type {
+      Some(emby_api::models::MediaStreamType::Audio) => {
+        if let Some(option) = map_emby_video_playback_stream_option(stream) {
+          audio_streams.push(option);
+        }
+      }
+      Some(emby_api::models::MediaStreamType::Subtitle) => {
+        if let Some(option) = map_emby_video_playback_stream_option(stream) {
+          subtitle_streams.push(option);
+        }
+      }
+      _ => {}
+    }
+  }
+
+  (audio_streams, subtitle_streams)
+}
+
+fn map_emby_video_playback_stream_option(
+  stream: emby_api::models::MediaStream,
+) -> Option<VideoPlaybackStreamOption> {
+  let index = stream.index?;
+  let language = stream.language;
+  let codec = stream.codec;
+  let display_title = stream.display_title.or(stream.title);
+  let fallback_label = match (language.as_deref(), codec.as_deref()) {
+    (Some(language), Some(codec)) => format!("{language} · {codec}"),
+    (Some(language), None) => language.to_string(),
+    (None, Some(codec)) => codec.to_string(),
+    (None, None) => format!("Stream {index}"),
+  };
+
+  Some(VideoPlaybackStreamOption {
+    index,
+    label: display_title.unwrap_or(fallback_label),
+    language,
+    codec,
+    is_default: stream.is_default.unwrap_or(false),
+    is_external: stream.is_external.unwrap_or(false),
+  })
+}
+
+fn map_emby_video_library_shortcut(
+  server_url: &str,
+  item: emby_api::models::BaseItemDto,
+) -> Option<VideoLibraryShortcut> {
+  let collection_type = item.collection_type?;
+  if !matches!(collection_type.as_str(), "movies" | "tvshows") {
+    return None;
+  }
+
+  let id = item.id?;
+  let artwork_url = emby_artwork_url(
+    server_url,
+    &id,
+    item.image_tags,
+    item.primary_image_item_id,
+    item.primary_image_tag,
+    "Primary",
+  );
+
+  Some(VideoLibraryShortcut {
+    id,
+    name: item.name.unwrap_or_else(|| "Untitled".to_string()),
+    collection_type,
+    item_count: item.recursive_item_count.flatten(),
+    artwork_url,
+  })
+}
+
+fn map_emby_video_user_data_update(
+  item_id: String,
+  user_data: emby_api::models::UserItemDataDto,
+) -> VideoUserDataUpdate {
+  VideoUserDataUpdate {
+    item_id,
+    played: user_data.played.unwrap_or(false),
+    favorite: user_data.is_favorite.unwrap_or(false),
+  }
+}
+
+fn emby_artwork_url(
+  server_url: &str,
+  item_id: &str,
+  image_tags: Option<std::collections::HashMap<String, String>>,
+  primary_image_item_id: Option<String>,
+  primary_image_tag: Option<String>,
+  image_type: &str,
+) -> Option<String> {
+  let (image_item_id, tag) = image_tags
+    .and_then(|tags| tags.get(image_type).cloned())
+    .map(|tag| (item_id.to_string(), tag))
+    .or_else(|| {
+      (image_type == "Primary").then(|| {
+        primary_image_tag.map(|tag| {
+          (
+            primary_image_item_id.unwrap_or_else(|| item_id.to_string()),
+            tag,
+          )
+        })
+      })?
+    })?;
+
+  Some(format!(
+    "{}/Items/{}/Images/{}?tag={}",
+    server_url, image_item_id, image_type, tag
+  ))
+}
+
+fn video_home_item_to_library_item(item: VideoHomeItem) -> VideoLibraryItem {
+  VideoLibraryItem {
+    id: item.id,
+    name: item.name,
+    item_type: item.item_type,
+    production_year: item.production_year,
+    runtime_seconds: item.runtime_seconds,
+    played: item.played,
+    favorite: item.favorite,
+    artwork_url: item.artwork_url,
+    season_number: item.season_number,
+    episode_number: item.episode_number,
+    series_id: item.series_id,
+    series_name: item.series_name,
+    resume_position_seconds: item.resume_position_seconds,
+    played_percentage: item.played_percentage,
+  }
+}
 impl Default for JellyfinClient {
   fn default() -> Self {
     Self::new()
@@ -3055,6 +4023,14 @@ mod tests {
     let mut state = client.state.write();
     state.server_url = Some(server_url);
     state.access_token = Some("token-1".to_string());
+    state.user_id = Some("00000000-0000-0000-0000-000000000001".to_string());
+  }
+
+  fn connect_test_client_as_emby(client: &JellyfinClient, server_url: String) {
+    let mut state = client.state.write();
+    state.provider = MediaServerProvider::Emby;
+    state.server_url = Some(server_url);
+    state.access_token = Some("emby-token".to_string());
     state.user_id = Some("00000000-0000-0000-0000-000000000001".to_string());
   }
 
@@ -3782,6 +4758,293 @@ mod tests {
     assert!(
       captured[3].starts_with("DELETE /UserPlayedItems/00000000-0000-0000-0000-000000000080?")
     );
+  }
+
+  #[tokio::test]
+  async fn emby_video_home_and_shortcuts_load_shared_browser_rows() {
+    let movie_library_id = "00000000-0000-0000-0000-000000000220";
+    let shows_library_id = "00000000-0000-0000-0000-000000000221";
+    let movie_id = "00000000-0000-0000-0000-000000000210";
+    let episode_id = "00000000-0000-0000-0000-000000000211";
+    let (server_url, requests) = serve_route_responses_with_requests(vec![
+      (
+        "/Users/00000000-0000-0000-0000-000000000001/Items/Resume",
+        "200 OK",
+        r#"{"Items":[{"Id":"00000000-0000-0000-0000-000000000210","Name":"Emby Resume Movie","Type":"Movie","ImageTags":{"Thumb":"thumb-emby"},"UserData":{"PlaybackPositionTicks":1500000000,"PlayedPercentage":20.0,"IsFavorite":true,"Played":false}}],"TotalRecordCount":1}"#,
+      ),
+      (
+        "/Shows/NextUp",
+        "200 OK",
+        r#"{"Items":[{"Id":"00000000-0000-0000-0000-000000000211","Name":"Emby Next Episode","Type":"Episode","SeriesId":"00000000-0000-0000-0000-000000000212","SeriesName":"Emby Show","ParentIndexNumber":1,"IndexNumber":2,"ImageTags":{"Primary":"next-primary"},"UserData":{"Played":false}}],"TotalRecordCount":1}"#,
+      ),
+      (
+        "IncludeItemTypes=Movie",
+        "200 OK",
+        r#"{"Items":[{"Id":"00000000-0000-0000-0000-000000000210","Name":"Latest Emby Movie","Type":"Movie","ImageTags":{"Primary":"latest-movie"}}],"TotalRecordCount":1}"#,
+      ),
+      (
+        "IncludeItemTypes=Episode",
+        "200 OK",
+        r#"{"Items":[{"Id":"00000000-0000-0000-0000-000000000211","Name":"Latest Emby Episode","Type":"Episode","SeriesName":"Emby Show"}],"TotalRecordCount":1}"#,
+      ),
+      (
+        "/Users/00000000-0000-0000-0000-000000000001/Views",
+        "200 OK",
+        r#"{"Items":[{"Id":"00000000-0000-0000-0000-000000000220","Name":"Emby Movies","Type":"CollectionFolder","CollectionType":"movies","RecursiveItemCount":4,"ImageTags":{"Primary":"movies-primary"}},{"Id":"00000000-0000-0000-0000-000000000221","Name":"Emby Shows","Type":"CollectionFolder","CollectionType":"tvshows","RecursiveItemCount":7},{"Id":"00000000-0000-0000-0000-000000000222","Name":"Music","Type":"CollectionFolder","CollectionType":"music"}],"TotalRecordCount":3}"#,
+      ),
+    ])
+    .await;
+    let client = JellyfinClient::new();
+    let emby_base = format!("{server_url}/emby");
+    connect_test_client_as_emby(&client, emby_base.clone());
+
+    let home = client
+      .library()
+      .video_home()
+      .await
+      .expect("Emby video home should load through shared DTOs");
+    let shortcuts = client
+      .library()
+      .library_shortcuts()
+      .await
+      .expect("Emby library shortcuts should load from user views");
+
+    assert_eq!(home.continue_watching[0].id, movie_id);
+    assert_eq!(home.continue_watching[0].name, "Emby Resume Movie");
+    assert_eq!(
+      home.continue_watching[0].resume_position_seconds,
+      Some(150.0)
+    );
+    assert_eq!(
+      home.continue_watching[0].artwork_url.as_deref(),
+      Some(format!("{emby_base}/Items/{movie_id}/Images/Thumb?tag=thumb-emby").as_str())
+    );
+    assert_eq!(home.next_up[0].id, episode_id);
+    assert_eq!(home.latest_movies[0].name, "Latest Emby Movie");
+    assert_eq!(home.latest_episodes[0].name, "Latest Emby Episode");
+    assert_eq!(
+      shortcuts
+        .iter()
+        .map(|library| (library.id.as_str(), library.collection_type.as_str()))
+        .collect::<Vec<_>>(),
+      vec![(movie_library_id, "movies"), (shows_library_id, "tvshows")]
+    );
+
+    let captured = requests.lock();
+    assert!(captured.iter().any(|request| request
+      .starts_with("GET /emby/Users/00000000-0000-0000-0000-000000000001/Items/Resume?")));
+    assert!(captured
+      .iter()
+      .any(|request| request
+        .starts_with("GET /emby/Users/00000000-0000-0000-0000-000000000001/Views?")));
+  }
+
+  #[tokio::test]
+  async fn emby_browse_and_search_video_map_to_shared_library_pages() {
+    let movie_library_id = "00000000-0000-0000-0000-000000000220";
+    let movie_id = "00000000-0000-0000-0000-000000000230";
+    let show_id = "00000000-0000-0000-0000-000000000231";
+    let (server_url, requests) = serve_responses_with_requests(vec![
+      (
+        "200 OK",
+        r#"{"Items":[{"Id":"00000000-0000-0000-0000-000000000230","Name":"Emby Paged Movie","Type":"Movie","ProductionYear":2026,"RunTimeTicks":54000000000,"ImageTags":{"Primary":"movie-primary"},"UserData":{"IsFavorite":true,"Played":false}}],"TotalRecordCount":24}"#,
+      ),
+      (
+        "200 OK",
+        r#"{"Items":[{"Id":"00000000-0000-0000-0000-000000000231","Name":"Emby Search Show","Type":"Series"},{"Id":"00000000-0000-0000-0000-000000000230","Name":"Emby Search Movie","Type":"Movie","UserData":{"Played":false}}],"TotalRecordCount":2}"#,
+      ),
+    ])
+    .await;
+    let client = JellyfinClient::new();
+    connect_test_client_as_emby(&client, server_url.clone());
+
+    let movies = client
+      .library()
+      .browse_video(VideoLibraryPageRequest {
+        library_id: movie_library_id.to_string(),
+        collection_type: VideoLibraryKind::Movies,
+        start_index: 20,
+        limit: 2,
+        sort: VideoLibrarySort::ReleaseDate,
+        played_filter: VideoLibraryPlayedFilter::Unplayed,
+        favorites_only: true,
+      })
+      .await
+      .expect("Emby movies browse should map item pages");
+    let search = client
+      .library()
+      .search_video(VideoSearchRequest {
+        query: " emby show ".to_string(),
+        start_index: 0,
+        limit: 10,
+      })
+      .await
+      .expect("Emby video search should map item pages");
+
+    assert_eq!(movies.items[0].id, movie_id);
+    assert_eq!(movies.items[0].runtime_seconds, Some(5400.0));
+    assert!(movies.items[0].favorite);
+    assert!(movies.has_more);
+    assert_eq!(
+      search
+        .items
+        .iter()
+        .map(|item| (item.id.as_str(), item.item_type.as_str()))
+        .collect::<Vec<_>>(),
+      vec![(show_id, "Series"), (movie_id, "Movie")]
+    );
+
+    let captured = requests.lock();
+    assert!(captured[0].starts_with("GET /Users/00000000-0000-0000-0000-000000000001/Items?"));
+    assert!(captured[0].contains("ParentId=00000000-0000-0000-0000-000000000220"));
+    assert!(captured[0].contains("IncludeItemTypes=Movie"));
+    assert!(captured[0].contains("MediaTypes=Video"));
+    assert!(captured[0].contains("SortBy=PremiereDate"));
+    assert!(captured[0].contains("SortOrder=Descending"));
+    assert!(captured[0].contains("IsPlayed=false"));
+    assert!(captured[0].contains("IsFavorite=true"));
+    assert!(captured[1].contains("SearchTerm=emby+show"));
+    assert!(captured[1].contains("IncludeItemTypes=Movie%2CSeries%2CEpisode"));
+  }
+
+  #[tokio::test]
+  async fn emby_details_show_and_episodes_tolerate_missing_optional_fields() {
+    let movie_id = "00000000-0000-0000-0000-000000000250";
+    let series_id = "00000000-0000-0000-0000-000000000260";
+    let season_id = "00000000-0000-0000-0000-000000000261";
+    let episode_id = "00000000-0000-0000-0000-000000000262";
+    let (server_url, requests) = serve_responses_with_requests(vec![
+      (
+        "200 OK",
+        r#"{"Id":"00000000-0000-0000-0000-000000000250","Name":"Emby Detail Movie","Type":"Movie","RunTimeTicks":72000000000,"UserData":{"PlaybackPositionTicks":600000000,"Played":false},"MediaStreams":[{"Index":1,"Type":"Audio","Language":"eng","Codec":"aac","IsDefault":true},{"Index":2,"Type":"Subtitle","Codec":"srt","IsExternal":true}]}"#,
+      ),
+      (
+        "200 OK",
+        r#"{"Id":"00000000-0000-0000-0000-000000000260","Name":"Emby Show","Type":"Series","ImageTags":{"Primary":"show-primary"},"UserData":{"IsFavorite":true}}"#,
+      ),
+      (
+        "200 OK",
+        r#"{"Items":[{"Id":"00000000-0000-0000-0000-000000000261","Name":"Season 1","Type":"Season","IndexNumber":1}],"TotalRecordCount":1}"#,
+      ),
+      (
+        "200 OK",
+        r#"{"Items":[{"Id":"00000000-0000-0000-0000-000000000262","Name":"Next Emby Episode","Type":"Episode","UserData":{"PlaybackPositionTicks":300000000,"Played":false}}],"TotalRecordCount":1}"#,
+      ),
+      (
+        "200 OK",
+        r#"{"Items":[{"Id":"00000000-0000-0000-0000-000000000262","Name":"Episode One","Type":"Episode","RunTimeTicks":18000000000,"ParentIndexNumber":1,"IndexNumber":1}],"TotalRecordCount":1}"#,
+      ),
+    ])
+    .await;
+    let client = JellyfinClient::new();
+    connect_test_client_as_emby(&client, server_url.clone());
+
+    let movie = client
+      .library()
+      .item_detail(movie_id.to_string())
+      .await
+      .expect("Emby movie detail should map playable metadata");
+    let show = client
+      .library()
+      .show_detail(series_id.to_string())
+      .await
+      .expect("Emby show detail should map seasons and next episode");
+    let episodes = client
+      .library()
+      .season_episodes(VideoSeasonEpisodesRequest {
+        series_id: series_id.to_string(),
+        season_id: Some(season_id.to_string()),
+        season_number: Some(1),
+      })
+      .await
+      .expect("Emby season episodes should map episode rows");
+
+    assert_eq!(movie.name, "Emby Detail Movie");
+    assert_eq!(movie.resume_position_seconds, Some(60.0));
+    assert!(movie.can_resume);
+    assert_eq!(movie.audio_streams[0].label, "eng · aac");
+    assert_eq!(movie.subtitle_streams[0].label, "srt");
+    assert_eq!(show.id, series_id);
+    assert!(show.favorite);
+    assert!(show.can_play);
+    assert_eq!(show.seasons[0].id, season_id);
+    assert_eq!(
+      show.next_episode.as_ref().map(|item| item.id.as_str()),
+      Some(episode_id)
+    );
+    assert_eq!(episodes.episodes[0].id, episode_id);
+    assert_eq!(episodes.episodes[0].season_number, Some(1));
+    assert_eq!(episodes.episodes[0].episode_number, Some(1));
+
+    let captured = requests.lock();
+    assert!(captured[0].starts_with(
+      "GET /Users/00000000-0000-0000-0000-000000000001/Items/00000000-0000-0000-0000-000000000250?"
+    ));
+    assert!(captured[0].contains("Fields=MediaStreams"));
+    assert!(captured[2].contains("IncludeItemTypes=Season"));
+    assert!(captured[3].starts_with("GET /Shows/NextUp?"));
+    assert!(captured[3].contains("SeriesId=00000000-0000-0000-0000-000000000260"));
+    assert!(captured[3].contains("EnableResumable=true"));
+    assert!(captured[4].contains("ParentId=00000000-0000-0000-0000-000000000261"));
+    assert!(captured[4].contains("IncludeItemTypes=Episode"));
+  }
+
+  #[tokio::test]
+  async fn emby_update_user_data_maps_supported_library_actions() {
+    let item_id = "00000000-0000-0000-0000-000000000280";
+    let (server_url, requests) = serve_responses_with_requests(vec![
+      ("200 OK", r#"{"IsFavorite":true,"Played":false}"#),
+      ("200 OK", r#"{"IsFavorite":false,"Played":false}"#),
+      ("200 OK", r#"{"IsFavorite":false,"Played":true}"#),
+      ("200 OK", r#"{"IsFavorite":false,"Played":false}"#),
+    ])
+    .await;
+    let client = JellyfinClient::new();
+    connect_test_client_as_emby(&client, server_url);
+
+    let favorite = client
+      .library()
+      .update_user_data(VideoUserDataUpdateRequest {
+        item_id: item_id.to_string(),
+        action: VideoUserDataAction::Favorite,
+      })
+      .await
+      .expect("Emby favorite should update user data");
+    let unfavorite = client
+      .library()
+      .update_user_data(VideoUserDataUpdateRequest {
+        item_id: item_id.to_string(),
+        action: VideoUserDataAction::Unfavorite,
+      })
+      .await
+      .expect("Emby unfavorite should update user data");
+    let played = client
+      .library()
+      .update_user_data(VideoUserDataUpdateRequest {
+        item_id: item_id.to_string(),
+        action: VideoUserDataAction::MarkPlayed,
+      })
+      .await
+      .expect("Emby mark played should update user data");
+    let unplayed = client
+      .library()
+      .update_user_data(VideoUserDataUpdateRequest {
+        item_id: item_id.to_string(),
+        action: VideoUserDataAction::MarkUnplayed,
+      })
+      .await
+      .expect("Emby mark unplayed should update user data");
+
+    assert!(favorite.favorite);
+    assert!(!unfavorite.favorite);
+    assert!(played.played);
+    assert!(!unplayed.played);
+
+    let captured = requests.lock();
+    assert!(captured[0].starts_with("POST /Users/00000000-0000-0000-0000-000000000001/FavoriteItems/00000000-0000-0000-0000-000000000280"));
+    assert!(captured[1].starts_with("DELETE /Users/00000000-0000-0000-0000-000000000001/FavoriteItems/00000000-0000-0000-0000-000000000280"));
+    assert!(captured[2].starts_with("POST /Users/00000000-0000-0000-0000-000000000001/PlayedItems/00000000-0000-0000-0000-000000000280"));
+    assert!(captured[3].starts_with("DELETE /Users/00000000-0000-0000-0000-000000000001/PlayedItems/00000000-0000-0000-0000-000000000280"));
   }
 
   #[test]
