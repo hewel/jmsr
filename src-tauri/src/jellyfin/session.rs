@@ -225,6 +225,11 @@ impl SessionManager {
     // Start WebSocket command consumer with auto-reconnect
     self.start_websocket_consumer();
 
+    self.start_local().await
+  }
+
+  /// Start local MPV consumers without registering as a remote-control target.
+  pub async fn start_local(&self) -> Result<(), JellyfinError> {
     // Start MPV action consumer
     self.start_action_consumer();
 
@@ -1785,6 +1790,32 @@ mod tests {
     (client, requests)
   }
 
+  async fn connected_emby_test_client(
+    responses: Vec<(&'static str, &'static str)>,
+  ) -> (JellyfinClient, RequestLog) {
+    let responses = responses
+      .into_iter()
+      .map(|(status, body)| (status.to_string(), body.to_string()))
+      .collect();
+    let (server_url, requests) = serve_owned_responses_with_requests(responses).await;
+    let client = JellyfinClient::new();
+    client
+      .login()
+      .restore_session(&SavedSession {
+        provider: MediaServerProvider::Emby,
+        server_url,
+        access_token: "emby-token".to_string(),
+        user_id: "00000000-0000-0000-0000-000000000001".to_string(),
+        user_name: "Ada".to_string(),
+        server_name: Some("Emby Home".to_string()),
+        device_id: Some("device-1".to_string()),
+      })
+      .await
+      .expect("test Emby client should restore saved session");
+
+    (client, requests)
+  }
+
   fn test_config() -> RwLock<AppConfig> {
     RwLock::new(AppConfig {
       intro_skipper_mode: IntroSkipperMode::Off,
@@ -2018,6 +2049,98 @@ mod tests {
     assert!(captured[5].starts_with("POST /Sessions/Playing "));
     assert!(captured[5].contains(r#""ItemId":"00000000-0000-0000-0000-000000000072""#));
     assert!(captured[5].contains(r#""PositionTicks":900000000"#));
+  }
+
+  #[tokio::test]
+  async fn emby_library_play_uses_shared_playback_resolution_and_provider_urls() {
+    let (client, requests) = connected_emby_test_client(vec![
+      (
+        "200 OK",
+        r#"{"Id":"00000000-0000-0000-0000-000000000001","Name":"Ada"}"#,
+      ),
+      (
+        "200 OK",
+        r#"{"Id":"movie-emby","Name":"Emby Movie","Type":"Movie"}"#,
+      ),
+      (
+        "200 OK",
+        r#"{"MediaSources":[{"Id":"source-emby","Protocol":"Http","Container":"mp4","SupportsDirectPlay":false,"SupportsDirectStream":true,"SupportsTranscoding":true,"DirectStreamUrl":"/videos/direct-stream.mp4?MediaSourceId=source-emby","TranscodingUrl":"/videos/transcode.m3u8","MediaStreams":[{"Index":1,"Type":"Audio","Language":"eng","DisplayTitle":"English AAC","Codec":"aac","IsDefault":true},{"Index":2,"Type":"Subtitle","Language":"eng","DisplayTitle":"English SRT","Codec":"srt","IsExternal":true}]}],"PlaySessionId":"play-emby"}"#,
+      ),
+      ("204 No Content", ""),
+    ])
+    .await;
+    let state = empty_test_state();
+    let config = test_config();
+    let (action_tx, mut action_rx) = mpsc::channel(4);
+
+    SessionManager::play_library_request(
+      &client,
+      &state,
+      &action_tx,
+      false,
+      &config,
+      VideoLibraryPlayRequest {
+        item_id: "movie-emby".to_string(),
+        mode: VideoLibraryPlayMode::Start,
+        start_position_seconds: None,
+        audio_stream_index: Some(1),
+        subtitle_stream_index: Some(2),
+      },
+    )
+    .await
+    .expect("Emby library play should start playback through shared flow");
+
+    let play_action = action_rx
+      .recv()
+      .await
+      .expect("Emby library playback should send play action");
+    match play_action {
+      MpvAction::Play {
+        url,
+        title,
+        audio_index,
+        subtitle_index,
+        ..
+      } => {
+        assert_eq!(title, "Emby Movie");
+        assert_eq!(audio_index, Some(1));
+        assert_eq!(subtitle_index, None);
+        assert!(
+          url.ends_with("/videos/direct-stream.mp4?MediaSourceId=source-emby&api_key=emby-token")
+        );
+      }
+      other => panic!("expected play action, got {other:?}"),
+    }
+
+    let subtitle_action = action_rx
+      .recv()
+      .await
+      .expect("external Emby subtitle should be loaded separately");
+    match subtitle_action {
+      MpvAction::AddExternalSubtitle(url) => {
+        assert!(
+          url.ends_with("/Videos/movie-emby/source-emby/Subtitles/2/Stream.srt?api_key=emby-token")
+        );
+      }
+      other => panic!("expected external subtitle action, got {other:?}"),
+    }
+
+    let playback = state.read().playback.clone().expect("new playback state");
+    assert_eq!(playback.item_id, "movie-emby");
+    assert_eq!(playback.media_source_id.as_deref(), Some("source-emby"));
+    assert_eq!(playback.play_session_id.as_deref(), Some("play-emby"));
+    assert_eq!(playback.audio_stream_index, Some(1));
+    assert_eq!(playback.subtitle_stream_index, Some(2));
+
+    let captured = requests.lock();
+    assert!(
+      captured[1].starts_with("GET /Users/00000000-0000-0000-0000-000000000001/Items/movie-emby ")
+    );
+    assert!(captured[2].starts_with("POST /Items/movie-emby/PlaybackInfo "));
+    assert!(captured[2].contains(r#""AudioStreamIndex":1"#));
+    assert!(captured[2].contains(r#""SubtitleStreamIndex":2"#));
+    assert!(captured[3].starts_with("POST /Sessions/Playing "));
+    assert!(captured[3].contains(r#""PlayMethod":"DirectStream""#));
   }
 
   #[tokio::test]

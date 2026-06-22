@@ -474,6 +474,12 @@ pub struct MediaSource {
   pub supports_direct_stream: bool,
   #[serde(default)]
   pub supports_transcoding: bool,
+  #[serde(default)]
+  pub direct_stream_url: Option<String>,
+  #[serde(default)]
+  pub add_api_key_to_direct_stream_url: Option<bool>,
+  #[serde(default)]
+  pub transcoding_url: Option<String>,
 }
 
 /// Individual stream (video, audio, subtitle).

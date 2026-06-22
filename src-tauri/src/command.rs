@@ -199,17 +199,25 @@ async fn start_remote_control_session_if_supported(
   state: &JellyfinState,
   config_state: &ConfigState,
 ) -> Result<(), CommandError> {
-  if !state.client.supports_remote_control() {
-    playback_control::emit_now_playing_changed(app, state).await;
-    return Ok(());
-  }
-
   let new_session = Arc::new(SessionManager::new(
     state.client.clone(),
     state.mpv.clone(),
     config_state.0.clone(),
     app.clone(),
   ));
+
+  if !state.client.supports_remote_control() {
+    new_session.start_local().await.map_err(internal_err)?;
+    let old_session = state.session.write().replace(new_session);
+    if let Some(old) = old_session {
+      if let Err(e) = old.stop().await {
+        log::warn!("Failed to stop old session: {}", e);
+      }
+    }
+    playback_control::emit_now_playing_changed(app, state).await;
+    return Ok(());
+  }
+
   new_session.start().await.map_err(internal_err)?;
 
   let old_session = state.session.write().replace(new_session);

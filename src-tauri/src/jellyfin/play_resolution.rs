@@ -191,6 +191,9 @@ mod tests {
       supports_direct_play: true,
       supports_direct_stream: false,
       supports_transcoding: false,
+      direct_stream_url: None,
+      add_api_key_to_direct_stream_url: None,
+      transcoding_url: None,
     }
   }
 

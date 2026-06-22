@@ -972,8 +972,24 @@ impl JellyfinClient {
     let server_url = state.server_url.as_ref()?;
     let token = state.access_token.as_ref()?;
 
-    // Build streaming URL - always use HTTP, never raw file paths
-    // The file path in media_source.path is on the server, not locally accessible
+    if !media_source.supports_direct_play {
+      if media_source.supports_direct_stream {
+        if let Some(url) = media_source.direct_stream_url.as_deref() {
+          let url = absolute_server_url(server_url, url);
+          return Some(append_api_key_if_missing(&url, token));
+        }
+      }
+
+      if media_source.supports_transcoding {
+        if let Some(url) = media_source.transcoding_url.as_deref() {
+          let url = absolute_server_url(server_url, url);
+          return Some(append_api_key_if_missing(&url, token));
+        }
+      }
+    }
+
+    // Build streaming URL - always use HTTP, never raw file paths.
+    // The file path in media_source.path is on the server, not locally accessible.
     let container = media_source.container.as_deref().unwrap_or("mkv");
     Some(format!(
       "{}/Videos/{}/stream.{}?Static=true&MediaSourceId={}&api_key={}",
@@ -2904,6 +2920,27 @@ fn artwork_url(
 
 fn ticks_to_seconds(ticks: i64) -> f64 {
   ticks as f64 / 10_000_000.0
+}
+
+fn absolute_server_url(server_url: &str, path_or_url: &str) -> String {
+  if path_or_url.starts_with("http://") || path_or_url.starts_with("https://") {
+    return path_or_url.to_string();
+  }
+
+  if path_or_url.starts_with('/') {
+    format!("{server_url}{path_or_url}")
+  } else {
+    format!("{server_url}/{path_or_url}")
+  }
+}
+
+fn append_api_key_if_missing(url: &str, token: &str) -> String {
+  if url.contains("api_key=") {
+    return url.to_string();
+  }
+
+  let separator = if url.contains('?') { '&' } else { '?' };
+  format!("{url}{separator}api_key={token}")
 }
 
 struct EmbyBrowseItemsQuery {
@@ -5045,6 +5082,56 @@ mod tests {
     assert!(captured[1].starts_with("DELETE /Users/00000000-0000-0000-0000-000000000001/FavoriteItems/00000000-0000-0000-0000-000000000280"));
     assert!(captured[2].starts_with("POST /Users/00000000-0000-0000-0000-000000000001/PlayedItems/00000000-0000-0000-0000-000000000280"));
     assert!(captured[3].starts_with("DELETE /Users/00000000-0000-0000-0000-000000000001/PlayedItems/00000000-0000-0000-0000-000000000280"));
+  }
+
+  #[test]
+  fn emby_stream_urls_prefer_direct_play_then_provider_fallbacks() {
+    let client = JellyfinClient::new();
+    connect_test_client_as_emby(&client, "http://media.example.test/emby".to_string());
+    let direct_play = MediaSource {
+      id: "source-1".to_string(),
+      path: None,
+      protocol: "Http".to_string(),
+      container: Some("mkv".to_string()),
+      run_time_ticks: None,
+      media_streams: Vec::new(),
+      supports_direct_play: true,
+      supports_direct_stream: true,
+      supports_transcoding: true,
+      direct_stream_url: Some("/videos/direct-stream.mp4?MediaSourceId=source-1".to_string()),
+      add_api_key_to_direct_stream_url: Some(true),
+      transcoding_url: Some("/videos/transcoded.m3u8".to_string()),
+    };
+    let direct_stream = MediaSource {
+      supports_direct_play: false,
+      direct_stream_url: Some("/videos/direct-stream.mp4?MediaSourceId=source-1".to_string()),
+      ..direct_play.clone()
+    };
+    let transcode = MediaSource {
+      supports_direct_play: false,
+      supports_direct_stream: false,
+      direct_stream_url: None,
+      ..direct_play.clone()
+    };
+
+    assert_eq!(
+      client
+        .build_stream_url("movie-1", &direct_play)
+        .expect("direct play URL"),
+      "http://media.example.test/emby/Videos/movie-1/stream.mkv?Static=true&MediaSourceId=source-1&api_key=emby-token"
+    );
+    assert_eq!(
+      client
+        .build_stream_url("movie-1", &direct_stream)
+        .expect("direct stream URL"),
+      "http://media.example.test/emby/videos/direct-stream.mp4?MediaSourceId=source-1&api_key=emby-token"
+    );
+    assert_eq!(
+      client
+        .build_stream_url("movie-1", &transcode)
+        .expect("transcoding URL"),
+      "http://media.example.test/emby/videos/transcoded.m3u8?api_key=emby-token"
+    );
   }
 
   #[test]
