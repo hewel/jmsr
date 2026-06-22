@@ -9,6 +9,8 @@
   "scripts": {
     "dev": "rsbuild dev",
     "build": "rsbuild build",
+    "dev:rsdoctor": "RSDOCTOR=true rsbuild",
+    "build:rsdoctor": "RSDOCTOR=true rsbuild build",
     "preview": "rsbuild preview",
     "test": "rstest",
     "test:watch": "rstest --watch",
@@ -52,6 +54,7 @@
     "@rsbuild/plugin-babel": "^1.2.1",
     "@rsbuild/plugin-solid": "^1.2.2",
     "@rsbuild/plugin-tailwindcss": "^2.0.3",
+    "@rsdoctor/rspack-plugin": "^1.5.15",
     "@rstest/core": "^0.10.5",
     "@tanstack/router-plugin": "^1.168.18",
     "@tauri-apps/cli": "^2.11.2",
