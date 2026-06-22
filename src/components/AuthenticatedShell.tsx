@@ -1,17 +1,22 @@
+import { createQuery } from '@tanstack/solid-query';
 import { Outlet } from '@tanstack/solid-router';
-import { Effect, Exit } from 'effect';
-import { createResource } from 'solid-js';
+import { Exit } from 'effect';
 
 import { fetchConnectionState } from '../effects/connection';
+import { queryKeys, runExit } from '../effects/query';
 import NowPlayingDrawer from './NowPlayingDrawer';
 import SettingsModal from './SettingsModal';
 import { ConsoleShell } from './ui';
 
 export default function AuthenticatedShell() {
-  const [connection] = createResource(async () => {
-    const exit = await Effect.runPromiseExit(fetchConnectionState());
-    return Exit.isSuccess(exit) ? exit.value : undefined;
-  });
+  const connectionQuery = createQuery(() => ({
+    queryKey: queryKeys.connectionState,
+    queryFn: () => runExit(fetchConnectionState()),
+  }));
+  const jellyfinConnected = () =>
+    connectionQuery.data && Exit.isSuccess(connectionQuery.data)
+      ? connectionQuery.data.value.connected
+      : false;
 
   return (
     <ConsoleShell>
@@ -27,7 +32,7 @@ export default function AuthenticatedShell() {
         aria-label="Floating controls"
         class="border-outline-variant/40 bg-surface-container-low/80 fixed right-4 bottom-4 z-100 flex flex-col items-center gap-2 rounded-3xl border p-1 shadow-2xl backdrop-blur-xl"
       >
-        <NowPlayingDrawer jellyfinConnected={connection()?.connected ?? false} />
+        <NowPlayingDrawer jellyfinConnected={jellyfinConnected()} />
         <SettingsModal />
       </div>
     </ConsoleShell>

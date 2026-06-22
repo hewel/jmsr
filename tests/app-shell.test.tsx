@@ -16,6 +16,7 @@ import type {
 } from '../src/bindings';
 import { ToastProvider } from '../src/components/ToastProvider';
 import { createJellyPilotRouter } from '../src/router';
+import { TestQueryProvider } from './query-client';
 
 // Mock scrollTo since JSDOM doesn't implement layout/scrolling APIs
 Element.prototype.scrollTo = () => {};
@@ -446,9 +447,11 @@ function renderShell(path = '/library') {
   const router = createJellyPilotRouter(createMemoryHistory({ initialEntries: [path] }));
   const dispose = render(
     () => (
-      <ToastProvider>
-        <RouterProvider router={router} />
-      </ToastProvider>
+      <TestQueryProvider>
+        <ToastProvider>
+          <RouterProvider router={router} />
+        </ToastProvider>
+      </TestQueryProvider>
     ),
     root,
   );
@@ -1010,7 +1013,7 @@ test('now playing drawer exposes full playback controls', async () => {
   expect(dialog).toBeVisible();
   expect(await screen.findByText('The Pilot')).toBeVisible();
   expect(screen.getByRole('button', { name: 'Pause' })).toBeVisible();
-  expect(screen.getByRole('slider', { name: 'Seek position' })).toBeVisible();
+  expect(await screen.findByRole('slider', { name: 'Seek position' })).toBeVisible();
 
   const setAudioTrack = rstest
     .spyOn(commands, 'mpvSetAudioTrack')

@@ -6,6 +6,7 @@ import { commands } from '../src/bindings';
 import type { AppConfig, SavedSession } from '../src/bindings';
 import OperationsConsole from '../src/components/OperationsConsole';
 import { ToastProvider } from '../src/components/ToastProvider';
+import { TestQueryProvider } from './query-client';
 
 const connectedState = {
   connected: true,
@@ -48,9 +49,11 @@ function renderConsole(onSignedOut = () => {}, appConfig = config, state = conne
   document.body.append(root);
   const dispose = render(
     () => (
-      <ToastProvider>
-        <OperationsConsole onSignedOut={onSignedOut} />
-      </ToastProvider>
+      <TestQueryProvider>
+        <ToastProvider>
+          <OperationsConsole onSignedOut={onSignedOut} />
+        </ToastProvider>
+      </TestQueryProvider>
     ),
     root,
   );
@@ -74,9 +77,11 @@ test('operations console reports config load command failures', async () => {
   document.body.append(root);
   const dispose = render(
     () => (
-      <ToastProvider>
-        <OperationsConsole onSignedOut={() => {}} />
-      </ToastProvider>
+      <TestQueryProvider>
+        <ToastProvider>
+          <OperationsConsole onSignedOut={() => {}} />
+        </ToastProvider>
+      </TestQueryProvider>
     ),
     root,
   );

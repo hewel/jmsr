@@ -6,8 +6,10 @@ import { render } from 'solid-js/web';
 import { commands } from '../src/bindings';
 import type { VideoItemDetail, VideoShowDetail } from '../src/bindings';
 import { MediaInfoContent, MediaInfoHoverCard } from '../src/components/library/MediaInfoHoverCard';
-import { clearMediaDetailCache, fetchMediaDetail } from '../src/effects/library';
+import { fetchMediaDetail } from '../src/effects/library';
 import type { MediaDetail } from '../src/effects/library';
+import { queryKeys, runExit } from '../src/effects/query';
+import { createTestQueryClient, TestQueryProvider } from './query-client';
 
 const connectedState = {
   connected: true,
@@ -76,7 +78,6 @@ function mediaValue<A, E>(exit: Exit.Exit<A, E>): A | null {
 }
 
 beforeEach(() => {
-  clearMediaDetailCache();
   rstest.spyOn(commands, 'jellyfinGetState').mockResolvedValue(connectedState);
 });
 
@@ -84,18 +85,16 @@ afterEach(() => {
   rstest.restoreAllMocks();
 });
 
-test('fetchMediaDetail routes movies to item detail and caches successes', async () => {
+test('fetchMediaDetail routes movies to item detail', async () => {
   const itemDetail = rstest
     .spyOn(commands, 'libraryItemDetail')
     .mockResolvedValue({ data: movieDetail, status: 'ok' });
 
-  const first = await fetchMediaDetail('movie-1', 'Movie');
-  const second = await fetchMediaDetail('movie-1', 'Movie');
+  const result = await runExit(fetchMediaDetail('movie-1', 'Movie'));
 
-  expect(Exit.isSuccess(first)).toBe(true);
-  expect(Exit.isSuccess(second)).toBe(true);
-  expect(itemDetail).toHaveBeenCalledTimes(1);
-  expect(mediaValue(first)).toMatchObject({
+  expect(Exit.isSuccess(result)).toBe(true);
+  expect(itemDetail).toHaveBeenCalledWith('movie-1');
+  expect(mediaValue(result)).toMatchObject({
     genres: ['Drama', 'Sci-Fi'],
     itemType: 'Movie',
     overview: 'A test movie overview.',
@@ -103,12 +102,32 @@ test('fetchMediaDetail routes movies to item detail and caches successes', async
   });
 });
 
+test('solid query caches media detail successes', async () => {
+  const itemDetail = rstest
+    .spyOn(commands, 'libraryItemDetail')
+    .mockResolvedValue({ data: movieDetail, status: 'ok' });
+  const queryClient = createTestQueryClient();
+
+  await queryClient.fetchQuery({
+    queryKey: queryKeys.libraryMediaDetail('Movie', 'movie-1'),
+    queryFn: () => runExit(fetchMediaDetail('movie-1', 'Movie')),
+    staleTime: Infinity,
+  });
+  await queryClient.fetchQuery({
+    queryKey: queryKeys.libraryMediaDetail('Movie', 'movie-1'),
+    queryFn: () => runExit(fetchMediaDetail('movie-1', 'Movie')),
+    staleTime: Infinity,
+  });
+
+  expect(itemDetail).toHaveBeenCalledTimes(1);
+});
+
 test('fetchMediaDetail routes series to show detail and nulls show-only fields', async () => {
   const showCommand = rstest
     .spyOn(commands, 'libraryShowDetail')
     .mockResolvedValue({ data: showDetail, status: 'ok' });
 
-  const result = await fetchMediaDetail('series-1', 'Series');
+  const result = await runExit(fetchMediaDetail('series-1', 'Series'));
 
   expect(showCommand).toHaveBeenCalledWith('series-1');
   expect(Exit.isSuccess(result)).toBe(true);
@@ -129,8 +148,8 @@ test('fetchMediaDetail passes failures through without caching them', async () =
     })
     .mockResolvedValueOnce({ data: movieDetail, status: 'ok' });
 
-  const failed = await fetchMediaDetail('err-1', 'Movie');
-  const ok = await fetchMediaDetail('err-1', 'Movie');
+  const failed = await runExit(fetchMediaDetail('err-1', 'Movie'));
+  const ok = await runExit(fetchMediaDetail('err-1', 'Movie'));
 
   expect(Exit.isSuccess(failed)).toBe(false);
   expect(Exit.isSuccess(ok)).toBe(true);
@@ -160,9 +179,11 @@ test('MediaInfoHoverCard renders trigger children and does not fetch before open
   document.body.append(root);
   const dispose = render(
     () => (
-      <MediaInfoHoverCard id="movie-1" itemType="Movie">
-        <a href="/library/items/movie-1">Test Movie card</a>
-      </MediaInfoHoverCard>
+      <TestQueryProvider>
+        <MediaInfoHoverCard id="movie-1" itemType="Movie">
+          <a href="/library/items/movie-1">Test Movie card</a>
+        </MediaInfoHoverCard>
+      </TestQueryProvider>
     ),
     root,
   );

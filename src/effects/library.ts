@@ -16,13 +16,15 @@ import type {
   VideoUserDataUpdate,
   VideoUserDataUpdateRequest,
 } from '@bindings';
-import { Effect, Exit } from 'effect';
+import type { Exit } from 'effect';
+import { Effect } from 'effect';
 
 import { runTauriCommand } from './commands';
 import { connection } from './connection';
 import { CommandError } from './errors';
 
 export type LibraryExit<T> = Exit.Exit<T, CommandError>;
+export type LibraryEffect<T> = Effect.Effect<T, CommandError>;
 
 export type LibraryHomeState = VideoHome;
 export type LibraryShortcutsState = VideoLibraryShortcut[];
@@ -54,16 +56,12 @@ function withConnection<T>(effect: Effect.Effect<T, CommandError>): Effect.Effec
   return requireConnection.pipe(Effect.flatMap(() => effect));
 }
 
-export function fetchLibraryHome(): Promise<LibraryExit<LibraryHomeState>> {
-  return withConnection(runTauriCommand(() => commands.libraryVideoHome())).pipe(
-    Effect.runPromiseExit,
-  );
+export function fetchLibraryHome(): LibraryEffect<LibraryHomeState> {
+  return withConnection(runTauriCommand(() => commands.libraryVideoHome()));
 }
 
-export function fetchLibraryShortcuts(): Promise<LibraryExit<LibraryShortcutsState>> {
-  return withConnection(runTauriCommand(() => commands.libraryVideoShortcuts())).pipe(
-    Effect.runPromiseExit,
-  );
+export function fetchLibraryShortcuts(): LibraryEffect<LibraryShortcutsState> {
+  return withConnection(runTauriCommand(() => commands.libraryVideoShortcuts()));
 }
 
 export function fetchVideoLibraryPage(
@@ -73,7 +71,7 @@ export function fetchVideoLibraryPage(
   sort: VideoLibrarySort,
   playedFilter: VideoLibraryPlayedFilter,
   favoritesOnly: boolean,
-): Promise<LibraryExit<LibraryBrowseState>> {
+): LibraryEffect<LibraryBrowseState> {
   return withConnection(
     runTauriCommand(() =>
       commands.libraryBrowseVideo({
@@ -86,43 +84,35 @@ export function fetchVideoLibraryPage(
         startIndex,
       }),
     ).pipe(Effect.map((page) => ({ items: page.items, page }))),
-  ).pipe(Effect.runPromiseExit);
-}
-
-export function fetchVideoItemDetail(itemId: string): Promise<LibraryExit<LibraryDetailState>> {
-  return withConnection(runTauriCommand(() => commands.libraryItemDetail(itemId))).pipe(
-    Effect.runPromiseExit,
   );
 }
 
-export function fetchVideoShowDetail(seriesId: string): Promise<LibraryExit<LibraryShowState>> {
-  return withConnection(runTauriCommand(() => commands.libraryShowDetail(seriesId))).pipe(
-    Effect.runPromiseExit,
-  );
+export function fetchVideoItemDetail(itemId: string): LibraryEffect<LibraryDetailState> {
+  return withConnection(runTauriCommand(() => commands.libraryItemDetail(itemId)));
+}
+
+export function fetchVideoShowDetail(seriesId: string): LibraryEffect<LibraryShowState> {
+  return withConnection(runTauriCommand(() => commands.libraryShowDetail(seriesId)));
 }
 
 export function fetchSeasonEpisodes(
   request: VideoSeasonEpisodesRequest,
-): Promise<LibraryExit<SeasonEpisodesState>> {
+): LibraryEffect<SeasonEpisodesState> {
   return withConnection(
     runTauriCommand(() => commands.librarySeasonEpisodes(request)).pipe(
       Effect.map((page) => ({ page })),
     ),
-  ).pipe(Effect.runPromiseExit);
+  );
 }
 
-export function startLibraryPlayback(request: VideoLibraryPlayRequest): Promise<LibraryExit<void>> {
-  return withConnection(
-    runTauriCommand(() => commands.libraryPlay(request)).pipe(Effect.asVoid),
-  ).pipe(Effect.runPromiseExit);
+export function startLibraryPlayback(request: VideoLibraryPlayRequest): LibraryEffect<void> {
+  return withConnection(runTauriCommand(() => commands.libraryPlay(request)).pipe(Effect.asVoid));
 }
 
 export function updateLibraryUserData(
   request: VideoUserDataUpdateRequest,
-): Promise<LibraryExit<VideoUserDataUpdate>> {
-  return withConnection(runTauriCommand(() => commands.libraryUpdateUserData(request))).pipe(
-    Effect.runPromiseExit,
-  );
+): LibraryEffect<VideoUserDataUpdate> {
+  return withConnection(runTauriCommand(() => commands.libraryUpdateUserData(request)));
 }
 
 /**
@@ -145,15 +135,6 @@ export interface MediaDetail {
   artworkUrl: string | null;
 }
 
-// Ponytail: session-scoped cache; no invalidation. Detail rarely changes, and
-// Re-fetch on disconnect/reconnect is acceptable if staleness ever matters.
-const mediaDetailCache = new Map<string, MediaDetail>();
-
-/** Clear the hover-card detail cache. Intended for tests and later invalidation. */
-export function clearMediaDetailCache(): void {
-  mediaDetailCache.clear();
-}
-
 function toMediaDetail(detail: VideoItemDetail | VideoShowDetail, itemType: string): MediaDetail {
   return {
     artworkUrl: detail.artworkUrl,
@@ -171,28 +152,12 @@ function toMediaDetail(detail: VideoItemDetail | VideoShowDetail, itemType: stri
   };
 }
 
-/**
- * Fetch normalized media detail for a hover-card preview. Routes Series to the
- * show detail command and everything else to the item detail command. Successes
- * are cached per item id so repeated hovers do not re-fetch.
- */
-export async function fetchMediaDetail(
-  id: string,
-  itemType: string,
-): Promise<LibraryExit<MediaDetail>> {
-  const cached = mediaDetailCache.get(id);
-  if (cached) {
-    return Exit.succeed(cached);
+export function fetchMediaDetail(id: string, itemType: string): LibraryEffect<MediaDetail> {
+  if (itemType === 'Series') {
+    return fetchVideoShowDetail(id).pipe(Effect.map((value) => toMediaDetail(value, itemType)));
   }
 
-  const exit =
-    itemType === 'Series' ? await fetchVideoShowDetail(id) : await fetchVideoItemDetail(id);
-
-  return Exit.map(exit, (detail: VideoItemDetail | VideoShowDetail) => {
-    const media = toMediaDetail(detail, itemType);
-    mediaDetailCache.set(id, media);
-    return media;
-  });
+  return fetchVideoItemDetail(id).pipe(Effect.map((value) => toMediaDetail(value, itemType)));
 }
 
 export function initialSeasonForShow(show: LibraryShowState): VideoSeason | null {
@@ -205,25 +170,4 @@ export function initialSeasonForShow(show: LibraryShowState): VideoSeason | null
   }
 
   return show.seasons[0] ?? null;
-}
-
-export async function fetchInitialSeasonEpisodes(
-  seriesId: string,
-  show: Promise<LibraryExit<LibraryShowState>>,
-): Promise<LibraryExit<SeasonEpisodesState> | null> {
-  const showExit = await show;
-  if (!Exit.isSuccess(showExit)) {
-    return null;
-  }
-
-  const season = initialSeasonForShow(showExit.value);
-  if (!season) {
-    return null;
-  }
-
-  return fetchSeasonEpisodes({
-    seasonId: season.id,
-    seasonNumber: season.seasonNumber,
-    seriesId,
-  });
 }

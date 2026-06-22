@@ -1,19 +1,23 @@
 import LibraryNavbar from '@components/library/LibraryNavbar';
 import { LibraryNavbarControlsProvider } from '@components/library/LibraryNavbarContext';
+import { createQuery } from '@tanstack/solid-query';
 import { Outlet, createFileRoute, useLocation } from '@tanstack/solid-router';
+import { Exit } from 'effect';
 import { Show, createMemo } from 'solid-js';
-import { defaultTo } from '~effects/helper';
 import { fetchLibraryShortcuts } from '~effects/library';
+import { queryKeys, runExit } from '~effects/query';
 
 export const Route = createFileRoute('/_authenticated/library')({
-  loader: async () => ({
-    shortcuts: await fetchLibraryShortcuts().then(defaultTo([])),
-  }),
   component: LibraryLayoutRoute,
 });
 
 function LibraryLayoutRoute() {
-  const loaderData = Route.useLoaderData();
+  const shortcutsQuery = createQuery(() => ({
+    queryKey: queryKeys.libraryShortcuts,
+    queryFn: () => runExit(fetchLibraryShortcuts()),
+  }));
+  const shortcuts = () =>
+    shortcutsQuery.data && Exit.isSuccess(shortcutsQuery.data) ? shortcutsQuery.data.value : [];
   const pathname = useLocation({ select: (location) => location.pathname });
   const normalizedPathname = createMemo(() => pathname().replace(/\/$/, '') || '/');
   const browsePathMatch = createMemo(() =>
@@ -31,7 +35,7 @@ function LibraryLayoutRoute() {
     <LibraryNavbarControlsProvider>
       <div class="space-y-6">
         <Show when={showNavbar()}>
-          <LibraryNavbar shortcuts={loaderData().shortcuts} activeValue={activeValue()} />
+          <LibraryNavbar shortcuts={shortcuts()} activeValue={activeValue()} />
         </Show>
         <Outlet />
       </div>

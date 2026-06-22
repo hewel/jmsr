@@ -1,6 +1,7 @@
 import { createForm } from '@tanstack/solid-form';
-import { Effect, Exit } from 'effect';
-import { createEffect, createResource } from 'solid-js';
+import { createMutation, createQuery, useQueryClient } from '@tanstack/solid-query';
+import { Exit } from 'effect';
+import { createEffect } from 'solid-js';
 
 import type { AppConfig, IntroSkipperMode } from '../bindings';
 import { commandFailureMessage } from '../effects/commands';
@@ -10,6 +11,7 @@ import {
   disconnectJellyfin,
   fetchConnectionState,
 } from '../effects/connection';
+import { queryKeys, runExit } from '../effects/query';
 import { clearSavedSession, loadSavedSession, restoreSavedSession } from '../sessionAccess';
 import ConnectionCard from './OperationsConsole/ConnectionCard';
 import DiagnosticsCard from './OperationsConsole/DiagnosticsCard';
@@ -58,21 +60,38 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
     { label: 'kor — Korean', value: 'kor' },
   ];
 
-  const [connectionState, { refetch: refetchConnection }] = createResource(async () => {
-    const exit = await Effect.runPromiseExit(fetchConnectionState());
-    return Exit.isSuccess(exit) ? exit.value : undefined;
-  });
-  const [initialConfig, { mutate: mutateConfig }] = createResource(async () => {
-    const exit = await Effect.runPromiseExit(fetchConfig());
-    if (Exit.isSuccess(exit)) {
-      return exit.value;
-    }
-
-    console.error(
-      'Failed to load config:',
-      commandFailureMessage(exit.cause, 'Could not load configuration'),
-    );
-    return null;
+  const queryClient = useQueryClient();
+  const connectionQuery = createQuery(() => ({
+    queryKey: queryKeys.connectionState,
+    queryFn: () => runExit(fetchConnectionState()),
+  }));
+  const configQuery = createQuery(() => ({
+    queryKey: queryKeys.appConfig,
+    queryFn: () => runExit(fetchConfig()),
+  }));
+  const saveConfigMutation = createMutation(() => ({
+    mutationFn: (config: AppConfig) => runExit(saveConfig(config)),
+  }));
+  const disconnectMutation = createMutation(() => ({
+    mutationFn: () => runExit(disconnectJellyfin()),
+  }));
+  const clearSessionMutation = createMutation(() => ({
+    mutationFn: () => runExit(clearJellyfinSession()),
+  }));
+  const detectMpvMutation = createMutation(() => ({
+    mutationFn: () => runExit(detectMpv()),
+  }));
+  const reconnectMutation = createMutation(() => ({
+    mutationFn: restoreSavedSession,
+  }));
+  let loggedConfigFailure: string | null = null;
+  createEffect(() => {
+    const result = configQuery.data;
+    if (!result || Exit.isSuccess(result)) return;
+    const message = commandFailureMessage(result.cause, 'Could not load configuration');
+    if (message === loggedConfigFailure) return;
+    loggedConfigFailure = message;
+    console.error('Failed to load config:', message);
   });
 
   const form = createForm(() => ({
@@ -88,7 +107,7 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
   }));
 
   createEffect(() => {
-    const cfg = initialConfig();
+    const cfg = config();
     if (cfg && !configHydrated) {
       lastSavedConfig = cfg;
       form.setFieldValue('deviceName', cfg.deviceName ?? 'JellyPilot');
@@ -109,8 +128,12 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
     }
   });
 
-  const state = () => connectionState();
-  const config = () => initialConfig();
+  const state = () =>
+    connectionQuery.data && Exit.isSuccess(connectionQuery.data)
+      ? connectionQuery.data.value
+      : undefined;
+  const config = () =>
+    configQuery.data && Exit.isSuccess(configQuery.data) ? configQuery.data.value : null;
   const introSkipperMode = () => ui.introSkipperDraft ?? config()?.introSkipperMode ?? 'automatic';
 
   const showPlayerBridgeStatus = (type: 'saving' | 'saved' | 'error', text: string) => {
@@ -154,10 +177,10 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
         pendingSave = null;
         showPlayerBridgeStatus('saving', 'Saving…');
 
-        const exit = await Effect.runPromiseExit(saveConfig(nextSave.config));
+        const exit = await saveConfigMutation.mutateAsync(nextSave.config);
         if (Exit.isSuccess(exit)) {
           lastSavedConfig = nextSave.config;
-          mutateConfig(nextSave.config);
+          queryClient.setQueryData(queryKeys.appConfig, Exit.succeed(nextSave.config));
           nextSave.onSuccess?.();
           showPlayerBridgeStatus('saved', 'Saved');
         } else {
@@ -329,7 +352,7 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
   };
 
   const handleRefresh = () => {
-    refetchConnection();
+    void connectionQuery.refetch();
   };
 
   const handleReconnect = async () => {
@@ -342,9 +365,9 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
 
     actions.beginReconnect();
     try {
-      if (await restoreSavedSession()) {
+      if (await reconnectMutation.mutateAsync()) {
         showToast('success', 'Reconnected to Jellyfin');
-        refetchConnection();
+        void connectionQuery.refetch();
       } else {
         showToast('error', 'Could not reconnect to Jellyfin. Sign in again.');
         props.onSignedOut();
@@ -356,10 +379,10 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
 
   const handleDisconnect = async () => {
     actions.beginDisconnect();
-    const exit = await Effect.runPromiseExit(disconnectJellyfin());
+    const exit = await disconnectMutation.mutateAsync();
     if (Exit.isSuccess(exit)) {
       showToast('success', 'Disconnected from Jellyfin');
-      refetchConnection();
+      void connectionQuery.refetch();
     } else {
       showToast('error', commandFailureMessage(exit.cause, 'Disconnect failed'));
     }
@@ -368,7 +391,7 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
 
   const handleSignOut = async () => {
     actions.beginSignOut();
-    const exit = await Effect.runPromiseExit(clearJellyfinSession());
+    const exit = await clearSessionMutation.mutateAsync();
     if (Exit.isSuccess(exit)) {
       clearSavedSession();
       props.onSignedOut();
@@ -380,7 +403,7 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
 
   const handleDetectMpv = async () => {
     actions.beginMpvDetection();
-    const exit = await Effect.runPromiseExit(detectMpv());
+    const exit = await detectMpvMutation.mutateAsync();
     if (Exit.isSuccess(exit)) {
       const path = exit.value;
       if (path) {

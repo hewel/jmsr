@@ -1,9 +1,11 @@
 import { VideoHomeRow } from '@components/library/shared';
 import { Card } from '@components/ui';
+import { createQuery } from '@tanstack/solid-query';
 import { createFileRoute } from '@tanstack/solid-router';
-import { For, Suspense, createResource } from 'solid-js';
-import { defaultTo } from '~effects/helper';
+import { Exit } from 'effect';
+import { For, Show } from 'solid-js';
 import { fetchLibraryHome } from '~effects/library';
+import { queryKeys, runExit } from '~effects/query';
 
 const homeSkeletonRows = [
   { id: 'continue-watching-skeleton', aspectClass: 'aspect-video' },
@@ -14,45 +16,47 @@ const homeSkeletonRows = [
 
 export const Route = createFileRoute('/_authenticated/library/')({
   component: LibraryLanding,
-  loader: async () => ({
-    home: fetchLibraryHome().then(defaultTo(null)),
-  }),
 });
 
 function LibraryLanding() {
-  const loaderData = Route.useLoaderData();
-  const [home] = createResource(
-    () => loaderData().home,
-    (promise) => promise,
-  );
+  const homeQuery = createQuery(() => ({
+    queryKey: queryKeys.libraryHome,
+    queryFn: () => runExit(fetchLibraryHome()),
+  }));
+  const home = () =>
+    homeQuery.data && Exit.isSuccess(homeQuery.data) ? homeQuery.data.value : null;
 
-  const renderHomeContent = () => (
-    <Suspense fallback={<VideoHomeSkeleton />}>
-      <div class="space-y-6">
-        <VideoHomeRow
-          id="continue-watching"
-          title="Continue Watching"
-          kind="continueWatching"
-          items={home()?.continueWatching ?? []}
-        />
-        <VideoHomeRow id="next-up" title="Next Up" kind="nextUp" items={home()?.nextUp ?? []} />
-        <VideoHomeRow
-          id="latest-movies"
-          title="Latest Movies"
-          kind="latestMovies"
-          items={home()?.latestMovies ?? []}
-        />
-        <VideoHomeRow
-          id="latest-episodes"
-          title="Latest Episodes"
-          kind="latestEpisodes"
-          items={home()?.latestEpisodes ?? []}
-        />
-      </div>
-    </Suspense>
+  return (
+    <div class="space-y-6">
+      <Show when={!homeQuery.isPending} fallback={<VideoHomeSkeleton />}>
+        <Show when={home()}>
+          {(value) => (
+            <div class="space-y-6">
+              <VideoHomeRow
+                id="continue-watching"
+                title="Continue Watching"
+                kind="continueWatching"
+                items={value().continueWatching}
+              />
+              <VideoHomeRow id="next-up" title="Next Up" kind="nextUp" items={value().nextUp} />
+              <VideoHomeRow
+                id="latest-movies"
+                title="Latest Movies"
+                kind="latestMovies"
+                items={value().latestMovies}
+              />
+              <VideoHomeRow
+                id="latest-episodes"
+                title="Latest Episodes"
+                kind="latestEpisodes"
+                items={value().latestEpisodes}
+              />
+            </div>
+          )}
+        </Show>
+      </Show>
+    </div>
   );
-
-  return <div class="space-y-6">{renderHomeContent()}</div>;
 }
 
 function VideoHomeSkeleton() {

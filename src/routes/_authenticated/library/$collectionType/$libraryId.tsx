@@ -11,6 +11,7 @@ import {
   sortItems,
 } from '@components/library/shared';
 import { Button, Card } from '@components/ui';
+import { createInfiniteQuery } from '@tanstack/solid-query';
 import { createFileRoute } from '@tanstack/solid-router';
 import { Exit } from 'effect';
 import {
@@ -21,11 +22,12 @@ import {
   ArrowDownWideNarrowIcon,
   ArrowUpWideNarrowIcon,
 } from 'lucide-solid';
-import { For, Show, Suspense, createResource, createSignal } from 'solid-js';
+import { For, Show, Suspense, createSignal } from 'solid-js';
 import { Portal } from 'solid-js/web';
 import { commandFailureMessage } from '~effects/commands';
 import { fetchVideoLibraryPage } from '~effects/library';
 import type { LibraryBrowseState, LibraryExit } from '~effects/library';
+import { queryKeys, runExit } from '~effects/query';
 
 const INITIAL_SORT: VideoLibrarySort = 'title';
 const INITIAL_PLAYED_FILTER: VideoLibraryPlayedFilter = 'all';
@@ -36,26 +38,11 @@ function collectionTypeFromParam(collectionType: string): VideoLibraryKind {
 }
 
 export const Route = createFileRoute('/_authenticated/library/$collectionType/$libraryId')({
-  loader: ({ params }) => ({
-    initialPage: fetchVideoLibraryPage(
-      collectionTypeFromParam(params.collectionType),
-      params.libraryId,
-      0,
-      INITIAL_SORT,
-      INITIAL_PLAYED_FILTER,
-      INITIAL_FAVORITES_ONLY,
-    ),
-  }),
   component: LibraryBrowseRoute,
 });
 
 function LibraryBrowseRoute() {
   const params = Route.useParams();
-  const loaderData = Route.useLoaderData();
-  const [initialPage] = createResource(() => loaderData().initialPage);
-  const [state, setState] = createSignal<LibraryExit<LibraryBrowseState> | null>(null);
-  const [loading, setLoading] = createSignal(false);
-  const [usingLoaderPage, setUsingLoaderPage] = createSignal(true);
   const [sort, setSort] = createSignal<VideoLibrarySort>(INITIAL_SORT);
   const [playedFilter, setPlayedFilter] =
     createSignal<VideoLibraryPlayedFilter>(INITIAL_PLAYED_FILTER);
@@ -63,63 +50,64 @@ function LibraryBrowseRoute() {
   const [sortDirection, setSortDirection] = createSignal<'asc' | 'desc'>('asc');
 
   const collectionType = () => collectionTypeFromParam(params().collectionType);
-  const currentState = () => (usingLoaderPage() ? (initialPage() ?? null) : state());
-
-  const loadPage = async (startIndex: number, replace = false) => {
-    if (loading()) {
-      return;
-    }
-    setLoading(true);
-    const previous = currentState();
-    const result = await fetchVideoLibraryPage(
+  const browseQuery = createInfiniteQuery(() => ({
+    queryKey: queryKeys.libraryBrowse(
       collectionType(),
       params().libraryId,
-      startIndex,
       sort(),
       playedFilter(),
       favoritesOnly(),
-    );
-    setState((current) => {
-      const base = current ?? previous;
-      if (!replace && base && Exit.isSuccess(base) && Exit.isSuccess(result)) {
-        return Exit.succeed({
-          items: [...base.value.items, ...result.value.items],
-          page: result.value.page,
-        });
-      }
-      return result;
-    });
-    setUsingLoaderPage(false);
-    setLoading(false);
-  };
-  const reloadFromFirstPage = () => {
-    setUsingLoaderPage(false);
-    setState(null);
-    void loadPage(0, true);
-  };
+      sortDirection(),
+    ),
+    queryFn: ({ pageParam }) => {
+      const startIndex = typeof pageParam === 'number' ? pageParam : 0;
+      return runExit(
+        fetchVideoLibraryPage(
+          collectionType(),
+          params().libraryId,
+          startIndex,
+          sort(),
+          playedFilter(),
+          favoritesOnly(),
+        ),
+      );
+    },
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) =>
+      Exit.match(lastPage, {
+        onFailure: () => undefined,
+        onSuccess: (value) =>
+          value.page.hasMore ? value.page.startIndex + value.page.limit : undefined,
+      }),
+  }));
 
+  const successfulPages = () =>
+    browseQuery.data?.pages.filter(
+      (page): page is LibraryExit<LibraryBrowseState> & { _tag: 'Success' } => Exit.isSuccess(page),
+    ) ?? [];
+  const firstPage = () => browseQuery.data?.pages[0] ?? null;
+  const laterPageFailure = () =>
+    browseQuery.data?.pages.slice(1).find((page) => !Exit.isSuccess(page)) ?? null;
   const readyState = () => {
-    const current = currentState();
-    if (!current || !Exit.isSuccess(current)) {
+    const pages = successfulPages();
+    if (pages.length === 0) {
       return null;
     }
-    const val = current.value;
+    const last = pages[pages.length - 1]?.value;
+    if (!last) {
+      return null;
+    }
+    const items = pages.flatMap((page) => page.value.items);
     const isDefaultAsc = sort() === 'title';
     const needsReverse = isDefaultAsc ? sortDirection() === 'desc' : sortDirection() === 'asc';
 
-    if (needsReverse) {
-      // Ponytail: backend lacks direction param, reverse current items array for opposite order
-      // eslint-disable-next-line unicorn/no-array-reverse
-      const reversed = [...val.items].reverse();
-      return {
-        ...val,
-        items: reversed,
-      };
-    }
-    return val;
+    return {
+      items: needsReverse ? [...items].toReversed() : items,
+      page: last.page,
+    };
   };
   const statusTitle = () => {
-    const current = currentState();
+    const current = firstPage();
     if (!current) {
       return `Loading ${libraryTitle(collectionType())}`;
     }
@@ -132,7 +120,7 @@ function LibraryBrowseRoute() {
     return `Loading ${libraryTitle(collectionType())}`;
   };
   const statusDescription = () => {
-    const current = currentState();
+    const current = firstPage();
     if (current && Exit.isSuccess(current) && current.value.items.length === 0) {
       return 'Jellyfin returned an empty server page for this video library.';
     }
@@ -141,42 +129,32 @@ function LibraryBrowseRoute() {
     }
     return 'JellyPilot is loading a server-paged video library result set.';
   };
-  const loadMoreStartIndex = () => {
-    const current = readyState();
-    return current ? current.page.startIndex + current.page.limit : 0;
+  const loadMoreErrorDescription = () => {
+    const failure = laterPageFailure();
+    return failure && !Exit.isSuccess(failure)
+      ? commandFailureMessage(failure.cause, 'Could not load Library page')
+      : null;
   };
 
   return (
     <div class="min-w-0">
       <LibraryBrowseNavbarControls
-        loading={loading}
+        loading={() => browseQuery.isFetching}
         sortedValue={sort}
         sortDirection={sortDirection}
         playedFilter={playedFilter}
         favoritesOnly={favoritesOnly}
-        onSortChange={(value) => {
-          setSort(value);
-          reloadFromFirstPage();
-        }}
-        onSortDirectionChange={(direction) => {
-          setSortDirection(direction);
-          reloadFromFirstPage();
-        }}
-        onPlayedFilterChange={(filter) => {
-          setPlayedFilter(filter);
-          reloadFromFirstPage();
-        }}
-        onFavoritesOnlyChange={(value) => {
-          setFavoritesOnly(value);
-          reloadFromFirstPage();
-        }}
+        onSortChange={setSort}
+        onSortDirectionChange={setSortDirection}
+        onPlayedFilterChange={setPlayedFilter}
+        onFavoritesOnlyChange={setFavoritesOnly}
       />
 
       <Suspense fallback={<LibraryBrowseSkeleton />}>
         <Show
           when={readyState()}
           fallback={
-            loading() ? (
+            browseQuery.isPending ? (
               <LibraryBrowseSkeleton />
             ) : (
               <LibraryStatusPanel title={statusTitle()} description={statusDescription()} />
@@ -204,19 +182,27 @@ function LibraryBrowseRoute() {
                 )}
               </For>
             </div>
-            <Show when={readyState()?.page.hasMore}>
+            <Show when={loadMoreErrorDescription()}>
+              {(message) => (
+                <p class="text-error text-center text-[12px] leading-[16px]">{message()}</p>
+              )}
+            </Show>
+            <Show when={browseQuery.hasNextPage || laterPageFailure()}>
               <div class="flex justify-center pt-2">
                 <Button
                   type="button"
                   variant="secondary"
                   class="rounded-full"
-                  disabled={loading()}
-                  onClick={() => void loadPage(loadMoreStartIndex())}
+                  disabled={browseQuery.isFetchingNextPage}
+                  onClick={() => void browseQuery.fetchNextPage()}
                   leadingIcon={
-                    <RefreshCw class="h-4 w-4" classList={{ 'animate-spin': loading() }} />
+                    <RefreshCw
+                      class="h-4 w-4"
+                      classList={{ 'animate-spin': browseQuery.isFetchingNextPage }}
+                    />
                   }
                 >
-                  {loading() ? 'Loading more' : 'Load more'}
+                  {browseQuery.isFetchingNextPage ? 'Loading more' : 'Load more'}
                 </Button>
               </div>
             </Show>

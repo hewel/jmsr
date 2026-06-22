@@ -1,13 +1,15 @@
 import { HoverCard } from '@ark-ui/solid/hover-card';
+import { createQuery } from '@tanstack/solid-query';
 import { Exit } from 'effect';
 import { Check, Heart, LoaderCircle } from 'lucide-solid';
-import { createResource, createSignal, For, Show } from 'solid-js';
+import { createSignal, For, Show } from 'solid-js';
 import type { JSX } from 'solid-js';
 import { Portal } from 'solid-js/web';
 
 import { commandFailureMessage } from '../../effects/commands';
 import { fetchMediaDetail } from '../../effects/library';
 import type { MediaDetail } from '../../effects/library';
+import { queryKeys, runExit } from '../../effects/query';
 
 // Inlined (instead of importing from ./shared) to avoid a shared.tsx <-> card
 // Import cycle. Matches the formatRuntime shape used elsewhere.
@@ -97,14 +99,16 @@ export function MediaInfoContent(props: { detail: MediaDetail }) {
  * Wraps a media card so hovering it reveals a popover with the item's full
  * detail (overview, genres, runtime, resume, user-data state). The card is
  * rendered untouched inside the hover-card trigger; detail is fetched on first
- * open and cached per item id.
+ * open and cached by Solid Query.
  */
 export function MediaInfoHoverCard(props: { id: string; itemType: string; children: JSX.Element }) {
   const [open, setOpen] = createSignal(false);
-  const [detail] = createResource(
-    () => (open() ? props.id : null),
-    (id) => fetchMediaDetail(id, props.itemType),
-  );
+  const detailQuery = createQuery(() => ({
+    queryKey: queryKeys.libraryMediaDetail(props.itemType, props.id),
+    queryFn: () => runExit(fetchMediaDetail(props.id, props.itemType)),
+    enabled: open(),
+    staleTime: Infinity,
+  }));
 
   return (
     <HoverCard.Root
@@ -120,7 +124,10 @@ export function MediaInfoHoverCard(props: { id: string; itemType: string; childr
         <HoverCard.Positioner>
           <HoverCard.Content class="border-outline-variant bg-surface-container-lowest z-100 w-80 max-w-[min(90vw,24rem)] rounded-2xl border p-4 shadow-2xl backdrop-blur-md">
             <Show
-              when={detail.state !== 'pending' && detail()}
+              when={
+                !(detailQuery.isPending || (detailQuery.isFetching && !detailQuery.data)) &&
+                detailQuery.data
+              }
               fallback={
                 <div class="text-on-surface-variant flex items-center justify-center gap-2 py-3 text-[12px] leading-[16px] font-bold tracking-[0.05em] uppercase">
                   <LoaderCircle class="h-4 w-4 animate-spin" />

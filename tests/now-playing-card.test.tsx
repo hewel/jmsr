@@ -6,6 +6,7 @@ import { commands, events } from '../src/bindings';
 import type { NowPlayingState } from '../src/bindings';
 import NowPlayingCard from '../src/components/NowPlayingCard';
 import { ToastProvider } from '../src/components/ToastProvider';
+import { TestQueryProvider } from './query-client';
 
 Element.prototype.scrollTo = () => {};
 
@@ -88,9 +89,11 @@ function renderCard(state: NowPlayingState = offlineState, jellyfinConnected = t
   document.body.append(root);
   const dispose = render(
     () => (
-      <ToastProvider>
-        <NowPlayingCard jellyfinConnected={jellyfinConnected} />
-      </ToastProvider>
+      <TestQueryProvider>
+        <ToastProvider>
+          <NowPlayingCard jellyfinConnected={jellyfinConnected} />
+        </ToastProvider>
+      </TestQueryProvider>
     ),
     root,
   );
@@ -281,9 +284,11 @@ test('clicking mute toggles icon and label after state reloads', async () => {
   document.body.append(root);
   const dispose = render(
     () => (
-      <ToastProvider>
-        <NowPlayingCard jellyfinConnected />
-      </ToastProvider>
+      <TestQueryProvider>
+        <ToastProvider>
+          <NowPlayingCard jellyfinConnected />
+        </ToastProvider>
+      </TestQueryProvider>
     ),
     root,
   );

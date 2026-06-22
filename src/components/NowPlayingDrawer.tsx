@@ -1,11 +1,13 @@
 import { Dialog } from '@ark-ui/solid/dialog';
-import { Effect, Exit } from 'effect';
+import { createQuery, useQueryClient } from '@tanstack/solid-query';
+import { Exit } from 'effect';
 import { MonitorPlay, X } from 'lucide-solid';
 import { Show, createSignal, onCleanup, onMount } from 'solid-js';
 import { Portal } from 'solid-js/web';
 
 import type { NowPlayingState } from '../bindings';
 import { fetchNowPlayingState, listenNowPlayingChanged } from '../effects/nowPlaying';
+import { queryKeys, runExit } from '../effects/query';
 import NowPlayingCard from './NowPlayingCard';
 import { Button } from './ui';
 
@@ -54,20 +56,24 @@ function triggerLabel(state: NowPlayingState | null): string {
 }
 
 export default function NowPlayingDrawer(props: { jellyfinConnected: boolean }) {
-  const [state, setState] = createSignal<NowPlayingState | null>(null);
+  const queryClient = useQueryClient();
+  const nowPlayingQuery = createQuery(() => ({
+    queryKey: queryKeys.nowPlayingState,
+    queryFn: () => runExit(fetchNowPlayingState()),
+  }));
+  const state = () =>
+    nowPlayingQuery.data && Exit.isSuccess(nowPlayingQuery.data)
+      ? nowPlayingQuery.data.value
+      : null;
   const [open, setOpen] = createSignal(false);
   const [selectPortalMount, setSelectPortalMount] = createSignal<HTMLElement>();
 
   onMount(() => {
-    void Effect.runPromiseExit(fetchNowPlayingState()).then((exit) => {
-      if (Exit.isSuccess(exit)) {
-        setState(exit.value);
-      }
-    });
-
     let disposed = false;
     let cleanup: (() => void) | undefined;
-    listenNowPlayingChanged((newState) => setState(newState)).then((unlisten) => {
+    listenNowPlayingChanged((newState) =>
+      queryClient.setQueryData(queryKeys.nowPlayingState, Exit.succeed(newState)),
+    ).then((unlisten) => {
       if (disposed) {
         unlisten();
       } else {

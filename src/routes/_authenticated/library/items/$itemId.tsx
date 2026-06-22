@@ -1,4 +1,9 @@
-import type { VideoLibraryPlayMode, VideoPlaybackStreamOption } from '@bindings';
+import type {
+  VideoLibraryPlayMode,
+  VideoLibraryPlayRequest,
+  VideoPlaybackStreamOption,
+  VideoUserDataUpdateRequest,
+} from '@bindings';
 import {
   LibraryStatusPanel,
   UserDataControls,
@@ -7,65 +12,51 @@ import {
 } from '@components/library/shared';
 import { Button, Card, JellyPilotSelect, StatusBadge } from '@components/ui';
 import type { JellyPilotSelectItem } from '@components/ui';
+import { createMutation, createQuery, useQueryClient } from '@tanstack/solid-query';
 import { createFileRoute } from '@tanstack/solid-router';
 import { Exit } from 'effect';
 import { Film, Library, Play, RefreshCw, RotateCcw } from 'lucide-solid';
-import {
-  For,
-  Show,
-  Suspense,
-  createEffect,
-  createMemo,
-  createResource,
-  createSignal,
-} from 'solid-js';
+import { For, Show, Suspense, createEffect, createMemo, createSignal } from 'solid-js';
 import { commandFailureMessage } from '~effects/commands';
 import {
   fetchVideoItemDetail,
   startLibraryPlayback,
   updateLibraryUserData,
 } from '~effects/library';
-import type { LibraryDetailState, LibraryExit } from '~effects/library';
+import { queryKeys, runExit } from '~effects/query';
 
 const AUDIO_AUTO = 'auto';
 const SUBTITLE_AUTO = 'auto';
 const SUBTITLE_OFF = 'off';
 
 export const Route = createFileRoute('/_authenticated/library/items/$itemId')({
-  loader: ({ params }) => ({
-    detail: fetchVideoItemDetail(params.itemId),
-  }),
   component: LibraryItemDetailRoute,
 });
 
 function LibraryItemDetailRoute() {
   const params = Route.useParams();
-  const loaderData = Route.useLoaderData();
-  const [manualDetailPromise, setManualDetailPromise] = createSignal<Promise<
-    LibraryExit<LibraryDetailState>
-  > | null>(null);
-  const [state] = createResource(
-    () => manualDetailPromise() ?? loaderData().detail,
-    (promise) => promise,
-  );
+  const queryClient = useQueryClient();
+  const detailQuery = createQuery(() => ({
+    queryKey: queryKeys.libraryItemDetail(params().itemId),
+    queryFn: () => runExit(fetchVideoItemDetail(params().itemId)),
+  }));
+  const playbackMutation = createMutation(() => ({
+    mutationFn: (request: VideoLibraryPlayRequest) => runExit(startLibraryPlayback(request)),
+  }));
+  const userDataMutation = createMutation(() => ({
+    mutationFn: (request: VideoUserDataUpdateRequest) => runExit(updateLibraryUserData(request)),
+  }));
   const [playBusy, setPlayBusy] = createSignal<VideoLibraryPlayMode | null>(null);
   const [audioValue, setAudioValue] = createSignal(AUDIO_AUTO);
   const [subtitleValue, setSubtitleValue] = createSignal(SUBTITLE_AUTO);
   const [playError, setPlayError] = createSignal<string | null>(null);
 
-  createEffect(() => {
-    params().itemId;
-    setManualDetailPromise(null);
-  });
-
   const reloadDetail = () => {
-    setManualDetailPromise(fetchVideoItemDetail(params().itemId));
+    void detailQuery.refetch();
   };
 
-  const detail = () => {
-    const current = state.latest ?? state();
-    return current && Exit.isSuccess(current) ? current.value : null;
-  };
+  const detail = () =>
+    detailQuery.data && Exit.isSuccess(detailQuery.data) ? detailQuery.data.value : null;
   const audioItems = createMemo<JellyPilotSelectItem[]>(() => [
     { label: 'Auto (series preference)', value: AUDIO_AUTO },
     ...(detail()?.audioStreams ?? []).map((stream) => ({
@@ -112,7 +103,7 @@ function LibraryItemDetailRoute() {
 
     setPlayBusy(mode);
     setPlayError(null);
-    const result = await startLibraryPlayback({
+    const result = await playbackMutation.mutateAsync({
       audioStreamIndex: selectedAudioStreamIndex(),
       itemId: item.id,
       mode,
@@ -128,14 +119,14 @@ function LibraryItemDetailRoute() {
     setPlayBusy(null);
   };
   const statusTitle = () => {
-    const current = state.latest ?? state();
+    const current = detailQuery.data;
     if (current && !Exit.isSuccess(current)) {
       return 'Could not load item detail';
     }
     return 'Loading item detail';
   };
   const statusDescription = () => {
-    const current = state.latest ?? state();
+    const current = detailQuery.data;
     if (current && !Exit.isSuccess(current)) {
       return commandFailureMessage(current.cause, 'Could not load item detail');
     }
@@ -157,9 +148,11 @@ function LibraryItemDetailRoute() {
           type="button"
           variant="outlined"
           class="rounded-full"
-          disabled={state.loading}
+          disabled={detailQuery.isFetching}
           onClick={reloadDetail}
-          leadingIcon={<RefreshCw class="h-4 w-4" classList={{ 'animate-spin': state.loading }} />}
+          leadingIcon={
+            <RefreshCw class="h-4 w-4" classList={{ 'animate-spin': detailQuery.isFetching }} />
+          }
         >
           Retry Detail
         </Button>
@@ -239,8 +232,18 @@ function LibraryItemDetailRoute() {
                     played={item().played}
                     favorite={item().favorite}
                     subject={item().itemType.toLowerCase()}
-                    onUpdate={updateLibraryUserData}
-                    onSuccess={reloadDetail}
+                    onUpdate={(request) => userDataMutation.mutateAsync(request)}
+                    onSuccess={() => {
+                      const itemType = item().itemType;
+                      queryClient.invalidateQueries({
+                        queryKey: queryKeys.libraryItemDetail(params().itemId),
+                      });
+                      queryClient.invalidateQueries({
+                        queryKey: queryKeys.libraryMediaDetail(itemType, params().itemId),
+                      });
+                      queryClient.invalidateQueries({ queryKey: queryKeys.libraryHome });
+                      queryClient.invalidateQueries({ queryKey: queryKeys.libraryBrowseRoot });
+                    }}
                   />
                   <Show when={item().overview}>
                     {(overview) => (

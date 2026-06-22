@@ -1,5 +1,6 @@
 import { Slider } from '@ark-ui/solid/slider';
-import { Effect, Exit } from 'effect';
+import { createMutation, createQuery, useQueryClient } from '@tanstack/solid-query';
+import { Exit } from 'effect';
 import { Pause, Play, SkipBack, SkipForward, Square, Volume2, VolumeX } from 'lucide-solid';
 import { Show, createSignal, onCleanup, onMount } from 'solid-js';
 
@@ -20,7 +21,8 @@ import {
   toggleMute,
   listenNowPlayingChanged,
 } from '../effects/nowPlaying';
-import type { MpvTrack, NowPlayingEffect } from '../effects/nowPlaying';
+import type { NowPlayingEffect } from '../effects/nowPlaying';
+import { queryKeys, runExit } from '../effects/query';
 import { useToast } from './ToastProvider';
 import { Button, Card, JellyPilotSelect, StatusBadge } from './ui';
 
@@ -90,26 +92,29 @@ export default function NowPlayingCard(props: {
   trackSelectPortalMount?: HTMLElement;
 }) {
   const { showToast } = useToast();
-  const [state, setState] = createSignal<NowPlayingState | null>(null);
+  const queryClient = useQueryClient();
+  const nowPlayingQuery = createQuery(() => ({
+    queryKey: queryKeys.nowPlayingState,
+    queryFn: () => runExit(fetchNowPlayingState()),
+  }));
   const [busy, setBusy] = createSignal<string | null>(null);
   const [seekDraft, setSeekDraft] = createSignal<number | null>(null);
   const [volumeDraft, setVolumeDraft] = createSignal<number | null>(null);
-  const [tracks, setTracks] = createSignal<MpvTrack[]>([]);
-
-  const loadTrackList = async (isConnected: boolean) => {
-    const exit = await Effect.runPromiseExit(fetchMpvTrackList(isConnected));
-    setTracks(Exit.isSuccess(exit) ? exit.value : []);
-  };
-
-  const loadState = async () => {
-    const exit = await Effect.runPromiseExit(fetchNowPlayingState());
-    if (Exit.isSuccess(exit)) {
-      setState(exit.value);
-      setSeekDraft(null);
-      setVolumeDraft(null);
-      await loadTrackList(exit.value.player.connected);
-    }
-  };
+  const current = () =>
+    nowPlayingQuery.data && Exit.isSuccess(nowPlayingQuery.data)
+      ? nowPlayingQuery.data.value
+      : null;
+  const player = () => current()?.player;
+  const connected = () => player()?.connected ?? false;
+  const tracksQuery = createQuery(() => ({
+    queryKey: queryKeys.mpvTracks(connected()),
+    queryFn: () => runExit(fetchMpvTrackList(connected())),
+  }));
+  const playerCommandMutation = createMutation(() => ({
+    mutationFn: (command: () => NowPlayingEffect<void>) => runExit(command()),
+  }));
+  const tracks = () =>
+    tracksQuery.data && Exit.isSuccess(tracksQuery.data) ? tracksQuery.data.value : [];
 
   const runCommand = async (
     key: string,
@@ -117,9 +122,10 @@ export default function NowPlayingCard(props: {
     failure: string,
   ) => {
     setBusy(key);
-    const exit = await Effect.runPromiseExit(command());
+    const exit = await playerCommandMutation.mutateAsync(command);
     if (Exit.isSuccess(exit)) {
-      await loadState();
+      await nowPlayingQuery.refetch();
+      await tracksQuery.refetch();
     } else {
       showToast('error', commandFailureMessage(exit.cause, failure));
     }
@@ -127,15 +133,14 @@ export default function NowPlayingCard(props: {
   };
 
   onMount(() => {
-    void loadState();
     let disposed = false;
     let cleanup: (() => void) | undefined;
 
     listenNowPlayingChanged((state) => {
-      setState(state);
+      queryClient.setQueryData(queryKeys.nowPlayingState, Exit.succeed(state));
       setSeekDraft(null);
       setVolumeDraft(null);
-      void loadTrackList(state.player.connected);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.mpvTracks(state.player.connected) });
     }).then((unlisten) => {
       if (disposed) {
         unlisten();
@@ -150,9 +155,6 @@ export default function NowPlayingCard(props: {
     });
   });
 
-  const current = () => state();
-  const player = () => current()?.player;
-  const connected = () => player()?.connected ?? false;
   const seekValue = () => seekDraft() ?? player()?.timePos ?? 0;
   const volumeValue = () => volumeDraft() ?? player()?.volume ?? 100;
   const muted = () => player()?.muted ?? false;

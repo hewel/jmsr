@@ -12,6 +12,7 @@ import {
   loadSavedCredentials,
 } from '../src/effects/session';
 import { loadSavedSession } from '../src/sessionAccess';
+import { TestQueryProvider } from './query-client';
 
 const sampleSession = {
   accessToken: 'token-1',
@@ -24,7 +25,14 @@ const sampleSession = {
 function renderLoginPage(onConnected = () => {}) {
   const root = document.createElement('div');
   document.body.append(root);
-  const dispose = render(() => <LoginPage onConnected={onConnected} />, root);
+  const dispose = render(
+    () => (
+      <TestQueryProvider>
+        <LoginPage onConnected={onConnected} />
+      </TestQueryProvider>
+    ),
+    root,
+  );
   return () => {
     dispose();
     root.remove();

@@ -1,4 +1,9 @@
-import type { VideoLibraryItem, VideoSeason } from '@bindings';
+import type {
+  VideoLibraryItem,
+  VideoLibraryPlayRequest,
+  VideoSeason,
+  VideoUserDataUpdateRequest,
+} from '@bindings';
 import { LibraryPlaybackChooser } from '@components/library/LibraryPlaybackChooser';
 import type {
   LibraryPlaybackSelection,
@@ -12,13 +17,13 @@ import {
   showSubtitle,
 } from '@components/library/shared';
 import { Button, Card, ConsoleGrid, StatusBadge } from '@components/ui';
+import { createMutation, createQuery, useQueryClient } from '@tanstack/solid-query';
 import { createFileRoute } from '@tanstack/solid-router';
 import { Exit } from 'effect';
 import { Film, Library, RefreshCw, Tv } from 'lucide-solid';
-import { For, Show, Suspense, createEffect, createResource, createSignal } from 'solid-js';
+import { For, Show, Suspense, createSignal } from 'solid-js';
 import { commandFailureMessage } from '~effects/commands';
 import {
-  fetchInitialSeasonEpisodes,
   fetchSeasonEpisodes,
   fetchVideoItemDetail,
   fetchVideoShowDetail,
@@ -26,65 +31,45 @@ import {
   startLibraryPlayback,
   updateLibraryUserData,
 } from '~effects/library';
-import type { LibraryExit, LibraryShowState, SeasonEpisodesState } from '~effects/library';
+import type { LibraryExit, SeasonEpisodesState } from '~effects/library';
+import { queryKeys, runExit } from '~effects/query';
 
 export const Route = createFileRoute('/_authenticated/library/shows/$seriesId')({
-  loader: ({ params }) => {
-    const show = fetchVideoShowDetail(params.seriesId);
-
-    return {
-      initialEpisodes: fetchInitialSeasonEpisodes(params.seriesId, show),
-      show,
-    };
-  },
   component: LibraryShowDetailRoute,
 });
 
 function LibraryShowDetailRoute() {
   const params = Route.useParams();
-  const loaderData = Route.useLoaderData();
-  const [manualShowPromise, setManualShowPromise] = createSignal<Promise<
-    LibraryExit<LibraryShowState>
-  > | null>(null);
-  const [manualInitialEpisodesPromise, setManualInitialEpisodesPromise] =
-    createSignal<Promise<LibraryExit<SeasonEpisodesState> | null> | null>(null);
-  const [state] = createResource(
-    () => manualShowPromise() ?? loaderData().show,
-    (promise) => promise,
-  );
-  const [initialEpisodes] = createResource(
-    () => manualInitialEpisodesPromise() ?? loaderData().initialEpisodes,
-    (promise) => promise,
-  );
+  const queryClient = useQueryClient();
+  const showQuery = createQuery(() => ({
+    queryKey: queryKeys.libraryShowDetail(params().seriesId),
+    queryFn: () => runExit(fetchVideoShowDetail(params().seriesId)),
+  }));
   const [selectedSeason, setSelectedSeason] = createSignal<VideoSeason | null>(null);
-  const [episodes, setEpisodes] = createSignal<LibraryExit<SeasonEpisodesState> | null>(null);
-  const [episodesLoading, setEpisodesLoading] = createSignal(false);
+  const playbackMutation = createMutation(() => ({
+    mutationFn: (request: VideoLibraryPlayRequest) => runExit(startLibraryPlayback(request)),
+  }));
+  const userDataMutation = createMutation(() => ({
+    mutationFn: (request: VideoUserDataUpdateRequest) => runExit(updateLibraryUserData(request)),
+  }));
   const [playBusy, setPlayBusy] = createSignal(false);
   const [episodePlayBusy, setEpisodePlayBusy] = createSignal<string | null>(null);
   const [confirmBusy, setConfirmBusy] = createSignal(false);
   const [pendingPlayback, setPendingPlayback] = createSignal<PendingLibraryPlayback | null>(null);
   const [playError, setPlayError] = createSignal<string | null>(null);
 
-  createEffect(() => {
-    params().seriesId;
-    setManualShowPromise(null);
-    setManualInitialEpisodesPromise(null);
-    setSelectedSeason(null);
-    setEpisodes(null);
-  });
-
   const reloadShow = () => {
-    const show = fetchVideoShowDetail(params().seriesId);
-    setManualShowPromise(show);
-    setManualInitialEpisodesPromise(fetchInitialSeasonEpisodes(params().seriesId, show));
     setSelectedSeason(null);
-    setEpisodes(null);
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.libraryShowDetail(params().seriesId),
+    });
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.librarySeasonEpisodesRoot(params().seriesId),
+    });
   };
 
-  const detail = () => {
-    const current = state.latest ?? state();
-    return current && Exit.isSuccess(current) ? current.value : null;
-  };
+  const detail = () =>
+    showQuery.data && Exit.isSuccess(showQuery.data) ? showQuery.data.value : null;
   const activeSeason = () => {
     const selected = selectedSeason();
     if (selected) {
@@ -94,29 +79,40 @@ function LibraryShowDetailRoute() {
     const show = detail();
     return show ? initialSeasonForShow(show) : null;
   };
-  const currentEpisodes = () => (selectedSeason() ? episodes() : (initialEpisodes() ?? null));
+  const seasonEpisodesQuery = createQuery<LibraryExit<SeasonEpisodesState> | null>(() => {
+    const season = activeSeason();
+    return {
+      queryKey: queryKeys.librarySeasonEpisodes(params().seriesId, season?.id ?? 'none'),
+      enabled: season !== null,
+      queryFn: () => {
+        if (!season) {
+          return Promise.resolve(null);
+        }
+        return runExit(
+          fetchSeasonEpisodes({
+            seasonId: season.id,
+            seasonNumber: season.seasonNumber,
+            seriesId: params().seriesId,
+          }),
+        );
+      },
+    };
+  });
+  const currentEpisodes = () => seasonEpisodesQuery.data;
   const seasonEpisodes = () => {
     const current = currentEpisodes();
     return current && Exit.isSuccess(current) ? current.value.page.episodes : [];
   };
   const hasSeasonEpisodes = () => seasonEpisodes().length > 0;
-  const loadEpisodes = async (season: VideoSeason) => {
-    if (episodesLoading()) {
-      return;
-    }
+  const episodesLoading = () => seasonEpisodesQuery.isPending || seasonEpisodesQuery.isFetching;
+  const loadEpisodes = (season: VideoSeason) => {
     setSelectedSeason(season);
-    setEpisodes(null);
-    setEpisodesLoading(true);
-    const result = await fetchSeasonEpisodes({
-      seasonId: season.id,
-      seasonNumber: season.seasonNumber,
-      seriesId: params().seriesId,
-    });
-    setEpisodes(result);
-    setEpisodesLoading(false);
   };
   const openEpisodePlaybackChooser = async (itemId: string) => {
-    const result = await fetchVideoItemDetail(itemId);
+    const result = await queryClient.fetchQuery({
+      queryKey: queryKeys.libraryItemDetail(itemId),
+      queryFn: () => runExit(fetchVideoItemDetail(itemId)),
+    });
     Exit.match(result, {
       onFailure: (cause) => setPlayError(commandFailureMessage(cause, 'Could not load episode')),
       onSuccess: (episodeDetail) => {
@@ -158,7 +154,7 @@ function LibraryShowDetailRoute() {
 
     setConfirmBusy(true);
     setPlayError(null);
-    const result = await startLibraryPlayback({
+    const result = await playbackMutation.mutateAsync({
       audioStreamIndex: selection.audioStreamIndex,
       itemId: pending.detail.id,
       mode: pending.mode,
@@ -176,14 +172,14 @@ function LibraryShowDetailRoute() {
     }
   };
   const statusTitle = () => {
-    const current = state.latest ?? state();
+    const current = showQuery.data;
     if (current && !Exit.isSuccess(current)) {
       return 'Could not load show detail';
     }
     return 'Loading show detail';
   };
   const statusDescription = () => {
-    const current = state.latest ?? state();
+    const current = showQuery.data;
     if (current && !Exit.isSuccess(current)) {
       return commandFailureMessage(current.cause, 'Could not load show detail');
     }
@@ -237,9 +233,11 @@ function LibraryShowDetailRoute() {
           type="button"
           variant="outlined"
           class="rounded-full"
-          disabled={state.loading}
+          disabled={showQuery.isFetching}
           onClick={reloadShow}
-          leadingIcon={<RefreshCw class="h-4 w-4" classList={{ 'animate-spin': state.loading }} />}
+          leadingIcon={
+            <RefreshCw class="h-4 w-4" classList={{ 'animate-spin': showQuery.isFetching }} />
+          }
         >
           Retry Show
         </Button>
@@ -297,7 +295,7 @@ function LibraryShowDetailRoute() {
                             }`}
                             aria-pressed={activeSeason()?.id === season.id}
                             disabled={episodesLoading()}
-                            onClick={() => void loadEpisodes(season)}
+                            onClick={() => loadEpisodes(season)}
                           >
                             {seasonLabel(season)}
                           </Button>
@@ -491,8 +489,20 @@ function LibraryShowDetailRoute() {
                     played={show().played}
                     favorite={show().favorite}
                     subject="show"
-                    onUpdate={updateLibraryUserData}
-                    onSuccess={reloadShow}
+                    onUpdate={(request) => userDataMutation.mutateAsync(request)}
+                    onSuccess={() => {
+                      queryClient.invalidateQueries({
+                        queryKey: queryKeys.libraryShowDetail(params().seriesId),
+                      });
+                      queryClient.invalidateQueries({
+                        queryKey: queryKeys.libraryMediaDetail('Series', params().seriesId),
+                      });
+                      queryClient.invalidateQueries({
+                        queryKey: queryKeys.librarySeasonEpisodesRoot(params().seriesId),
+                      });
+                      queryClient.invalidateQueries({ queryKey: queryKeys.libraryHome });
+                      queryClient.invalidateQueries({ queryKey: queryKeys.libraryBrowseRoot });
+                    }}
                   />
 
                   <Show when={show().overview}>
