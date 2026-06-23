@@ -12,7 +12,7 @@ The app still has runtime boundaries that are not fully covered by the generated
 
 ## Decision
 
-Commit the generated Jellyfin OpenAPI Rust client under `src-tauri/jellyfin-api` and use it for supported Jellyfin HTTP endpoints. JellyPilot-owned facades such as `JellyfinLogin`, `JellyfinPlayback`, and `JellyfinLibrary` remain the boundary exposed to commands and frontend bindings.
+Commit the generated Jellyfin OpenAPI Rust client under `src-tauri/media-server-api/jellyfin` and use it for supported Jellyfin HTTP endpoints. JellyPilot-owned facades such as `JellyfinLogin`, `JellyfinPlayback`, and `JellyfinLibrary` remain the boundary exposed to commands and frontend bindings.
 
 Generated models do not cross the Tauri command boundary directly. Commands return JellyPilot-owned DTOs generated into `src/bindings.ts` by `tauri-specta`.
 
