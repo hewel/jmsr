@@ -11,7 +11,7 @@ import {
   playedFilterLabel,
   sortItems,
 } from '@components/library/shared';
-import { Button, Card } from '@components/ui';
+import { Button } from '@components/ui';
 import { createInfiniteQuery, createQuery, useQueryClient } from '@tanstack/solid-query';
 import { createFileRoute } from '@tanstack/solid-router';
 import { createVirtualizer, observeElementRect } from '@tanstack/solid-virtual';
@@ -842,16 +842,7 @@ function LibraryBrowseNavbarControls(props: LibraryBrowseNavbarControlsProps) {
 }
 
 function LibraryBrowseSkeletonCard() {
-  return (
-    <Card variant="filled" surfaceTint={false} class="overflow-hidden !p-0">
-      <div class="border-outline-variant bg-surface-container-lowest/60 aspect-[2/3] animate-pulse border-b" />
-      <div class="space-y-2 p-4">
-        <div class="bg-surface-container-high/80 h-4 w-4/5 animate-pulse rounded" />
-        <div class="bg-surface-container-high/60 h-3 w-3/5 animate-pulse rounded" />
-        <div class="bg-surface-container-high/50 h-3 w-1/3 animate-pulse rounded" />
-      </div>
-    </Card>
-  );
+  return <VideoCard kind="library" collectionType="movies" loading />;
 }
 
 function LibraryBrowseSkeletonCards() {

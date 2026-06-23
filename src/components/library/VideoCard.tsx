@@ -11,14 +11,39 @@ export type VideoCardProps =
       kind: 'home';
       item: VideoHomeItem;
       aspectClass: VideoCardAspectClass;
+      loading?: false;
     }
   | {
       kind: 'library';
       item: VideoLibraryItem;
       collectionType?: VideoLibraryKind;
+      loading?: false;
+    }
+  | {
+      kind: 'library';
+      collectionType?: VideoLibraryKind;
+      loading: true;
     };
 
 export function VideoCard(props: VideoCardProps) {
+  const aspectClass = (): VideoCardAspectClass => {
+    if (props.kind === 'home') {
+      return props.aspectClass;
+    }
+    if (props.loading) {
+      return 'aspect-[2/3]';
+    }
+    return props.collectionType === 'tvshows' ||
+      props.item.itemType === 'Series' ||
+      props.item.itemType === 'Movie'
+      ? 'aspect-[2/3]'
+      : 'aspect-video';
+  };
+
+  if (props.loading) {
+    return <VideoCardSkeleton aspectClass={aspectClass()} />;
+  }
+
   const href = () => {
     if (props.kind === 'home') {
       return `/library/items/${props.item.id}`;
@@ -26,17 +51,6 @@ export function VideoCard(props: VideoCardProps) {
     return props.item.itemType === 'Series'
       ? `/library/shows/${props.item.id}`
       : `/library/items/${props.item.id}`;
-  };
-
-  const aspectClass = (): VideoCardAspectClass => {
-    if (props.kind === 'home') {
-      return props.aspectClass;
-    }
-    return props.collectionType === 'tvshows' ||
-      props.item.itemType === 'Series' ||
-      props.item.itemType === 'Movie'
-      ? 'aspect-[2/3]'
-      : 'aspect-video';
   };
 
   const subtitle = () => {
@@ -121,5 +135,22 @@ export function VideoCard(props: VideoCardProps) {
         </Show>
       </div>
     </a>
+  );
+}
+
+function VideoCardSkeleton(props: { aspectClass: VideoCardAspectClass }) {
+  return (
+    <div
+      class="border-outline-variant/80 bg-surface/50 block overflow-hidden rounded-2xl border bg-[linear-gradient(135deg,rgba(21,24,35,0.5)_0%,rgba(11,13,20,0.7)_100%)] p-0! shadow-xl backdrop-blur-md"
+      aria-hidden="true"
+    >
+      <div
+        class={`${props.aspectClass} border-outline-variant bg-surface-container-lowest/60 animate-pulse border-b`}
+      />
+      <div class="space-y-2 px-4 pt-2 pb-3">
+        <div class="bg-surface-container-high/80 h-4 w-4/5 animate-pulse rounded" />
+        <div class="bg-surface-container-high/60 h-3 w-3/5 animate-pulse rounded" />
+      </div>
+    </div>
   );
 }

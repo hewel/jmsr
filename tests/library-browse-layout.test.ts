@@ -1,6 +1,9 @@
 import { expect, test } from '@rstest/core';
 
-import { libraryBrowseColumnCount } from '../src/utils/libraryBrowseLayout';
+import {
+  LIBRARY_BROWSE_AUTO_GRID_CLASS,
+  libraryBrowseColumnCount,
+} from '../src/utils/libraryBrowseLayout';
 
 test('library browse column count auto-fits by available width', () => {
   expect(libraryBrowseColumnCount(360)).toBe(2);
@@ -11,4 +14,9 @@ test('library browse column count auto-fits by available width', () => {
 test('library browse column count falls back to one column for unknown widths', () => {
   expect(libraryBrowseColumnCount(0)).toBe(1);
   expect(libraryBrowseColumnCount(Number.NaN)).toBe(1);
+});
+
+test('library browse grid preserves empty tracks so the last row does not stretch', () => {
+  expect(LIBRARY_BROWSE_AUTO_GRID_CLASS).toContain('repeat(auto-fill');
+  expect(LIBRARY_BROWSE_AUTO_GRID_CLASS).not.toContain('repeat(auto-fit');
 });
