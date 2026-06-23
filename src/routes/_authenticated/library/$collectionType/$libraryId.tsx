@@ -47,18 +47,15 @@ import {
 } from '~effects/query';
 import { createSharedLibraryFilters } from '~utils/createSharedLibraryFilters';
 import type { LibrarySortDirection } from '~utils/createSharedLibraryFilters';
+import {
+  LIBRARY_BROWSE_AUTO_GRID_CLASS,
+  LIBRARY_BROWSE_GRID_GAP_PX,
+  libraryBrowseColumnCount,
+} from '~utils/libraryBrowseLayout';
 
 const LIBRARY_BROWSE_SKELETON_CARD_KEYS = Array.from({ length: 10 }, (_, index) => index);
 const LIBRARY_VIRTUAL_TOTAL_THRESHOLD = 100;
-const LIBRARY_BROWSE_GRID_GAP_PX = 12;
 const LIBRARY_BROWSE_GRID_OVERSCAN_ROWS = 3;
-
-function libraryBrowseColumnCount(width: number): number {
-  if (width >= 1024) return 5;
-  if (width >= 768) return 3;
-  if (width >= 640) return 2;
-  return 1;
-}
 
 interface LibraryBrowseInfiniteData {
   pages: LibraryExit<LibraryBrowseState>[];
@@ -582,7 +579,9 @@ function LibraryBrowseRoute() {
             <Show
               when={usesVirtualGrid()}
               fallback={
-                <div class="grid animate-[fadeIn_0.3s_cubic-bezier(0.16,1,0.3,1)_forwards] gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                <div
+                  class={`${LIBRARY_BROWSE_AUTO_GRID_CLASS} animate-[fadeIn_0.3s_cubic-bezier(0.16,1,0.3,1)_forwards]`}
+                >
                   <For each={readyState()?.items ?? []}>
                     {(item) => (
                       <MediaInfoHoverCard id={item.id} itemType={item.itemType}>
@@ -614,7 +613,7 @@ function LibraryBrowseRoute() {
                           transform: `translateY(${virtualRow.start - virtualScrollMargin()}px)`,
                         }}
                       >
-                        <div class="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                        <div class={LIBRARY_BROWSE_AUTO_GRID_CLASS}>
                           <For each={virtualRowColumnIndexes()}>
                             {(columnIndex) => {
                               const displayIndex = () =>
@@ -689,7 +688,7 @@ function LibrarySortMenu(props: LibrarySortMenuProps) {
       <Menu.Trigger
         disabled={props.disabled()}
         aria-label="Sort By"
-        class="border-outline-variant text-on-surface hover:text-secondary flex h-12 w-full flex-1 items-center justify-between border-l px-3 text-left transition-colors duration-200 outline-none disabled:cursor-not-allowed disabled:opacity-50"
+        class="border-outline-variant text-on-surface hover:text-secondary flex h-10 w-10 flex-none items-center justify-center border-l px-2 text-left transition-colors duration-200 outline-none disabled:cursor-not-allowed disabled:opacity-50 sm:h-12 sm:w-12"
       >
         <ListSortAscending size={14} />
       </Menu.Trigger>
@@ -736,7 +735,7 @@ function LibraryStatusMenu(props: LibraryStatusMenuProps) {
       <Menu.Trigger
         disabled={props.disabled()}
         aria-label="Status"
-        class="border-outline-variant text-on-surface hover:text-secondary flex h-12 w-full flex-1 items-center justify-between border-l px-3 text-left transition-colors duration-200 outline-none disabled:cursor-not-allowed disabled:opacity-50"
+        class="border-outline-variant text-on-surface hover:text-secondary flex h-10 w-10 flex-none items-center justify-center border-l px-2 text-left transition-colors duration-200 outline-none disabled:cursor-not-allowed disabled:opacity-50 sm:h-12 sm:w-12"
       >
         <Funnel size={14} />
       </Menu.Trigger>
@@ -805,7 +804,7 @@ function LibraryBrowseNavbarControls(props: LibraryBrowseNavbarControlsProps) {
       {(target) => (
         <Portal mount={target()}>
           <nav class="flex flex-row items-end justify-between" aria-label="Library browse controls">
-            <div class="flex min-w-0">
+            <div class="flex min-w-0 flex-wrap justify-end overflow-hidden rounded-2xl">
               <Toggle.Root
                 pressed={props.sortDirection() === 'desc'}
                 onPressedChange={(pressed) => {
@@ -813,7 +812,7 @@ function LibraryBrowseNavbarControls(props: LibraryBrowseNavbarControlsProps) {
                 }}
                 disabled={props.loading()}
                 aria-label={props.sortDirection() === 'desc' ? 'Sort descending' : 'Sort ascending'}
-                class="border-outline-variant text-on-surface hover:text-secondary data-[state=on]:bg-secondary-container/45 data-[state=on]:text-on-secondary-container flex h-12 w-12 items-center justify-center border-l transition-colors duration-200 outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                class="border-outline-variant text-on-surface hover:text-secondary data-[state=on]:bg-secondary-container/45 data-[state=on]:text-on-secondary-container flex h-10 w-10 items-center justify-center border-l transition-colors duration-200 outline-none disabled:cursor-not-allowed disabled:opacity-50 sm:h-12 sm:w-12"
               >
                 <Show
                   when={props.sortDirection() === 'desc'}
@@ -866,7 +865,7 @@ function LibraryBrowseSkeleton() {
         <div class="bg-surface-container-high/70 h-7 w-32 animate-pulse rounded-md" />
         <div class="bg-surface-container-high/60 h-4 w-24 animate-pulse rounded" />
       </div>
-      <div class="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+      <div class={LIBRARY_BROWSE_AUTO_GRID_CLASS}>
         <LibraryBrowseSkeletonCards />
       </div>
     </section>

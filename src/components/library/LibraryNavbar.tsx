@@ -44,7 +44,7 @@ export default function LibraryNavbar(props: LibraryNavbarProps) {
       aria-label="Library navigation"
       class="border-outline-variant bg-surface-container-low/75 sticky top-2 z-30 rounded-2xl border shadow-xl backdrop-blur-md"
     >
-      <div class="flex flex-row flex-wrap items-center justify-between gap-4">
+      <div class="flex flex-row flex-wrap items-center justify-between gap-2 sm:gap-4">
         <SegmentGroup.Root
           value={props.activeValue}
           onValueChange={(details) => navigateToSegment(details.value)}
@@ -70,7 +70,10 @@ export default function LibraryNavbar(props: LibraryNavbarProps) {
           </For>
         </SegmentGroup.Root>
 
-        <div ref={navbarControls.setPortalTarget} class="min-w-0 flex-1 xl:flex-none" />
+        <div
+          ref={navbarControls.setPortalTarget}
+          class="flex min-w-0 flex-1 justify-end xl:flex-none"
+        />
       </div>
     </nav>
   );
