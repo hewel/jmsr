@@ -4,16 +4,29 @@ import { createQuery } from '@tanstack/solid-query';
 import { Outlet, createFileRoute, useLocation } from '@tanstack/solid-router';
 import { Exit } from 'effect';
 import { Show, createMemo } from 'solid-js';
+import { fetchConnectionState } from '~effects/connection';
 import { fetchLibraryShortcuts } from '~effects/library';
-import { queryKeys, runExit } from '~effects/query';
+import {
+  isLibrarySessionKeyConnected,
+  librarySessionKeyFromConnectionExit,
+  queryKeys,
+  runExit,
+} from '~effects/query';
 
 export const Route = createFileRoute('/_authenticated/library')({
   component: LibraryLayoutRoute,
 });
 
 function LibraryLayoutRoute() {
+  const connectionQuery = createQuery(() => ({
+    queryKey: queryKeys.connectionState,
+    queryFn: () => runExit(fetchConnectionState()),
+    staleTime: Infinity,
+  }));
+  const sessionKey = createMemo(() => librarySessionKeyFromConnectionExit(connectionQuery.data));
   const shortcutsQuery = createQuery(() => ({
-    queryKey: queryKeys.libraryShortcuts,
+    queryKey: queryKeys.libraryShortcuts(sessionKey()),
+    enabled: isLibrarySessionKeyConnected(sessionKey()),
     queryFn: () => runExit(fetchLibraryShortcuts()),
   }));
   const shortcuts = () =>

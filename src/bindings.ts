@@ -196,6 +196,7 @@ export type ConnectionState = {
 	connected: boolean,
 	serverUrl: string | null,
 	serverName: string | null,
+	userId: string | null,
 	userName: string | null,
 };
 

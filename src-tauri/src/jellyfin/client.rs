@@ -766,6 +766,7 @@ impl JellyfinClient {
       connected: state.access_token.is_some(),
       server_url: state.server_url.clone(),
       server_name: state.server_name.clone(),
+      user_id: state.user_id.clone(),
       user_name: state.user_name.clone(),
     }
   }

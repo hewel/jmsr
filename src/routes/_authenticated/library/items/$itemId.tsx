@@ -18,12 +18,18 @@ import { Exit } from 'effect';
 import { Film, Library, Play, RefreshCw, RotateCcw } from 'lucide-solid';
 import { For, Show, Suspense, createEffect, createMemo, createSignal } from 'solid-js';
 import { commandFailureMessage } from '~effects/commands';
+import { fetchConnectionState } from '~effects/connection';
 import {
   fetchVideoItemDetail,
   startLibraryPlayback,
   updateLibraryUserData,
 } from '~effects/library';
-import { queryKeys, runExit } from '~effects/query';
+import {
+  isLibrarySessionKeyConnected,
+  librarySessionKeyFromConnectionExit,
+  queryKeys,
+  runExit,
+} from '~effects/query';
 
 const AUDIO_AUTO = 'auto';
 const SUBTITLE_AUTO = 'auto';
@@ -36,8 +42,15 @@ export const Route = createFileRoute('/_authenticated/library/items/$itemId')({
 function LibraryItemDetailRoute() {
   const params = Route.useParams();
   const queryClient = useQueryClient();
+  const connectionQuery = createQuery(() => ({
+    queryKey: queryKeys.connectionState,
+    queryFn: () => runExit(fetchConnectionState()),
+    staleTime: Infinity,
+  }));
+  const sessionKey = createMemo(() => librarySessionKeyFromConnectionExit(connectionQuery.data));
   const detailQuery = createQuery(() => ({
-    queryKey: queryKeys.libraryItemDetail(params().itemId),
+    queryKey: queryKeys.libraryItemDetail(sessionKey(), params().itemId),
+    enabled: isLibrarySessionKeyConnected(sessionKey()),
     queryFn: () => runExit(fetchVideoItemDetail(params().itemId)),
   }));
   const playbackMutation = createMutation(() => ({
@@ -236,13 +249,21 @@ function LibraryItemDetailRoute() {
                     onSuccess={() => {
                       const itemType = item().itemType;
                       queryClient.invalidateQueries({
-                        queryKey: queryKeys.libraryItemDetail(params().itemId),
+                        queryKey: queryKeys.libraryItemDetail(sessionKey(), params().itemId),
                       });
                       queryClient.invalidateQueries({
-                        queryKey: queryKeys.libraryMediaDetail(itemType, params().itemId),
+                        queryKey: queryKeys.libraryMediaDetail(
+                          sessionKey(),
+                          itemType,
+                          params().itemId,
+                        ),
                       });
-                      queryClient.invalidateQueries({ queryKey: queryKeys.libraryHome });
-                      queryClient.invalidateQueries({ queryKey: queryKeys.libraryBrowseRoot });
+                      queryClient.invalidateQueries({
+                        queryKey: queryKeys.libraryHome(sessionKey()),
+                      });
+                      queryClient.invalidateQueries({
+                        queryKey: queryKeys.libraryBrowseRoot(sessionKey()),
+                      });
                     }}
                   />
                   <Show when={item().overview}>

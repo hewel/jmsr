@@ -11,7 +11,7 @@ import {
   sortItems,
 } from '@components/library/shared';
 import { Button, Card } from '@components/ui';
-import { createInfiniteQuery, useQueryClient } from '@tanstack/solid-query';
+import { createInfiniteQuery, createQuery, useQueryClient } from '@tanstack/solid-query';
 import { createFileRoute } from '@tanstack/solid-router';
 import { createVirtualizer, observeElementRect } from '@tanstack/solid-virtual';
 import { Exit } from 'effect';
@@ -35,9 +35,15 @@ import {
 } from 'solid-js';
 import { Portal } from 'solid-js/web';
 import { commandFailureMessage } from '~effects/commands';
+import { fetchConnectionState } from '~effects/connection';
 import { LIBRARY_BROWSE_PAGE_SIZE, fetchVideoLibraryPage } from '~effects/library';
 import type { LibraryBrowseState, LibraryExit } from '~effects/library';
-import { queryKeys, runExit } from '~effects/query';
+import {
+  isLibrarySessionKeyConnected,
+  librarySessionKeyFromConnectionExit,
+  queryKeys,
+  runExit,
+} from '~effects/query';
 import { createSharedLibraryFilters } from '~utils/createSharedLibraryFilters';
 import type { LibrarySortDirection } from '~utils/createSharedLibraryFilters';
 
@@ -81,6 +87,12 @@ function LibraryBrowseRoute() {
     new Map<number, LibraryExit<LibraryBrowseState>>(),
   );
   const [virtualPageStartsFetching, setVirtualPageStartsFetching] = createSignal(new Set<number>());
+  const connectionQuery = createQuery(() => ({
+    queryKey: queryKeys.connectionState,
+    queryFn: () => runExit(fetchConnectionState()),
+    staleTime: Infinity,
+  }));
+  const sessionKey = createMemo(() => librarySessionKeyFromConnectionExit(connectionQuery.data));
 
   const fallbackVirtualGridWidth = () => {
     const gridWidth = virtualGrid()?.clientWidth ?? 0;
@@ -169,6 +181,7 @@ function LibraryBrowseRoute() {
   const collectionType = () => collectionTypeFromParam(params().collectionType);
   const browseQueryKey = () =>
     queryKeys.libraryBrowse(
+      sessionKey(),
       collectionType(),
       params().libraryId,
       filterSort(),
@@ -178,7 +191,7 @@ function LibraryBrowseRoute() {
     );
   const browseQuery = createInfiniteQuery(() => ({
     queryKey: browseQueryKey(),
-    enabled: libraryFilters.ready(),
+    enabled: libraryFilters.ready() && isLibrarySessionKeyConnected(sessionKey()),
     queryFn: ({ pageParam }) => {
       const startIndex = typeof pageParam === 'number' ? pageParam : 0;
       return runExit(
@@ -365,6 +378,7 @@ function LibraryBrowseRoute() {
     void queryClient
       .fetchQuery({
         queryKey: queryKeys.libraryBrowsePage(
+          sessionKey(),
           collectionTypeValue,
           libraryId,
           sort,

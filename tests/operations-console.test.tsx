@@ -20,6 +20,7 @@ const connectedState = {
   provider: 'jellyfin' as const,
   serverName: 'Jellyfin Home',
   serverUrl: 'https://jellyfin.example.com',
+  userId: 'user-1',
   userName: 'Ada',
 };
 
@@ -35,6 +36,7 @@ const embyConnectedState = {
   provider: 'emby' as const,
   serverName: 'Emby Home',
   serverUrl: 'https://media.example.com/emby',
+  userId: 'emby-user-1',
 };
 
 const config: AppConfig = {
@@ -634,6 +636,7 @@ test('reconnect activates the active saved service profile', async () => {
     connected: false,
     serverName: null,
     serverUrl: null,
+    userId: null,
     userName: null,
   });
 
@@ -656,6 +659,7 @@ test('reconnect failure keeps the saved service profile available', async () => 
     connected: false,
     serverName: null,
     serverUrl: null,
+    userId: null,
     userName: null,
   });
 

@@ -21,8 +21,9 @@ import { createMutation, createQuery, useQueryClient } from '@tanstack/solid-que
 import { createFileRoute } from '@tanstack/solid-router';
 import { Exit, Option } from 'effect';
 import { Film, Library, RefreshCw, Tv } from 'lucide-solid';
-import { For, Show, Suspense, createSignal } from 'solid-js';
+import { For, Show, Suspense, createMemo, createSignal } from 'solid-js';
 import { commandFailureMessage } from '~effects/commands';
+import { fetchConnectionState } from '~effects/connection';
 import {
   fetchSeasonEpisodes,
   fetchVideoItemDetail,
@@ -32,7 +33,12 @@ import {
   updateLibraryUserData,
 } from '~effects/library';
 import type { LibraryExit, SeasonEpisodesState } from '~effects/library';
-import { queryKeys, runExit } from '~effects/query';
+import {
+  isLibrarySessionKeyConnected,
+  librarySessionKeyFromConnectionExit,
+  queryKeys,
+  runExit,
+} from '~effects/query';
 
 export const Route = createFileRoute('/_authenticated/library/shows/$seriesId')({
   component: LibraryShowDetailRoute,
@@ -41,8 +47,15 @@ export const Route = createFileRoute('/_authenticated/library/shows/$seriesId')(
 function LibraryShowDetailRoute() {
   const params = Route.useParams();
   const queryClient = useQueryClient();
+  const connectionQuery = createQuery(() => ({
+    queryKey: queryKeys.connectionState,
+    queryFn: () => runExit(fetchConnectionState()),
+    staleTime: Infinity,
+  }));
+  const sessionKey = createMemo(() => librarySessionKeyFromConnectionExit(connectionQuery.data));
   const showQuery = createQuery(() => ({
-    queryKey: queryKeys.libraryShowDetail(params().seriesId),
+    queryKey: queryKeys.libraryShowDetail(sessionKey(), params().seriesId),
+    enabled: isLibrarySessionKeyConnected(sessionKey()),
     queryFn: () => runExit(fetchVideoShowDetail(params().seriesId)),
   }));
   const [selectedSeason, setSelectedSeason] = createSignal<VideoSeason | null>(null);
@@ -61,10 +74,10 @@ function LibraryShowDetailRoute() {
   const reloadShow = () => {
     setSelectedSeason(null);
     void queryClient.invalidateQueries({
-      queryKey: queryKeys.libraryShowDetail(params().seriesId),
+      queryKey: queryKeys.libraryShowDetail(sessionKey(), params().seriesId),
     });
     void queryClient.invalidateQueries({
-      queryKey: queryKeys.librarySeasonEpisodesRoot(params().seriesId),
+      queryKey: queryKeys.librarySeasonEpisodesRoot(sessionKey(), params().seriesId),
     });
   };
 
@@ -84,8 +97,12 @@ function LibraryShowDetailRoute() {
   const seasonEpisodesQuery = createQuery<LibraryExit<SeasonEpisodesState> | null>(() => {
     const season = activeSeason();
     return {
-      queryKey: queryKeys.librarySeasonEpisodes(params().seriesId, season?.id ?? 'none'),
-      enabled: season !== null,
+      queryKey: queryKeys.librarySeasonEpisodes(
+        sessionKey(),
+        params().seriesId,
+        season?.id ?? 'none',
+      ),
+      enabled: season !== null && isLibrarySessionKeyConnected(sessionKey()),
       queryFn: () => {
         if (!season) {
           return Promise.resolve(null);
@@ -112,7 +129,7 @@ function LibraryShowDetailRoute() {
   };
   const openEpisodePlaybackChooser = async (itemId: string) => {
     const result = await queryClient.fetchQuery({
-      queryKey: queryKeys.libraryItemDetail(itemId),
+      queryKey: queryKeys.libraryItemDetail(sessionKey(), itemId),
       queryFn: () => runExit(fetchVideoItemDetail(itemId)),
     });
     Exit.match(result, {
@@ -494,16 +511,27 @@ function LibraryShowDetailRoute() {
                     onUpdate={(request) => userDataMutation.mutateAsync(request)}
                     onSuccess={() => {
                       queryClient.invalidateQueries({
-                        queryKey: queryKeys.libraryShowDetail(params().seriesId),
+                        queryKey: queryKeys.libraryShowDetail(sessionKey(), params().seriesId),
                       });
                       queryClient.invalidateQueries({
-                        queryKey: queryKeys.libraryMediaDetail('Series', params().seriesId),
+                        queryKey: queryKeys.libraryMediaDetail(
+                          sessionKey(),
+                          'Series',
+                          params().seriesId,
+                        ),
                       });
                       queryClient.invalidateQueries({
-                        queryKey: queryKeys.librarySeasonEpisodesRoot(params().seriesId),
+                        queryKey: queryKeys.librarySeasonEpisodesRoot(
+                          sessionKey(),
+                          params().seriesId,
+                        ),
                       });
-                      queryClient.invalidateQueries({ queryKey: queryKeys.libraryHome });
-                      queryClient.invalidateQueries({ queryKey: queryKeys.libraryBrowseRoot });
+                      queryClient.invalidateQueries({
+                        queryKey: queryKeys.libraryHome(sessionKey()),
+                      });
+                      queryClient.invalidateQueries({
+                        queryKey: queryKeys.libraryBrowseRoot(sessionKey()),
+                      });
                     }}
                   />
 

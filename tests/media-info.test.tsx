@@ -8,7 +8,7 @@ import type { VideoItemDetail, VideoShowDetail } from '../src/bindings';
 import { MediaInfoContent, MediaInfoHoverCard } from '../src/components/library/MediaInfoHoverCard';
 import { fetchMediaDetail } from '../src/effects/library';
 import type { MediaDetail } from '../src/effects/library';
-import { queryKeys, runExit } from '../src/effects/query';
+import { librarySessionKey, queryKeys, runExit } from '../src/effects/query';
 import { createTestQueryClient, TestQueryProvider } from './query-client';
 
 const connectedState = {
@@ -23,6 +23,7 @@ const connectedState = {
   provider: 'jellyfin' as const,
   serverName: 'Jellyfin Home',
   serverUrl: 'https://jellyfin.example.com',
+  userId: 'user-1',
   userName: 'Ada',
 };
 
@@ -115,14 +116,15 @@ test('solid query caches media detail successes', async () => {
     .spyOn(commands, 'libraryItemDetail')
     .mockResolvedValue({ data: movieDetail, status: 'ok' });
   const queryClient = createTestQueryClient();
+  const sessionKey = librarySessionKey(connectedState);
 
   await queryClient.fetchQuery({
-    queryKey: queryKeys.libraryMediaDetail('Movie', 'movie-1'),
+    queryKey: queryKeys.libraryMediaDetail(sessionKey, 'Movie', 'movie-1'),
     queryFn: () => runExit(fetchMediaDetail('movie-1', 'Movie')),
     staleTime: Infinity,
   });
   await queryClient.fetchQuery({
-    queryKey: queryKeys.libraryMediaDetail('Movie', 'movie-1'),
+    queryKey: queryKeys.libraryMediaDetail(sessionKey, 'Movie', 'movie-1'),
     queryFn: () => runExit(fetchMediaDetail('movie-1', 'Movie')),
     staleTime: Infinity,
   });

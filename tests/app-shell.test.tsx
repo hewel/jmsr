@@ -16,6 +16,7 @@ import type {
 } from '../src/bindings';
 import { ToastProvider } from '../src/components/ToastProvider';
 import { createJellyPilotRouter } from '../src/router';
+import { resetSharedLibraryFilters } from '../src/utils/createSharedLibraryFilters';
 import { TestQueryProvider } from './query-client';
 
 // Mock scrollTo since JSDOM doesn't implement layout/scrolling APIs
@@ -34,6 +35,7 @@ const connectedState = {
   provider: 'jellyfin' as const,
   serverName: 'Jellyfin Home',
   serverUrl: 'https://jellyfin.example.com',
+  userId: 'user-1',
   userName: 'Ada',
 };
 
@@ -84,6 +86,8 @@ const config: AppConfig = {
   progressInterval: 5,
   startMinimized: false,
 };
+
+const shellCleanups: (() => void)[] = [];
 
 const audioStreams = [
   {
@@ -525,10 +529,16 @@ function renderShell(path = '/library') {
     root,
   );
 
-  return () => {
+  const cleanup = () => {
+    const cleanupIndex = shellCleanups.indexOf(cleanup);
+    if (cleanupIndex !== -1) {
+      shellCleanups.splice(cleanupIndex, 1);
+    }
     dispose();
     root.remove();
   };
+  shellCleanups.push(cleanup);
+  return cleanup;
 }
 
 function getArkHiddenSelect(label: string) {
@@ -562,11 +572,16 @@ async function selectArkOption(label: string, name: RegExp | string) {
 
 beforeEach(async () => {
   await new Promise((resolve) => setTimeout(resolve, 0));
+  resetSharedLibraryFilters();
   window.__TEST_TAURI_STORE__.reset();
 });
 
 afterEach(() => {
+  while (shellCleanups.length > 0) {
+    shellCleanups.pop()?.();
+  }
   rstest.restoreAllMocks();
+  resetSharedLibraryFilters();
   document.body.innerHTML = '';
   localStorage.clear();
   window.__TEST_TAURI_STORE__.reset();

@@ -43,6 +43,7 @@ pub struct ConnectionState {
   pub connected: bool,
   pub server_url: Option<String>,
   pub server_name: Option<String>,
+  pub user_id: Option<String>,
   pub user_name: Option<String>,
 }
 

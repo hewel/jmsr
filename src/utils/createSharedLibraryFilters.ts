@@ -1,7 +1,7 @@
 import { load } from '@tauri-apps/plugin-store';
 import { Effect, Exit, Match, Option } from 'effect';
 import type { Accessor, Setter } from 'solid-js';
-import { createEffect, createSignal } from 'solid-js';
+import { createEffect, createSignal, onCleanup } from 'solid-js';
 
 import type { VideoLibraryPlayedFilter, VideoLibrarySort } from '../bindings';
 
@@ -31,6 +31,7 @@ const [sortDirection, setSortDirection] =
   createSignal<LibrarySortDirection>(DEFAULT_SORT_DIRECTION);
 let writeQueue: Promise<void> | null = null;
 let hydratedSnapshot: LibraryFilterSnapshot | null = null;
+let hydrateGeneration = 0;
 
 export interface SharedLibraryFilters {
   ready: Accessor<boolean>;
@@ -145,17 +146,29 @@ function removeLegacySnapshot() {
   );
 }
 
-async function hydrateFilters() {
+function applyHydratedSnapshot(filters: LibraryFilterSnapshot, generation: number) {
+  if (generation !== hydrateGeneration) {
+    return false;
+  }
+
+  applySnapshot(filters);
+  hydratedSnapshot = filters;
+  return true;
+}
+
+async function hydrateFilters(generation: number) {
   await Effect.runPromiseExit(
     Effect.tryPromise({
       try: async () => {
         await writeQueue;
+        if (generation !== hydrateGeneration) {
+          return;
+        }
         const store = await load(PREFERENCES_STORE_FILE, { defaults: {}, autoSave: false });
         const stored = parseStoreSnapshot(await store.get(LIBRARY_FILTERS_STORE_KEY));
 
         if (Option.isSome(stored)) {
-          applySnapshot(stored.value);
-          hydratedSnapshot = stored.value;
+          applyHydratedSnapshot(stored.value, generation);
           return;
         }
 
@@ -164,8 +177,9 @@ async function hydrateFilters() {
           onNone: () => defaultSnapshot(),
           onSome: (value) => value,
         });
-        applySnapshot(snapshot);
-        hydratedSnapshot = snapshot;
+        if (!applyHydratedSnapshot(snapshot, generation)) {
+          return;
+        }
 
         if (Option.isSome(legacy)) {
           await store.set(LIBRARY_FILTERS_STORE_KEY, snapshot);
@@ -179,13 +193,19 @@ async function hydrateFilters() {
   );
 }
 
-function persistFilters(filters: LibraryFilterSnapshot) {
+function persistFilters(filters: LibraryFilterSnapshot, generation: number) {
   const write = async () => {
+    if (generation !== hydrateGeneration) {
+      return;
+    }
     // Persistence is best-effort; rendering keeps the current in-memory signals.
     await Effect.runPromiseExit(
       Effect.tryPromise({
         try: async () => {
           const store = await load(PREFERENCES_STORE_FILE, { defaults: {}, autoSave: false });
+          if (generation !== hydrateGeneration) {
+            return;
+          }
           await store.set(LIBRARY_FILTERS_STORE_KEY, filters);
           await store.save();
         },
@@ -197,9 +217,28 @@ function persistFilters(filters: LibraryFilterSnapshot) {
   writeQueue = (writeQueue ?? Promise.resolve()).then(write, () => undefined);
 }
 
-export function createSharedLibraryFilters(): SharedLibraryFilters {
+export function resetSharedLibraryFilters() {
+  hydrateGeneration += 1;
+  writeQueue = null;
+  hydratedSnapshot = null;
   setReady(false);
-  void hydrateFilters().finally(() => setReady(true));
+  applySnapshot(defaultSnapshot());
+}
+
+export function createSharedLibraryFilters(): SharedLibraryFilters {
+  const generation = hydrateGeneration + 1;
+  hydrateGeneration = generation;
+  setReady(false);
+  onCleanup(() => {
+    if (generation === hydrateGeneration) {
+      hydrateGeneration += 1;
+    }
+  });
+  void hydrateFilters(generation).finally(() => {
+    if (generation === hydrateGeneration) {
+      setReady(true);
+    }
+  });
 
   createEffect(() => {
     if (!ready()) {
@@ -210,7 +249,7 @@ export function createSharedLibraryFilters(): SharedLibraryFilters {
       hydratedSnapshot = null;
       return;
     }
-    persistFilters(filters);
+    persistFilters(filters, generation);
   });
 
   return {

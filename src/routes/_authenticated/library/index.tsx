@@ -3,9 +3,15 @@ import { Card } from '@components/ui';
 import { createQuery } from '@tanstack/solid-query';
 import { createFileRoute } from '@tanstack/solid-router';
 import { Exit } from 'effect';
-import { For, Show } from 'solid-js';
+import { For, Show, createMemo } from 'solid-js';
+import { fetchConnectionState } from '~effects/connection';
 import { fetchLibraryHome } from '~effects/library';
-import { queryKeys, runExit } from '~effects/query';
+import {
+  isLibrarySessionKeyConnected,
+  librarySessionKeyFromConnectionExit,
+  queryKeys,
+  runExit,
+} from '~effects/query';
 
 const homeSkeletonRows = [
   { id: 'continue-watching-skeleton', aspectClass: 'aspect-video' },
@@ -19,8 +25,15 @@ export const Route = createFileRoute('/_authenticated/library/')({
 });
 
 function LibraryLanding() {
+  const connectionQuery = createQuery(() => ({
+    queryKey: queryKeys.connectionState,
+    queryFn: () => runExit(fetchConnectionState()),
+    staleTime: Infinity,
+  }));
+  const sessionKey = createMemo(() => librarySessionKeyFromConnectionExit(connectionQuery.data));
   const homeQuery = createQuery(() => ({
-    queryKey: queryKeys.libraryHome,
+    queryKey: queryKeys.libraryHome(sessionKey()),
+    enabled: isLibrarySessionKeyConnected(sessionKey()),
     queryFn: () => runExit(fetchLibraryHome()),
   }));
   const home = () =>

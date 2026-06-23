@@ -101,6 +101,9 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
   const removeProfileMutation = createMutation(() => ({
     mutationFn: (key: string) => runExit(removeSavedServiceProfile(key)),
   }));
+  const clearLibraryQueries = () => {
+    queryClient.removeQueries({ queryKey: queryKeys.libraryRoot });
+  };
   let loggedConfigFailure: string | null = null;
   createEffect(() => {
     const result = configQuery.data;
@@ -384,6 +387,7 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
     actions.beginReconnect();
     try {
       if (await reconnectMutation.mutateAsync()) {
+        clearLibraryQueries();
         showToast('success', 'Reconnected to saved service');
         void connectionQuery.refetch();
         void profilesQuery.refetch();
@@ -400,6 +404,7 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
     actions.beginDisconnect();
     const exit = await disconnectMutation.mutateAsync();
     if (Exit.isSuccess(exit)) {
+      clearLibraryQueries();
       showToast('success', 'Disconnected from Jellyfin');
       void connectionQuery.refetch();
     } else {
@@ -420,6 +425,7 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
     try {
       const exit = await removeProfileMutation.mutateAsync(activeProfileKey);
       if (Exit.isSuccess(exit)) {
+        clearLibraryQueries();
         void connectionQuery.refetch();
         void profilesQuery.refetch();
         if (exit.value.profiles.length === 0) {
@@ -441,6 +447,7 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
     try {
       const exit = await activateProfileMutation.mutateAsync(key);
       if (Exit.isSuccess(exit)) {
+        clearLibraryQueries();
         showToast('success', 'Switched active service');
         void connectionQuery.refetch();
         void profilesQuery.refetch();
@@ -458,6 +465,9 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
     try {
       const exit = await removeProfileMutation.mutateAsync(key);
       if (Exit.isSuccess(exit)) {
+        if (profiles()?.activeProfileKey === key) {
+          clearLibraryQueries();
+        }
         void connectionQuery.refetch();
         void profilesQuery.refetch();
         if (exit.value.profiles.length === 0) {
@@ -474,6 +484,7 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
   };
 
   const handleAddServiceConnected = () => {
+    clearLibraryQueries();
     setAddServiceOpen(false);
     showToast('success', 'Saved service added and activated');
     void connectionQuery.refetch();

@@ -2,14 +2,20 @@ import { HoverCard } from '@ark-ui/solid/hover-card';
 import { createQuery } from '@tanstack/solid-query';
 import { Exit, Option } from 'effect';
 import { Check, Heart, LoaderCircle } from 'lucide-solid';
-import { createSignal, For, Show } from 'solid-js';
+import { createMemo, createSignal, For, Show } from 'solid-js';
 import type { JSX } from 'solid-js';
 import { Portal } from 'solid-js/web';
 
 import { commandFailureMessage } from '../../effects/commands';
+import { fetchConnectionState } from '../../effects/connection';
 import { fetchMediaDetail } from '../../effects/library';
 import type { MediaDetail } from '../../effects/library';
-import { queryKeys, runExit } from '../../effects/query';
+import {
+  isLibrarySessionKeyConnected,
+  librarySessionKeyFromConnectionExit,
+  queryKeys,
+  runExit,
+} from '../../effects/query';
 
 // Inlined (instead of importing from ./shared) to avoid a shared.tsx <-> card
 // Import cycle. Matches the formatRuntime shape used elsewhere.
@@ -109,10 +115,16 @@ export function MediaInfoContent(props: { detail: MediaDetail }) {
  */
 export function MediaInfoHoverCard(props: { id: string; itemType: string; children: JSX.Element }) {
   const [open, setOpen] = createSignal(false);
+  const connectionQuery = createQuery(() => ({
+    queryKey: queryKeys.connectionState,
+    queryFn: () => runExit(fetchConnectionState()),
+    staleTime: Infinity,
+  }));
+  const sessionKey = createMemo(() => librarySessionKeyFromConnectionExit(connectionQuery.data));
   const detailQuery = createQuery(() => ({
-    queryKey: queryKeys.libraryMediaDetail(props.itemType, props.id),
+    queryKey: queryKeys.libraryMediaDetail(sessionKey(), props.itemType, props.id),
     queryFn: () => runExit(fetchMediaDetail(props.id, props.itemType)),
-    enabled: open(),
+    enabled: open() && isLibrarySessionKeyConnected(sessionKey()),
     staleTime: Infinity,
   }));
 

@@ -2,6 +2,7 @@ import { Checkbox } from '@ark-ui/solid/checkbox';
 import { Field as ArkField } from '@ark-ui/solid/field';
 import { Tabs } from '@ark-ui/solid/tabs';
 import { createForm } from '@tanstack/solid-form';
+import { useQueryClient } from '@tanstack/solid-query';
 import { Effect, Exit, Fiber } from 'effect';
 import { Check, CircleAlert, LoaderCircle, RadioTower } from 'lucide-solid';
 import { Show, createEffect, createSignal, onCleanup, onMount } from 'solid-js';
@@ -10,6 +11,7 @@ import type { Credentials, MediaServerProvider } from '../bindings';
 import { commandFailureMessage } from '../effects/commands';
 import { connectJellyfin } from '../effects/connection';
 import { CommandError } from '../effects/errors';
+import { queryKeys } from '../effects/query';
 import { runQuickConnectWorkflow } from '../effects/quickConnect';
 import { clearSavedCredentials, loadSavedCredentials, saveCredentials } from '../effects/session';
 import { capabilitiesForProvider } from '../providerCapabilities';
@@ -45,6 +47,7 @@ type ServerUrlValidation =
   | { status: 'error'; message: string };
 
 export default function LoginPage(props: LoginPageProps) {
+  const queryClient = useQueryClient();
   const [loginMethod, setLoginMethod] = createSignal<LoginMethod>('quickConnect');
   const [quickConnectState, setQuickConnectState] = createSignal<QuickConnectState>('idle');
   const [quickConnectCode, setQuickConnectCode] = createSignal<string | null>(null);
@@ -117,6 +120,7 @@ export default function LoginPage(props: LoginPageProps) {
   };
 
   const finishConnected = async () => {
+    queryClient.removeQueries({ queryKey: queryKeys.libraryRoot });
     await saveCurrentSession();
     props.onConnected();
   };
@@ -154,6 +158,7 @@ export default function LoginPage(props: LoginPageProps) {
     setSubmitting(false);
 
     if (Exit.isSuccess(exit)) {
+      queryClient.removeQueries({ queryKey: queryKeys.libraryRoot });
       props.onConnected();
     } else {
       setQuickConnectState('failed');
