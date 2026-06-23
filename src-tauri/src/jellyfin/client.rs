@@ -3229,17 +3229,15 @@ async fn emby_latest_video_items(
     ("EnableUserData", "true".to_string()),
     ("GroupItems", "false".to_string()),
   ];
-  let response = client
-    .get_with_query::<emby_api::models::QueryResultBaseItemDto>(
+  let items = client
+    .get_with_query::<Vec<emby_api::models::BaseItemDto>>(
       &format!("/Users/{user_id}/Items/Latest"),
       &query,
     )
     .await?;
 
   Ok(
-    response
-      .items
-      .unwrap_or_default()
+    items
       .into_iter()
       .filter_map(|item| map_emby_video_home_item(server_url, item, "Primary"))
       .collect(),
@@ -5172,12 +5170,12 @@ mod tests {
       (
         "IncludeItemTypes=Movie",
         "200 OK",
-        r#"{"Items":[{"Id":"00000000-0000-0000-0000-000000000210","Name":"Latest Emby Movie","Type":"Movie","ImageTags":{"Primary":"latest-movie"}}],"TotalRecordCount":1}"#,
+        r#"[{"Id":"00000000-0000-0000-0000-000000000210","Name":"Latest Emby Movie","Type":"Movie","ImageTags":{"Primary":"latest-movie"}}]"#,
       ),
       (
         "IncludeItemTypes=Episode",
         "200 OK",
-        r#"{"Items":[{"Id":"00000000-0000-0000-0000-000000000211","Name":"Latest Emby Episode","Type":"Episode","SeriesName":"Emby Show"}],"TotalRecordCount":1}"#,
+        r#"[{"Id":"00000000-0000-0000-0000-000000000211","Name":"Latest Emby Episode","Type":"Episode","SeriesName":"Emby Show"}]"#,
       ),
       (
         "/Users/00000000-0000-0000-0000-000000000001/Views",
