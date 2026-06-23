@@ -1,6 +1,7 @@
 import { Menu } from '@ark-ui/solid/menu';
 import { Toggle } from '@ark-ui/solid/toggle';
 import type { VideoLibraryKind, VideoLibraryPlayedFilter, VideoLibrarySort } from '@bindings';
+import { useAppScrollArea } from '@components/AppScrollAreaContext';
 import { useLibraryNavbarControls } from '@components/library/LibraryNavbarContext';
 import {
   LibraryStatusPanel,
@@ -81,7 +82,7 @@ function LibraryBrowseRoute() {
   const [autoLoadSentinelVisible, setAutoLoadSentinelVisible] = createSignal(false);
   const [virtualGrid, setVirtualGrid] = createSignal<HTMLDivElement | null>(null);
   const [virtualGridWidth, setVirtualGridWidth] = createSignal(1280);
-  const [appScrollElement, setAppScrollElement] = createSignal<HTMLElement | null>(null);
+  const appScroll = useAppScrollArea();
   const [virtualScrollMargin, setVirtualScrollMargin] = createSignal(0);
   const [virtualPagesByStartIndex, setVirtualPagesByStartIndex] = createSignal(
     new Map<number, LibraryExit<LibraryBrowseState>>(),
@@ -100,7 +101,7 @@ function LibraryBrowseRoute() {
       return gridWidth;
     }
 
-    const viewportWidth = appScrollElement()?.clientWidth ?? 0;
+    const viewportWidth = appScroll.viewport()?.clientWidth ?? 0;
     if (viewportWidth > 0) {
       return viewportWidth;
     }
@@ -112,7 +113,7 @@ function LibraryBrowseRoute() {
     return 1280;
   };
   const fallbackVirtualGridHeight = () => {
-    const viewportHeight = appScrollElement()?.clientHeight ?? 0;
+    const viewportHeight = appScroll.viewport()?.clientHeight ?? 0;
     if (viewportHeight > 0) {
       return viewportHeight;
     }
@@ -127,7 +128,7 @@ function LibraryBrowseRoute() {
     setVirtualGridWidth(fallbackVirtualGridWidth());
 
     const grid = virtualGrid();
-    const scrollElement = appScrollElement();
+    const scrollElement = appScroll.viewport();
     if (!grid || !scrollElement) {
       setVirtualScrollMargin(0);
       return;
@@ -141,9 +142,6 @@ function LibraryBrowseRoute() {
   };
 
   onMount(() => {
-    setAppScrollElement(
-      document.querySelector<HTMLElement>('[data-scope="scroll-area"][data-part="viewport"]'),
-    );
     measureVirtualGrid();
 
     if (typeof window === 'undefined') {
@@ -156,13 +154,13 @@ function LibraryBrowseRoute() {
 
   createEffect(() => {
     virtualGrid();
-    appScrollElement();
+    appScroll.viewport();
     measureVirtualGrid();
   });
 
   createEffect(() => {
     const grid = virtualGrid();
-    const scrollElement = appScrollElement();
+    const scrollElement = appScroll.viewport();
     if (typeof ResizeObserver === 'undefined') {
       measureVirtualGrid();
       return;
@@ -311,7 +309,7 @@ function LibraryBrowseRoute() {
     get count() {
       return usesVirtualGrid() ? Math.ceil(totalRecordCount() / columnCount()) : 0;
     },
-    getScrollElement: () => appScrollElement(),
+    getScrollElement: () => appScroll.viewport(),
     estimateSize: estimateVirtualRowHeight,
     overscan: LIBRARY_BROWSE_GRID_OVERSCAN_ROWS,
     observeElementRect: (instance, callback) =>
