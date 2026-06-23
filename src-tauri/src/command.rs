@@ -9,6 +9,7 @@ use tauri_specta::{collect_commands, collect_events, Builder, Event};
 
 use crate::auth_profiles::{load_profiles, save_profiles, SavedServiceProfiles};
 use crate::config::AppConfig;
+use crate::image_cache::{self, ImageCache, ImageCacheError, ImageCachePartition, ImageCacheState};
 use crate::jellyfin::{
   ConnectionState, Credentials, JellyfinClient, JellyfinError, QuickConnectRequest,
   QuickConnectStatus, SavedSession, SessionManager, VideoHome, VideoItemDetail, VideoLibraryPage,
@@ -613,13 +614,33 @@ pub fn jellyfin_is_connected(state: State<'_, JellyfinState>) -> bool {
 #[specta]
 pub async fn library_video_home(
   state: State<'_, JellyfinState>,
+  config_state: State<'_, ConfigState>,
+  image_cache_state: State<'_, ImageCacheState>,
 ) -> Result<VideoHome, CommandError> {
-  state
+  let home = state
     .client
     .library()
     .video_home()
     .await
-    .map_err(jellyfin_err)
+    .map_err(jellyfin_err)?;
+
+  let Some((cache, partition)) = active_image_cache(&config_state, &image_cache_state, &state)
+  else {
+    return Ok(home);
+  };
+  let client = state.client.clone();
+  Ok(
+    image_cache::cache_video_home(cache, &partition, home, move |url| {
+      let client = client.clone();
+      async move {
+        client
+          .download_image(&url)
+          .await
+          .map_err(image_download_failure)
+      }
+    })
+    .await,
+  )
 }
 
 /// Load Movies and Shows library shortcuts for Library Browser navigation.
@@ -627,13 +648,33 @@ pub async fn library_video_home(
 #[specta]
 pub async fn library_video_shortcuts(
   state: State<'_, JellyfinState>,
+  config_state: State<'_, ConfigState>,
+  image_cache_state: State<'_, ImageCacheState>,
 ) -> Result<Vec<VideoLibraryShortcut>, CommandError> {
-  state
+  let shortcuts = state
     .client
     .library()
     .library_shortcuts()
     .await
-    .map_err(jellyfin_err)
+    .map_err(jellyfin_err)?;
+
+  let Some((cache, partition)) = active_image_cache(&config_state, &image_cache_state, &state)
+  else {
+    return Ok(shortcuts);
+  };
+  let client = state.client.clone();
+  Ok(
+    image_cache::cache_library_shortcuts(cache, &partition, shortcuts, move |url| {
+      let client = client.clone();
+      async move {
+        client
+          .download_image(&url)
+          .await
+          .map_err(image_download_failure)
+      }
+    })
+    .await,
+  )
 }
 
 /// Load one server-paged Movies or Shows library result page.
@@ -641,14 +682,34 @@ pub async fn library_video_shortcuts(
 #[specta]
 pub async fn library_browse_video(
   state: State<'_, JellyfinState>,
+  config_state: State<'_, ConfigState>,
+  image_cache_state: State<'_, ImageCacheState>,
   request: VideoLibraryPageRequest,
 ) -> Result<VideoLibraryPage, CommandError> {
-  state
+  let page = state
     .client
     .library()
     .browse_video(request)
     .await
-    .map_err(jellyfin_err)
+    .map_err(jellyfin_err)?;
+
+  let Some((cache, partition)) = active_image_cache(&config_state, &image_cache_state, &state)
+  else {
+    return Ok(page);
+  };
+  let client = state.client.clone();
+  Ok(
+    image_cache::cache_library_page(cache, &partition, page, move |url| {
+      let client = client.clone();
+      async move {
+        client
+          .download_image(&url)
+          .await
+          .map_err(image_download_failure)
+      }
+    })
+    .await,
+  )
 }
 
 /// Search Movies, Shows, and Episodes with server paging.
@@ -656,14 +717,34 @@ pub async fn library_browse_video(
 #[specta]
 pub async fn library_search_video(
   state: State<'_, JellyfinState>,
+  config_state: State<'_, ConfigState>,
+  image_cache_state: State<'_, ImageCacheState>,
   request: VideoSearchRequest,
 ) -> Result<VideoSearchPage, CommandError> {
-  state
+  let page = state
     .client
     .library()
     .search_video(request)
     .await
-    .map_err(jellyfin_err)
+    .map_err(jellyfin_err)?;
+
+  let Some((cache, partition)) = active_image_cache(&config_state, &image_cache_state, &state)
+  else {
+    return Ok(page);
+  };
+  let client = state.client.clone();
+  Ok(
+    image_cache::cache_search_page(cache, &partition, page, move |url| {
+      let client = client.clone();
+      async move {
+        client
+          .download_image(&url)
+          .await
+          .map_err(image_download_failure)
+      }
+    })
+    .await,
+  )
 }
 
 /// Load Movie or Episode details for the Library Browser.
@@ -671,14 +752,34 @@ pub async fn library_search_video(
 #[specta]
 pub async fn library_item_detail(
   state: State<'_, JellyfinState>,
+  config_state: State<'_, ConfigState>,
+  image_cache_state: State<'_, ImageCacheState>,
   item_id: String,
 ) -> Result<VideoItemDetail, CommandError> {
-  state
+  let detail = state
     .client
     .library()
     .item_detail(item_id)
     .await
-    .map_err(jellyfin_err)
+    .map_err(jellyfin_err)?;
+
+  let Some((cache, partition)) = active_image_cache(&config_state, &image_cache_state, &state)
+  else {
+    return Ok(detail);
+  };
+  let client = state.client.clone();
+  Ok(
+    image_cache::cache_item_detail(cache, &partition, detail, move |url| {
+      let client = client.clone();
+      async move {
+        client
+          .download_image(&url)
+          .await
+          .map_err(image_download_failure)
+      }
+    })
+    .await,
+  )
 }
 
 /// Load Show details with seasons and the Jellyfin next playable episode.
@@ -686,14 +787,34 @@ pub async fn library_item_detail(
 #[specta]
 pub async fn library_show_detail(
   state: State<'_, JellyfinState>,
+  config_state: State<'_, ConfigState>,
+  image_cache_state: State<'_, ImageCacheState>,
   series_id: String,
 ) -> Result<VideoShowDetail, CommandError> {
-  state
+  let detail = state
     .client
     .library()
     .show_detail(series_id)
     .await
-    .map_err(jellyfin_err)
+    .map_err(jellyfin_err)?;
+
+  let Some((cache, partition)) = active_image_cache(&config_state, &image_cache_state, &state)
+  else {
+    return Ok(detail);
+  };
+  let client = state.client.clone();
+  Ok(
+    image_cache::cache_show_detail(cache, &partition, detail, move |url| {
+      let client = client.clone();
+      async move {
+        client
+          .download_image(&url)
+          .await
+          .map_err(image_download_failure)
+      }
+    })
+    .await,
+  )
 }
 
 /// Load Episodes for one Show season.
@@ -701,14 +822,34 @@ pub async fn library_show_detail(
 #[specta]
 pub async fn library_season_episodes(
   state: State<'_, JellyfinState>,
+  config_state: State<'_, ConfigState>,
+  image_cache_state: State<'_, ImageCacheState>,
   request: VideoSeasonEpisodesRequest,
 ) -> Result<VideoSeasonEpisodes, CommandError> {
-  state
+  let episodes = state
     .client
     .library()
     .season_episodes(request)
     .await
-    .map_err(jellyfin_err)
+    .map_err(jellyfin_err)?;
+
+  let Some((cache, partition)) = active_image_cache(&config_state, &image_cache_state, &state)
+  else {
+    return Ok(episodes);
+  };
+  let client = state.client.clone();
+  Ok(
+    image_cache::cache_season_episodes(cache, &partition, episodes, move |url| {
+      let client = client.clone();
+      async move {
+        client
+          .download_image(&url)
+          .await
+          .map_err(image_download_failure)
+      }
+    })
+    .await,
+  )
 }
 
 /// Start explicit Library Browser playback through the active Jellyfin session.
@@ -1021,6 +1162,30 @@ pub struct ConfigState(pub Arc<RwLock<AppConfig>>);
 
 const CONFIG_STORE_FILE: &str = "config.json";
 const CONFIG_STORE_KEY: &str = "app_config";
+
+fn active_image_cache(
+  config_state: &ConfigState,
+  image_cache_state: &ImageCacheState,
+  jellyfin_state: &JellyfinState,
+) -> Option<(Arc<ImageCache>, ImageCachePartition)> {
+  if !config_state.0.read().image_disk_cache_enabled {
+    return None;
+  }
+
+  let connection = jellyfin_state.client.login().connection_state();
+  if !connection.connected {
+    return None;
+  }
+
+  let server_url = connection.server_url.as_deref()?;
+  let cache = image_cache_state.get()?;
+  let partition = ImageCache::partition(connection.provider, server_url);
+  Some((cache, partition))
+}
+
+fn image_download_failure(e: impl std::fmt::Display) -> ImageCacheError {
+  ImageCacheError::Download(e.to_string())
+}
 
 /// Get the current app configuration.
 #[tauri::command]

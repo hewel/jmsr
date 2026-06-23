@@ -122,6 +122,7 @@ Object.assign(window, {
     unregisterListener: () => {},
   },
   __TAURI_INTERNALS__: {
+    convertFileSrc: (path: string, protocol = 'asset') => `${protocol}://localhost/${path}`,
     invoke: async (cmd: string, args?: unknown) => {
       if (cmd === 'plugin:app|version') {
         return 'test';

@@ -21,6 +21,7 @@ import LoginPage from './LoginPage';
 import ConnectionCard from './OperationsConsole/ConnectionCard';
 import DiagnosticsCard from './OperationsConsole/DiagnosticsCard';
 import IntroSkipCard from './OperationsConsole/IntroSkipCard';
+import LibrarySettingsCard from './OperationsConsole/LibrarySettingsCard';
 import PlayerBridgeSettingsCard from './OperationsConsole/PlayerBridgeSettingsCard';
 import SavedServicesCard from './OperationsConsole/SavedServicesCard';
 import SessionCard from './OperationsConsole/SessionCard';
@@ -45,6 +46,7 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
   const [addServicePortalMount, setAddServicePortalMount] = createSignal<HTMLDivElement>();
   const [activatingProfileKey, setActivatingProfileKey] = createSignal<string | null>(null);
   const [removingProfileKey, setRemovingProfileKey] = createSignal<string | null>(null);
+  const [imageCacheEnabledDraft, setImageCacheEnabledDraft] = createSignal<boolean | null>(null);
 
   let configHydrated = false;
   interface PendingSave {
@@ -143,6 +145,7 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
           cfg.preferredSubtitleLanguages,
         ),
       });
+      setImageCacheEnabledDraft(null);
       form.setFieldValue('introSkipperMode', cfg.introSkipperMode ?? 'automatic');
       configHydrated = true;
     }
@@ -158,6 +161,11 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
   const config = () =>
     configQuery.data && Exit.isSuccess(configQuery.data) ? configQuery.data.value : null;
   const introSkipperMode = () => ui.introSkipperDraft ?? config()?.introSkipperMode ?? 'automatic';
+  const imageDiskCacheEnabled = () =>
+    imageCacheEnabledDraft() ??
+    latestConfigSnapshot?.imageDiskCacheEnabled ??
+    config()?.imageDiskCacheEnabled ??
+    true;
 
   const showPlayerBridgeStatus = (type: 'saving' | 'saved' | 'error', text: string) => {
     if (clearPlayerBridgeStatusTimer) {
@@ -320,6 +328,24 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
       },
       onSuccess: () => {
         actions.finishIntroSkipperSave();
+      },
+    });
+  };
+
+  const saveImageDiskCacheEnabled = (enabled: boolean) => {
+    const previous = imageDiskCacheEnabled();
+    const desired = latestConfigSnapshot ?? lastSavedConfig ?? config();
+    if (desired?.imageDiskCacheEnabled === enabled) {
+      return;
+    }
+
+    setImageCacheEnabledDraft(enabled);
+    queueConfigSave(buildConfigSnapshot({ imageDiskCacheEnabled: enabled }), {
+      onError: () => {
+        setImageCacheEnabledDraft(previous);
+      },
+      onSuccess: () => {
+        setImageCacheEnabledDraft(null);
       },
     });
   };
@@ -561,6 +587,11 @@ export default function OperationsConsole(props: OperationsConsoleProps) {
 
           <aside class="space-y-6">
             <DiagnosticsCard />
+
+            <LibrarySettingsCard
+              imageDiskCacheEnabled={imageDiskCacheEnabled()}
+              onImageDiskCacheEnabledChange={saveImageDiskCacheEnabled}
+            />
 
             <Show when={capabilities()?.introSkipper ?? true}>
               <IntroSkipCard

@@ -39,6 +39,7 @@ import {
   queryKeys,
   runExit,
 } from '~effects/query';
+import { imageSource } from '~utils/imageSource';
 
 export const Route = createFileRoute('/_authenticated/library/shows/$seriesId')({
   component: LibraryShowDetailRoute,
@@ -364,7 +365,7 @@ function LibraryShowDetailRoute() {
                                   >
                                     {(artworkUrl) => (
                                       <img
-                                        src={artworkUrl()}
+                                        src={imageSource(artworkUrl())}
                                         alt={`${episode.name} artwork`}
                                         class="h-full w-full object-cover outline outline-1 -outline-offset-1 outline-white/10"
                                         loading="lazy"
@@ -476,7 +477,7 @@ function LibraryShowDetailRoute() {
                     >
                       {(artworkUrl) => (
                         <img
-                          src={artworkUrl()}
+                          src={imageSource(artworkUrl())}
                           alt={`${show().name} artwork`}
                           class="h-full w-full animate-[fadeIn_0.3s_cubic-bezier(0.16,1,0.3,1)_forwards] object-cover outline outline-1 -outline-offset-1 outline-white/10"
                         />

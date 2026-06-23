@@ -30,6 +30,7 @@ import {
   queryKeys,
   runExit,
 } from '~effects/query';
+import { imageSource } from '~utils/imageSource';
 
 const AUDIO_AUTO = 'auto';
 const SUBTITLE_AUTO = 'auto';
@@ -201,7 +202,7 @@ function LibraryItemDetailRoute() {
                     >
                       {(artworkUrl) => (
                         <img
-                          src={artworkUrl()}
+                          src={imageSource(artworkUrl())}
                           alt={`${item().name} artwork`}
                           class="h-full w-full object-cover outline outline-1 -outline-offset-1 outline-white/10"
                         />

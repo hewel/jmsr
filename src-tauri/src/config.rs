@@ -44,6 +44,10 @@ pub struct AppConfig {
   #[serde(default)]
   pub preferred_subtitle_languages: Vec<String>,
 
+  /// Cache Library Browser images on disk for faster repeat browsing.
+  #[serde(default = "default_image_disk_cache_enabled")]
+  pub image_disk_cache_enabled: bool,
+
   /// Keybinding for next episode in MPV.
   #[serde(default = "default_keybind_next")]
   pub keybind_next: String,
@@ -76,6 +80,8 @@ struct AppConfigWire {
   intro_skipper_enabled: Option<bool>,
   #[serde(default)]
   preferred_subtitle_languages: Vec<String>,
+  #[serde(default = "default_image_disk_cache_enabled")]
+  image_disk_cache_enabled: bool,
   #[serde(default = "default_keybind_next")]
   keybind_next: String,
   #[serde(default = "default_keybind_prev")]
@@ -106,6 +112,7 @@ impl<'de> Deserialize<'de> for AppConfig {
       start_minimized: wire.start_minimized,
       intro_skipper_mode,
       preferred_subtitle_languages: wire.preferred_subtitle_languages,
+      image_disk_cache_enabled: wire.image_disk_cache_enabled,
       keybind_next: wire.keybind_next,
       keybind_prev: wire.keybind_prev,
       keybind_intro_skip: wire.keybind_intro_skip,
@@ -137,6 +144,10 @@ fn default_intro_skipper_mode() -> IntroSkipperMode {
   IntroSkipperMode::Automatic
 }
 
+fn default_image_disk_cache_enabled() -> bool {
+  true
+}
+
 impl Default for AppConfig {
   fn default() -> Self {
     Self {
@@ -147,6 +158,7 @@ impl Default for AppConfig {
       start_minimized: false,
       intro_skipper_mode: default_intro_skipper_mode(),
       preferred_subtitle_languages: Vec::new(),
+      image_disk_cache_enabled: default_image_disk_cache_enabled(),
       keybind_next: default_keybind_next(),
       keybind_prev: default_keybind_prev(),
       keybind_intro_skip: default_keybind_intro_skip(),
@@ -210,6 +222,7 @@ mod tests {
 
     assert_eq!(config.intro_skipper_mode, IntroSkipperMode::Automatic);
     assert!(config.preferred_subtitle_languages.is_empty());
+    assert!(config.image_disk_cache_enabled);
   }
 
   #[test]

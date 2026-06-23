@@ -154,6 +154,8 @@ export type AppConfig = {
 	introSkipperMode?: IntroSkipperMode,
 	/**  Ordered subtitle language codes to prefer when Jellyfin does not request a track. */
 	preferredSubtitleLanguages?: string[],
+	/**  Cache Library Browser images on disk for faster repeat browsing. */
+	imageDiskCacheEnabled?: boolean,
 	/**  Keybinding for next episode in MPV. */
 	keybindNext?: string,
 	/**  Keybinding for previous episode in MPV. */

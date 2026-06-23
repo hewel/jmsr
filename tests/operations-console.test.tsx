@@ -41,6 +41,7 @@ const embyConnectedState = {
 
 const config: AppConfig = {
   deviceName: 'JellyPilot Test',
+  imageDiskCacheEnabled: true,
   introSkipperMode: 'automatic',
   keybindIntroSkip: 'g',
   keybindNext: 'Shift+>',
@@ -907,6 +908,26 @@ test('settings and session actions keep shared visual semantics', async () => {
 
   const signOut = screen.getByRole('button', { name: 'Sign out' });
   expect(signOut.className).toContain('border-error');
+
+  cleanup();
+});
+
+test('library image disk cache toggle persists in config', async () => {
+  const configSet = rstest.spyOn(commands, 'configSet').mockResolvedValue({
+    data: null,
+    status: 'ok',
+  });
+  const cleanup = renderConsole();
+
+  await screen.findByDisplayValue('JellyPilot Test');
+  await screen.findByRole('heading', { name: 'Library' });
+  const checkbox = screen.getByRole('checkbox', { name: 'Image disk cache' });
+  expect(checkbox).toBeChecked();
+
+  fireEvent.click(checkbox);
+
+  await waitFor(() => expect(configSet).toHaveBeenCalledTimes(1));
+  expect(configSet).toHaveBeenCalledWith(expect.objectContaining({ imageDiskCacheEnabled: false }));
 
   cleanup();
 });

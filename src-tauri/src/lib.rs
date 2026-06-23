@@ -4,6 +4,7 @@ use std::sync::Arc;
 mod auth_profiles;
 mod command;
 mod config;
+mod image_cache;
 mod jellyfin;
 mod mpv;
 mod now_playing;
@@ -12,10 +13,11 @@ mod tray;
 
 use command::{ConfigState, JellyfinState, MpvState};
 pub use config::AppConfig;
+use image_cache::{ImageCache, ImageCacheState};
 use jellyfin::JellyfinClient;
 use mpv::MpvClient;
 use parking_lot::RwLock;
-use tauri::WindowEvent;
+use tauri::{Manager, WindowEvent};
 use tauri_plugin_log::{Target, TargetKind};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -26,6 +28,8 @@ pub fn run() {
   let config = Arc::new(RwLock::new(AppConfig::default()));
   let config_state = ConfigState(config.clone());
   let config_for_setup = config.clone();
+  let image_cache_state = ImageCacheState::empty();
+  let image_cache_for_setup = image_cache_state.0.clone();
 
   // Create MPV client state
   let mpv_client = Arc::new(MpvClient::new(None));
@@ -39,6 +43,7 @@ pub fn run() {
 
   tauri::Builder::default()
     .manage(config_state)
+    .manage(image_cache_state)
     .manage(mpv_state)
     .manage(jellyfin_state)
     .invoke_handler(builder.invoke_handler())
@@ -57,6 +62,17 @@ pub fn run() {
 
       // Load config from disk (store plugin is now available)
       let loaded_config = command::load_config_from_store(app.handle());
+      match app.path().app_cache_dir() {
+        Ok(cache_dir) => {
+          *image_cache_for_setup.write() = Some(Arc::new(ImageCache::new(cache_dir)));
+        }
+        Err(e) => {
+          log::warn!(
+            "Failed to resolve app cache directory for image cache: {}",
+            e
+          );
+        }
+      }
 
       // Apply loaded config to MPV client
       let mpv_path = loaded_config

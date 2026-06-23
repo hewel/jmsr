@@ -40,11 +40,11 @@ export function LibraryStatusPanel(props: { title: string; description?: string 
         <div class="space-y-2">
           <h2
             id="video-home-status-title"
-            class="font-display text-[24px] leading-[32px] font-bold tracking-tight"
+            class="font-display text-[24px] leading-8 font-bold tracking-tight"
           >
             {props.title}
           </h2>
-          <p class="text-on-surface-variant text-[14px] leading-[20px]">
+          <p class="text-on-surface-variant text-[14px] leading-5">
             {props.description ??
               'JellyPilot is checking the current Jellyfin session before loading Library data.'}
           </p>
@@ -68,7 +68,7 @@ export function VideoHomeRow(props: {
   return (
     <Show when={props.items.length > 0}>
       <section class="space-y-3" aria-labelledby={`row-${props.id}`}>
-        <h2 id={`row-${props.id}`} class="text-on-surface text-[22px] leading-[28px] font-bold">
+        <h2 id={`row-${props.id}`} class="text-on-surface text-[22px] leading-7 font-bold">
           {props.title}
         </h2>
         <div class="grid gap-3 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
@@ -218,7 +218,7 @@ export function UserDataControls(props: {
         </Button>
       </div>
       <Show when={error()}>
-        {(message) => <p class="text-error text-[12px] leading-[16px]">{message()}</p>}
+        {(message) => <p class="text-error text-[12px] leading-4">{message()}</p>}
       </Show>
     </div>
   );
