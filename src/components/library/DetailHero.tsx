@@ -1,4 +1,5 @@
-import { StatusBadge } from '@components/ui';
+import { Button, StatusBadge } from '@components/ui';
+import { ArrowLeft } from 'lucide-solid';
 import { Show } from 'solid-js';
 import type { JSX } from 'solid-js';
 import { imageSource } from '~utils/imageSource';
@@ -14,6 +15,8 @@ export interface DetailHeroProps {
   badges: JSX.Element;
   actions: JSX.Element;
   resumeProgress?: number | null;
+  backLabel?: string;
+  onBack?: () => void;
 }
 
 export function DetailHero(props: DetailHeroProps) {
@@ -46,6 +49,19 @@ export function DetailHero(props: DetailHeroProps) {
         </Show>
       </div>
       <div class="from-surface via-surface/60 absolute inset-0 bg-gradient-to-t to-transparent" />
+
+      <Show when={props.onBack}>
+        <Button
+          type="button"
+          variant="outlined"
+          size="sm"
+          class="absolute top-4 left-4 z-20 rounded-full border-white/15 bg-black/35 text-white shadow-2xl backdrop-blur-md transition-transform hover:border-white/30 hover:bg-black/50 active:scale-[0.96] lg:top-6 lg:left-8 xl:left-10"
+          leadingIcon={<ArrowLeft class="h-4 w-4" />}
+          onClick={() => props.onBack?.()}
+        >
+          {props.backLabel ?? 'Back'}
+        </Button>
+      </Show>
 
       <div class="relative z-10 flex h-full items-end gap-6 px-6 pb-6 lg:gap-8 lg:px-10 lg:pb-8 xl:gap-10 xl:px-12 xl:pb-10">
         <div

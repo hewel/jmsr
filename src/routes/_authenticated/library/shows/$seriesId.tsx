@@ -20,7 +20,7 @@ import {
 import { Button, Card, JellyPilotSelect, StatusBadge } from '@components/ui';
 import type { JellyPilotSelectItem } from '@components/ui';
 import { createMutation, createQuery, useQueryClient } from '@tanstack/solid-query';
-import { createFileRoute } from '@tanstack/solid-router';
+import { createFileRoute, useCanGoBack, useNavigate, useRouter } from '@tanstack/solid-router';
 import { Exit, Option } from 'effect';
 import { Film, Play, RefreshCw, Tv } from 'lucide-solid';
 import { For, Show, Suspense, createMemo, createSignal } from 'solid-js';
@@ -49,6 +49,9 @@ export const Route = createFileRoute('/_authenticated/library/shows/$seriesId')(
 
 function LibraryShowDetailRoute() {
   const params = Route.useParams();
+  const router = useRouter();
+  const navigate = useNavigate();
+  const canGoBack = useCanGoBack();
   const queryClient = useQueryClient();
   const connectionQuery = createQuery(() => ({
     queryKey: queryKeys.connectionState,
@@ -74,6 +77,14 @@ function LibraryShowDetailRoute() {
   const [pendingPlayback, setPendingPlayback] = createSignal<PendingLibraryPlayback | null>(null);
   const [playError, setPlayError] = createSignal<string | null>(null);
 
+  const closeDetail = () => {
+    if (canGoBack()) {
+      router.history.back();
+      return;
+    }
+
+    void navigate({ to: '/library' });
+  };
   const detail = () =>
     showQuery.data && Exit.isSuccess(showQuery.data) ? showQuery.data.value : null;
   const activeSeason = () => {
@@ -261,6 +272,7 @@ function LibraryShowDetailRoute() {
                 artworkAspect="poster"
                 typeLabel="Series"
                 typeIcon={<Tv class="h-6 w-6" />}
+                onBack={closeDetail}
                 badges={
                   <>
                     <StatusBadge variant={show().played ? 'success' : 'neutral'}>

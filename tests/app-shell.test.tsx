@@ -545,10 +545,16 @@ function appScrollViewport(): HTMLElement {
   throw new Error('App scroll viewport was not rendered');
 }
 
-function renderShell(path = '/library', client?: QueryClient) {
+function renderShell(path: string | string[] = '/library', client?: QueryClient) {
   const root = document.createElement('div');
   document.body.append(root);
-  const router = createJellyPilotRouter(createMemoryHistory({ initialEntries: [path] }));
+  const initialEntries = Array.isArray(path) ? path : [path];
+  const router = createJellyPilotRouter(
+    createMemoryHistory({
+      initialEntries,
+      initialIndex: initialEntries.length - 1,
+    }),
+  );
   const dispose = render(
     () => (
       <TestQueryProvider client={client}>
@@ -1194,6 +1200,7 @@ test('library item detail renders resume-primary movie metadata', async () => {
   const cleanup = renderShell('/library/items/detail-movie');
 
   await screen.findByRole('heading', { name: 'Detail Movie' });
+  expect(screen.getByRole('button', { name: 'Back' })).toBeVisible();
   expect(screen.getByText('A movie overview.')).toBeVisible();
   expect(screen.getByText('Drama')).toBeVisible();
   expect(screen.getByText('Mystery')).toBeVisible();
@@ -1253,6 +1260,33 @@ test('library item detail renders resume-primary movie metadata', async () => {
     }),
   );
   expect(mpvStart).not.toHaveBeenCalled();
+
+  cleanup();
+});
+
+test('library item detail back falls back to library home without route history', async () => {
+  mockShellCommands();
+  const cleanup = renderShell('/library/items/detail-movie');
+
+  await screen.findByRole('heading', { name: 'Detail Movie' });
+  fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+
+  expect(await screen.findByRole('heading', { name: 'Continue Watching' })).toBeVisible();
+  await waitFor(() => expect(screen.queryByRole('heading', { name: 'Detail Movie' })).toBeNull());
+
+  cleanup();
+});
+
+test('library item detail back returns to the previous library route when history exists', async () => {
+  mockShellCommands();
+  const cleanup = renderShell(['/library/movies/movies', '/library/items/detail-movie']);
+
+  await screen.findByRole('heading', { name: 'Detail Movie' });
+  fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+
+  expect(await screen.findByRole('heading', { name: 'Movies' })).toBeVisible();
+  expect(await screen.findByRole('link', { name: 'Open Paged Movie, favorite' })).toBeVisible();
+  await waitFor(() => expect(screen.queryByRole('heading', { name: 'Detail Movie' })).toBeNull());
 
   cleanup();
 });
@@ -1346,6 +1380,7 @@ test('library show detail auto-loads next-up season and renders episode rows', a
   const cleanup = renderShell('/library/shows/series-1');
 
   await screen.findByRole('heading', { name: 'Example Show' });
+  expect(screen.getByRole('button', { name: 'Back' })).toBeVisible();
   expect(screen.getByText('A show overview.')).toBeVisible();
   expect(screen.getByText('Drama')).toBeVisible();
   expect(screen.getByText('Unplayed')).toBeVisible();

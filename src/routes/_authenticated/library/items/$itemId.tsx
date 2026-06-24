@@ -18,7 +18,7 @@ import {
 } from '@components/library/shared';
 import { Button, StatusBadge } from '@components/ui';
 import { createMutation, createQuery, useQueryClient } from '@tanstack/solid-query';
-import { createFileRoute } from '@tanstack/solid-router';
+import { createFileRoute, useCanGoBack, useNavigate, useRouter } from '@tanstack/solid-router';
 import { Exit } from 'effect';
 import { Film, Play, RotateCcw, Tv } from 'lucide-solid';
 import { For, Show, Suspense, createMemo, createSignal } from 'solid-js';
@@ -42,6 +42,9 @@ export const Route = createFileRoute('/_authenticated/library/items/$itemId')({
 
 function LibraryItemDetailRoute() {
   const params = Route.useParams();
+  const router = useRouter();
+  const navigate = useNavigate();
+  const canGoBack = useCanGoBack();
   const queryClient = useQueryClient();
   const connectionQuery = createQuery(() => ({
     queryKey: queryKeys.connectionState,
@@ -64,6 +67,14 @@ function LibraryItemDetailRoute() {
   const [pendingPlayback, setPendingPlayback] = createSignal<PendingLibraryPlayback | null>(null);
   const [playError, setPlayError] = createSignal<string | null>(null);
 
+  const closeDetail = () => {
+    if (canGoBack()) {
+      router.history.back();
+      return;
+    }
+
+    void navigate({ to: '/library' });
+  };
   const detail = () =>
     detailQuery.data && Exit.isSuccess(detailQuery.data) ? detailQuery.data.value : null;
   const statusTitle = () => {
@@ -140,6 +151,7 @@ function LibraryItemDetailRoute() {
                   artworkAspect={isEpisode() ? 'landscape' : 'poster'}
                   typeLabel={item().itemType}
                   typeIcon={isEpisode() ? <Tv class="h-6 w-6" /> : <Film class="h-6 w-6" />}
+                  onBack={closeDetail}
                   badges={
                     <>
                       <StatusBadge variant={item().played ? 'success' : 'neutral'}>
