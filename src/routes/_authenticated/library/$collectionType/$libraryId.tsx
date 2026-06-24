@@ -369,6 +369,30 @@ function LibraryBrowseRoute() {
     getScrollElement: () => appScroll.viewport(),
     estimateSize: estimateVirtualRowHeight,
     overscan: LIBRARY_BROWSE_GRID_OVERSCAN_ROWS,
+    observeElementOffset: (_instance, callback) => {
+      callback(appScroll.snapshot().scrollTop, false);
+
+      let scrollEndTimer: ReturnType<typeof setTimeout> | undefined;
+      const unsubscribe = appScroll.subscribe((snapshot, event) => {
+        const isScrolling = event !== null;
+        callback(snapshot.scrollTop, isScrolling);
+        if (!isScrolling) {
+          return;
+        }
+
+        if (scrollEndTimer) {
+          clearTimeout(scrollEndTimer);
+        }
+        scrollEndTimer = setTimeout(() => callback(snapshot.scrollTop, false), 150);
+      });
+
+      return () => {
+        if (scrollEndTimer) {
+          clearTimeout(scrollEndTimer);
+        }
+        unsubscribe();
+      };
+    },
     observeElementRect: (instance, callback) =>
       observeElementRect(instance, (rect) =>
         callback({

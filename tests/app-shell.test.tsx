@@ -534,9 +534,7 @@ function mockShellCommands(state = connectedState) {
 }
 
 function appScrollViewport(): HTMLElement {
-  const viewport = document.querySelector<HTMLElement>(
-    '[data-scope="scroll-area"][data-part="viewport"]',
-  );
+  const viewport = document.querySelector<HTMLElement>('[data-testid="app-scroll-viewport"]');
   if (viewport) {
     return viewport;
   }
@@ -640,11 +638,8 @@ test('authenticated shell removes top header chrome and exposes floating control
   );
   expect(within(floatingControls).getByRole('button', { name: 'Open Settings' })).toBeVisible();
 
-  const scrollAreaRoot = document.querySelector('[data-scope="scroll-area"][data-part="root"]');
-  if (!(scrollAreaRoot instanceof HTMLElement)) {
-    throw new Error('Missing ScrollArea root');
-  }
-  expect(scrollAreaRoot).toHaveClass('has-[>[data-scrolling]]:select-none');
+  expect(document.querySelector('[data-scope="scroll-area"][data-part="root"]')).toBeNull();
+  expect(appScrollViewport()).toHaveClass('h-screen', 'w-screen', 'overflow-auto');
 
   // Main content reserves bottom space so the floating cluster cannot cover it.
   expect(screen.getByRole('main')).toHaveClass('pb-40');

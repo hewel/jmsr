@@ -11,7 +11,7 @@ export function ConsoleShell(props: ConsoleShellProps) {
   const [local, rest] = splitProps(props, ['class', 'children']);
   return (
     <div
-      class={`text-on-surface flex min-h-dvh flex-col justify-between p-1 sm:p-2 lg:p-4 ${local.class ?? ''}`}
+      class={`text-on-surface flex min-h-dvh flex-col justify-between px-2.5 py-2 ${local.class ?? ''}`}
       {...rest}
     >
       {local.children}

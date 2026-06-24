@@ -1,4 +1,3 @@
-import { ScrollArea } from '@ark-ui/solid';
 import {
   AppScrollAreaProvider,
   createAppScrollAreaController,
@@ -13,21 +12,16 @@ const ScrollerWrapper: Component = () => {
 
   return (
     <AppScrollAreaProvider value={appScroll}>
-      <ScrollArea.Root class="relative flex h-screen w-screen overflow-hidden has-[>[data-scrolling]]:select-none">
-        <ScrollArea.Viewport
-          ref={appScroll.setViewport}
-          onScroll={appScroll.handleViewportScroll}
-          class="h-full w-full scrollbar-none overscroll-contain"
-        >
-          <ScrollArea.Content>
-            <Outlet />
-          </ScrollArea.Content>
-        </ScrollArea.Viewport>
-        <ScrollArea.Scrollbar class="flex touch-none p-0.5 opacity-0 transition-colors duration-200 hover:opacity-100 data-scrolling:opacity-100 data-[orientation=horizontal]:h-3 data-[orientation=horizontal]:w-full data-[orientation=horizontal]:flex-col data-[orientation=vertical]:h-full data-[orientation=vertical]:w-3">
-          <ScrollArea.Thumb class="bg-outline/55 hover:bg-outline relative flex-1 rounded-full transition-colors before:absolute before:-inset-1" />
-        </ScrollArea.Scrollbar>
-        <ScrollArea.Corner class="bg-surface-container-highest/70" />
-      </ScrollArea.Root>
+      <div
+        ref={appScroll.setViewport}
+        onScroll={appScroll.handleViewportScroll}
+        data-testid="app-scroll-viewport"
+        class="h-screen w-screen overflow-auto overscroll-contain"
+      >
+        <div class="min-w-fit">
+          <Outlet />
+        </div>
+      </div>
     </AppScrollAreaProvider>
   );
 };

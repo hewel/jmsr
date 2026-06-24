@@ -42,7 +42,7 @@ export default function LibraryNavbar(props: LibraryNavbarProps) {
   return (
     <nav
       aria-label="Library navigation"
-      class="border-outline-variant bg-surface-container-low/75 sticky top-2 z-30 rounded-2xl border shadow-xl backdrop-blur-md"
+      class="border-outline-variant bg-surface-container-low/75 sticky top-2 z-200 rounded-2xl border shadow-xl backdrop-blur-md"
     >
       <div class="flex flex-row flex-wrap items-center justify-between gap-2 sm:gap-4">
         <SegmentGroup.Root

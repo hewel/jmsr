@@ -65,6 +65,26 @@ function snapshotFromViewport(viewport: HTMLElement | null): AppScrollSnapshot {
   };
 }
 
+function snapshotFromScrollOffset(
+  viewport: HTMLElement,
+  previous: AppScrollSnapshot,
+): AppScrollSnapshot {
+  const scrollTop = viewport.scrollTop;
+  const scrollLeft = viewport.scrollLeft;
+  const scrollBottom = scrollTop + previous.clientHeight;
+  const scrollRight = scrollLeft + previous.clientWidth;
+
+  return {
+    ...previous,
+    scrollTop,
+    scrollLeft,
+    atTop: scrollTop <= SCROLL_EDGE_TOLERANCE_PX,
+    atBottom: scrollBottom >= previous.scrollHeight - SCROLL_EDGE_TOLERANCE_PX,
+    atLeft: scrollLeft <= SCROLL_EDGE_TOLERANCE_PX,
+    atRight: scrollRight >= previous.scrollWidth - SCROLL_EDGE_TOLERANCE_PX,
+  };
+}
+
 export function createAppScrollAreaController(): AppScrollAreaApi {
   const [viewport, setViewportSignal] = createSignal<HTMLElement | null>(null);
   const [snapshot, setSnapshot] = createSignal<AppScrollSnapshot>(INITIAL_SCROLL_SNAPSHOT);
@@ -90,7 +110,7 @@ export function createAppScrollAreaController(): AppScrollAreaApi {
     if (viewport() !== currentViewport) {
       setViewportSignal(currentViewport);
     }
-    publish(snapshotFromViewport(currentViewport), event);
+    publish(snapshotFromScrollOffset(currentViewport, snapshot()), event);
   };
 
   return {
