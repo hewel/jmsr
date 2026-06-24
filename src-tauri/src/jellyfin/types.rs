@@ -99,7 +99,7 @@ pub struct VideoHomeItem {
   pub played_percentage: Option<f64>,
   pub played: bool,
   pub favorite: bool,
-  pub artwork_url: Option<String>,
+  pub artwork_image_id: Option<String>,
 }
 
 /// Video library shortcut for drilling into Movies or Shows libraries.
@@ -110,7 +110,7 @@ pub struct VideoLibraryShortcut {
   pub name: String,
   pub collection_type: String,
   pub item_count: Option<i32>,
-  pub artwork_url: Option<String>,
+  pub artwork_image_id: Option<String>,
 }
 
 /// Supported video library browse families.
@@ -181,7 +181,7 @@ pub struct VideoLibraryItem {
   pub runtime_seconds: Option<f64>,
   pub played: bool,
   pub favorite: bool,
-  pub artwork_url: Option<String>,
+  pub artwork_image_id: Option<String>,
   /// Episode metadata: season number (1-based), available for Episode items.
   pub season_number: Option<i32>,
   /// Episode metadata: episode number within season (1-based), available for Episode items.
@@ -238,8 +238,8 @@ pub struct VideoItemDetail {
   pub resume_position_seconds: Option<f64>,
   pub can_resume: bool,
   pub can_play: bool,
-  pub artwork_url: Option<String>,
-  pub backdrop_url: Option<String>,
+  pub artwork_image_id: Option<String>,
+  pub backdrop_image_id: Option<String>,
   pub audio_streams: Vec<VideoPlaybackStreamOption>,
   pub subtitle_streams: Vec<VideoPlaybackStreamOption>,
 }
@@ -268,8 +268,8 @@ pub struct VideoShowDetail {
   pub played: bool,
   pub favorite: bool,
   pub can_play: bool,
-  pub artwork_url: Option<String>,
-  pub backdrop_url: Option<String>,
+  pub artwork_image_id: Option<String>,
+  pub backdrop_image_id: Option<String>,
   pub next_episode: Option<VideoLibraryItem>,
   pub seasons: Vec<VideoSeason>,
 }
@@ -283,7 +283,7 @@ pub struct VideoSeason {
   pub season_number: Option<i32>,
   pub played: bool,
   pub favorite: bool,
-  pub artwork_url: Option<String>,
+  pub artwork_image_id: Option<String>,
 }
 
 /// Request for episodes inside a show season.

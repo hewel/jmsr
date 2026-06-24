@@ -28,8 +28,8 @@ const connectedState = {
 };
 
 const movieDetail: VideoItemDetail = {
-  artworkUrl: 'https://example.com/movie.png',
-  backdropUrl: null,
+  artworkImageId: 'https://example.com/movie.png',
+  backdropImageId: null,
   audioStreams: [],
   canPlay: true,
   canResume: true,
@@ -52,8 +52,8 @@ const movieDetail: VideoItemDetail = {
 };
 
 const showDetail: VideoShowDetail = {
-  artworkUrl: null,
-  backdropUrl: null,
+  artworkImageId: null,
+  backdropImageId: null,
   canPlay: true,
   favorite: false,
   genres: ['Crime', 'Thriller'],
@@ -67,7 +67,7 @@ const showDetail: VideoShowDetail = {
 };
 
 const movieMediaDetail: MediaDetail = {
-  artworkUrl: Option.some('https://example.com/movie.png'),
+  artworkImageId: Option.some('https://example.com/movie.png'),
   favorite: true,
   genres: ['Drama', 'Sci-Fi'],
   id: 'movie-1',

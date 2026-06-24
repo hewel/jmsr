@@ -146,8 +146,8 @@ function LibraryItemDetailRoute() {
                 <DetailHero
                   title={item().name}
                   subtitle={detailSubtitleElement(item())}
-                  backdropUrl={item().backdropUrl ?? null}
-                  artworkUrl={item().artworkUrl ?? null}
+                  backdropImageId={item().backdropImageId ?? null}
+                  artworkImageId={item().artworkImageId ?? null}
                   artworkAspect={isEpisode() ? 'landscape' : 'poster'}
                   typeLabel={item().itemType}
                   typeIcon={isEpisode() ? <Tv class="h-6 w-6" /> : <Film class="h-6 w-6" />}

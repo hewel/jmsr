@@ -23,7 +23,7 @@ import { createMutation, createQuery, useQueryClient } from '@tanstack/solid-que
 import { createFileRoute, useCanGoBack, useNavigate, useRouter } from '@tanstack/solid-router';
 import { Exit, Option } from 'effect';
 import { Film, Play, RefreshCw, Tv } from 'lucide-solid';
-import { For, Show, Suspense, createMemo, createSignal } from 'solid-js';
+import { For, Show, Suspense, createEffect, createMemo, createSignal } from 'solid-js';
 import { commandFailureMessage } from '~effects/commands';
 import { fetchConnectionState } from '~effects/connection';
 import {
@@ -267,8 +267,8 @@ function LibraryShowDetailRoute() {
               <DetailHero
                 title={show().name}
                 subtitle={showSubtitle(show())}
-                backdropUrl={show().backdropUrl ?? null}
-                artworkUrl={show().artworkUrl ?? null}
+                backdropImageId={show().backdropImageId ?? null}
+                artworkImageId={show().artworkImageId ?? null}
                 artworkAspect="poster"
                 typeLabel="Series"
                 typeIcon={<Tv class="h-6 w-6" />}
@@ -518,10 +518,16 @@ function EpisodeRow(props: {
   disabled: boolean;
   onPlay: () => void;
 }) {
+  const [imageFailed, setImageFailed] = createSignal(false);
   const hasResume = () =>
     props.episode.resumePositionSeconds != null &&
     props.episode.resumePositionSeconds > 0 &&
     !props.episode.played;
+
+  createEffect(() => {
+    props.episode.artworkImageId;
+    setImageFailed(false);
+  });
 
   return (
     <Card
@@ -531,19 +537,20 @@ function EpisodeRow(props: {
     >
       <div class="bg-surface-container-lowest/60 hidden aspect-video w-[160px] overflow-hidden rounded-lg sm:block lg:w-[220px]">
         <Show
-          when={props.episode.artworkUrl}
+          when={!imageFailed() ? props.episode.artworkImageId : null}
           fallback={
             <div class="text-on-surface-variant flex h-full items-center justify-center text-[11px] leading-[16px] font-bold tracking-[0.08em] uppercase">
               <Film class="h-5 w-5" />
             </div>
           }
         >
-          {(artworkUrl) => (
+          {(imageId) => (
             <img
-              src={imageSource(artworkUrl())}
+              src={imageSource(imageId())}
               alt={`${props.episode.name} artwork`}
               class="h-full w-full object-cover outline outline-1 -outline-offset-1 outline-white/10"
               loading="lazy"
+              onError={() => setImageFailed(true)}
             />
           )}
         </Show>

@@ -130,12 +130,12 @@ export interface MediaDetail {
   favorite: boolean;
   playedPercentage: Option.Option<number>;
   resumePositionSeconds: Option.Option<number>;
-  artworkUrl: Option.Option<string>;
+  artworkImageId: Option.Option<string>;
 }
 
 function toMediaDetail(detail: VideoItemDetail | VideoShowDetail, itemType: string): MediaDetail {
   return {
-    artworkUrl: Option.fromNullishOr(detail.artworkUrl),
+    artworkImageId: Option.fromNullishOr(detail.artworkImageId),
     favorite: detail.favorite,
     genres: detail.genres,
     id: detail.id,

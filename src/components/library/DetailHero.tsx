@@ -1,14 +1,14 @@
 import { Button, StatusBadge } from '@components/ui';
 import { ArrowLeft } from 'lucide-solid';
-import { Show } from 'solid-js';
+import { Show, createEffect, createSignal } from 'solid-js';
 import type { JSX } from 'solid-js';
 import { imageSource } from '~utils/imageSource';
 
 export interface DetailHeroProps {
   title: string;
   subtitle: JSX.Element;
-  backdropUrl: string | null;
-  artworkUrl: string | null;
+  backdropImageId: string | null;
+  artworkImageId: string | null;
   artworkAspect: 'poster' | 'landscape';
   typeLabel: string;
   typeIcon: JSX.Element;
@@ -20,7 +20,9 @@ export interface DetailHeroProps {
 }
 
 export function DetailHero(props: DetailHeroProps) {
-  const heroImage = () => props.backdropUrl ?? props.artworkUrl;
+  const heroImageId = () => props.backdropImageId ?? props.artworkImageId;
+  const [heroImageFailed, setHeroImageFailed] = createSignal(false);
+  const [artworkImageFailed, setArtworkImageFailed] = createSignal(false);
   const artworkWidthClass = () =>
     props.artworkAspect === 'poster'
       ? 'w-[140px] lg:w-[190px] 2xl:w-[220px]'
@@ -29,21 +31,32 @@ export function DetailHero(props: DetailHeroProps) {
     props.artworkAspect === 'poster' ? 'aspect-[2/3]' : 'aspect-video';
   const progressPercent = () => Math.max(0, Math.min(1, props.resumeProgress ?? 0)) * 100;
 
+  createEffect(() => {
+    heroImageId();
+    setHeroImageFailed(false);
+  });
+
+  createEffect(() => {
+    props.artworkImageId;
+    setArtworkImageFailed(false);
+  });
+
   return (
     <section class="relative h-[clamp(280px,44vh,560px)] overflow-hidden">
       <div class="absolute inset-0">
         <Show
-          when={heroImage()}
+          when={!heroImageFailed() ? heroImageId() : null}
           fallback={
             <div class="from-primary-container/30 to-surface h-full w-full bg-gradient-to-b" />
           }
         >
-          {(url) => (
+          {(imageId) => (
             <img
-              src={imageSource(url())}
+              src={imageSource(imageId())}
               alt=""
               aria-hidden="true"
               class="h-full w-full scale-110 object-cover blur-[20px] brightness-[0.3]"
+              onError={() => setHeroImageFailed(true)}
             />
           )}
         </Show>
@@ -68,7 +81,7 @@ export function DetailHero(props: DetailHeroProps) {
           class={`bg-surface-container-lowest/70 relative hidden shrink-0 overflow-hidden rounded-xl shadow-2xl outline outline-1 -outline-offset-1 outline-white/10 sm:block ${artworkWidthClass()} ${artworkAspectClass()}`}
         >
           <Show
-            when={props.artworkUrl}
+            when={!artworkImageFailed() ? props.artworkImageId : null}
             fallback={
               <div class="text-on-surface-variant flex h-full flex-col items-center justify-center gap-3 px-4 text-center">
                 <div class="text-secondary bg-secondary-container/30 flex h-12 w-12 items-center justify-center rounded-2xl">
@@ -80,11 +93,12 @@ export function DetailHero(props: DetailHeroProps) {
               </div>
             }
           >
-            {(artworkUrl) => (
+            {(imageId) => (
               <img
-                src={imageSource(artworkUrl())}
+                src={imageSource(imageId())}
                 alt={`${props.title} artwork`}
                 class="h-full w-full object-cover"
+                onError={() => setArtworkImageFailed(true)}
               />
             )}
           </Show>

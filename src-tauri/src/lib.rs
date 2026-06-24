@@ -5,6 +5,7 @@ mod auth_profiles;
 mod command;
 mod config;
 mod image_cache;
+mod image_ref;
 mod jellyfin;
 mod mpv;
 mod now_playing;
@@ -30,6 +31,7 @@ pub fn run() {
   let config_for_setup = config.clone();
   let image_cache_state = ImageCacheState::empty();
   let image_cache_for_setup = image_cache_state.0.clone();
+  let image_cache_for_protocol = image_cache_state.clone();
 
   // Create MPV client state
   let mpv_client = Arc::new(MpvClient::new(None));
@@ -39,9 +41,25 @@ pub fn run() {
   // Create Jellyfin client state
   let jellyfin_client = Arc::new(JellyfinClient::new());
   let jellyfin_for_setup = jellyfin_client.clone();
+  let jellyfin_for_protocol = jellyfin_client.clone();
   let jellyfin_state = JellyfinState::new(jellyfin_client, mpv_client);
+  let config_for_protocol = config.clone();
 
   tauri::Builder::default()
+    .register_asynchronous_uri_scheme_protocol(
+      "jellypilot-image",
+      move |_ctx, request, responder| {
+        let client = jellyfin_for_protocol.clone();
+        let config = config_for_protocol.clone();
+        let image_cache_state = image_cache_for_protocol.clone();
+        let token = request.uri().path().trim_start_matches('/').to_string();
+        tauri::async_runtime::spawn(async move {
+          responder.respond(
+            image_cache::image_response_for_token(client, config, image_cache_state, token).await,
+          );
+        });
+      },
+    )
     .manage(config_state)
     .manage(image_cache_state)
     .manage(mpv_state)

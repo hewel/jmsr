@@ -45,8 +45,8 @@ test('initialSeasonForShow returns season matching nextEpisode.seasonNumber', ()
     played: false,
     productionYear: null,
     canPlay: true,
-    artworkUrl: null,
-    backdropUrl: null,
+    artworkImageId: null,
+    backdropImageId: null,
     nextEpisode: {
       id: 'ep-2',
       name: 'Episode 2',
@@ -55,7 +55,7 @@ test('initialSeasonForShow returns season matching nextEpisode.seasonNumber', ()
       runtimeSeconds: null,
       played: false,
       favorite: false,
-      artworkUrl: null,
+      artworkImageId: null,
       seasonNumber: 2,
       episodeNumber: 1,
       seriesId: 'show-1',
@@ -70,7 +70,7 @@ test('initialSeasonForShow returns season matching nextEpisode.seasonNumber', ()
         seasonNumber: 1,
         played: false,
         favorite: false,
-        artworkUrl: null,
+        artworkImageId: null,
       },
       {
         id: 'season-2',
@@ -78,7 +78,7 @@ test('initialSeasonForShow returns season matching nextEpisode.seasonNumber', ()
         seasonNumber: 2,
         played: false,
         favorite: false,
-        artworkUrl: null,
+        artworkImageId: null,
       },
     ],
   };
@@ -92,7 +92,7 @@ test('initialSeasonForShow returns season matching nextEpisode.seasonNumber', ()
       seasonNumber: 2,
       played: false,
       favorite: false,
-      artworkUrl: null,
+      artworkImageId: null,
     });
   }
 });
@@ -107,8 +107,8 @@ test('initialSeasonForShow returns first season if no matching nextEpisode.seaso
     played: false,
     productionYear: null,
     canPlay: true,
-    artworkUrl: null,
-    backdropUrl: null,
+    artworkImageId: null,
+    backdropImageId: null,
     nextEpisode: null,
     seasons: [
       {
@@ -117,7 +117,7 @@ test('initialSeasonForShow returns first season if no matching nextEpisode.seaso
         seasonNumber: 1,
         played: false,
         favorite: false,
-        artworkUrl: null,
+        artworkImageId: null,
       },
       {
         id: 'season-2',
@@ -125,7 +125,7 @@ test('initialSeasonForShow returns first season if no matching nextEpisode.seaso
         seasonNumber: 2,
         played: false,
         favorite: false,
-        artworkUrl: null,
+        artworkImageId: null,
       },
     ],
   };
@@ -139,7 +139,7 @@ test('initialSeasonForShow returns first season if no matching nextEpisode.seaso
       seasonNumber: 1,
       played: false,
       favorite: false,
-      artworkUrl: null,
+      artworkImageId: null,
     });
   }
 });
@@ -154,8 +154,8 @@ test('initialSeasonForShow returns null if show has no seasons', () => {
     played: false,
     productionYear: null,
     canPlay: true,
-    artworkUrl: null,
-    backdropUrl: null,
+    artworkImageId: null,
+    backdropImageId: null,
     nextEpisode: null,
     seasons: [],
   };

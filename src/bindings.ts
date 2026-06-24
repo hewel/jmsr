@@ -330,7 +330,7 @@ export type VideoHomeItem = {
 	playedPercentage: number | null,
 	played: boolean,
 	favorite: boolean,
-	artworkUrl: string | null,
+	artworkImageId: string | null,
 };
 
 /**  Playable Movie or Episode detail data exposed to the frontend. */
@@ -352,8 +352,8 @@ export type VideoItemDetail = {
 	resumePositionSeconds: number | null,
 	canResume: boolean,
 	canPlay: boolean,
-	artworkUrl: string | null,
-	backdropUrl: string | null,
+	artworkImageId: string | null,
+	backdropImageId: string | null,
 	audioStreams: VideoPlaybackStreamOption[],
 	subtitleStreams: VideoPlaybackStreamOption[],
 };
@@ -367,7 +367,7 @@ export type VideoLibraryItem = {
 	runtimeSeconds: number | null,
 	played: boolean,
 	favorite: boolean,
-	artworkUrl: string | null,
+	artworkImageId: string | null,
 	/**  Episode metadata: season number (1-based), available for Episode items. */
 	seasonNumber: number | null,
 	/**  Episode metadata: episode number within season (1-based), available for Episode items. */
@@ -428,7 +428,7 @@ export type VideoLibraryShortcut = {
 	name: string,
 	collectionType: string,
 	itemCount: number | null,
-	artworkUrl: string | null,
+	artworkImageId: string | null,
 };
 
 /**  Supported Library Browser sort options. */
@@ -468,7 +468,7 @@ export type VideoSeason = {
 	seasonNumber: number | null,
 	played: boolean,
 	favorite: boolean,
-	artworkUrl: string | null,
+	artworkImageId: string | null,
 };
 
 /**  Episode list for a selected season. */
@@ -496,8 +496,8 @@ export type VideoShowDetail = {
 	played: boolean,
 	favorite: boolean,
 	canPlay: boolean,
-	artworkUrl: string | null,
-	backdropUrl: string | null,
+	artworkImageId: string | null,
+	backdropImageId: string | null,
 	nextEpisode: VideoLibraryItem | null,
 	seasons: VideoSeason[],
 };

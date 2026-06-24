@@ -1,5 +1,5 @@
 import { Check, Film, Heart, Tv } from 'lucide-solid';
-import { Show } from 'solid-js';
+import { Show, createEffect, createSignal } from 'solid-js';
 
 import type { VideoHomeItem, VideoLibraryItem, VideoLibraryKind } from '../../bindings';
 import { imageSource } from '../../utils/imageSource';
@@ -78,6 +78,13 @@ export function VideoCard(props: VideoCardProps) {
     props.item.itemType === 'Episode';
 
   const cardAriaLabel = () => `Open ${props.item.name}${props.item.favorite ? ', favorite' : ''}`;
+  const [imageFailed, setImageFailed] = createSignal(false);
+  const artworkImageId = () => props.item.artworkImageId;
+
+  createEffect(() => {
+    artworkImageId();
+    setImageFailed(false);
+  });
 
   return (
     <a
@@ -89,7 +96,7 @@ export function VideoCard(props: VideoCardProps) {
         class={`${aspectClass()} border-outline-variant bg-surface-container-lowest/60 relative overflow-hidden border-b`}
       >
         <Show
-          when={props.item.artworkUrl}
+          when={!imageFailed() ? artworkImageId() : null}
           fallback={
             <div class="text-on-surface-variant flex h-full flex-col items-center justify-center gap-2 px-4 text-center text-[11px] leading-4 font-bold tracking-[0.08em] uppercase">
               <Show when={usesTvIcon()} fallback={<Film class="h-5 w-5" aria-hidden="true" />}>
@@ -99,12 +106,13 @@ export function VideoCard(props: VideoCardProps) {
             </div>
           }
         >
-          {(artworkUrl) => (
+          {(imageId) => (
             <img
-              src={imageSource(artworkUrl())}
+              src={imageSource(imageId())}
               alt={`${props.item.name} artwork`}
               class="h-full w-full object-cover outline -outline-offset-1 outline-white/10"
               loading="lazy"
+              onError={() => setImageFailed(true)}
             />
           )}
         </Show>

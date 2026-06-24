@@ -7,18 +7,16 @@ use std::{
   time::{SystemTime, UNIX_EPOCH},
 };
 
-use futures_util::{stream, StreamExt};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
+use tauri::http::{header, Response, StatusCode};
 use tokio::sync::Mutex;
 
-use crate::jellyfin::{
-  MediaServerProvider, VideoHome, VideoItemDetail, VideoLibraryPage, VideoLibraryShortcut,
-  VideoSearchPage, VideoSeasonEpisodes, VideoShowDetail,
-};
+use crate::config::AppConfig;
+use crate::image_ref::{decode_image_id, normalize_server_url};
+use crate::jellyfin::{JellyfinClient, MediaServerProvider};
 
 pub const IMAGE_CACHE_MAX_BYTES: u64 = 1024 * 1024 * 1024;
-pub const IMAGE_CACHE_CONCURRENCY: usize = 6;
 pub const IMAGE_CACHE_DOWNLOAD_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
 
 #[derive(Debug, thiserror::Error)]
@@ -39,7 +37,7 @@ pub struct ImageDownload {
   pub content_type: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ImageCachePartition {
   id: String,
 }
@@ -49,6 +47,8 @@ struct CacheEntry {
   file_name: String,
   size_bytes: u64,
   accessed_at_ms: u128,
+  #[serde(default)]
+  content_type: Option<String>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -62,6 +62,7 @@ pub struct ImageCache {
   index_lock: Mutex<()>,
 }
 
+#[derive(Clone)]
 pub struct ImageCacheState(pub Arc<RwLock<Option<Arc<ImageCache>>>>);
 
 impl ImageCacheState {
@@ -95,56 +96,30 @@ impl ImageCache {
     }
   }
 
-  pub async fn resolve_urls<F, Fut>(
-    self: &Arc<Self>,
-    partition: &ImageCachePartition,
-    urls: Vec<String>,
-    fetch: F,
-  ) -> HashMap<String, String>
-  where
-    F: Fn(String) -> Fut + Clone,
-    Fut: std::future::Future<Output = Result<ImageDownload, ImageCacheError>>,
-  {
-    stream::iter(urls)
-      .map(|url| {
-        let cache = self.clone();
-        let partition = partition.clone();
-        let fetch = fetch.clone();
-        async move {
-          let resolved = cache
-            .resolve_url(&partition, &url, fetch(url.clone()))
-            .await
-            .unwrap_or_else(|err| {
-              log::warn!("Image cache miss fallback for {}: {}", url, err);
-              url.clone()
-            });
-          (url, resolved)
-        }
-      })
-      .buffer_unordered(IMAGE_CACHE_CONCURRENCY)
-      .collect()
-      .await
-  }
-
-  pub async fn resolve_url<Fut>(
+  pub async fn resolve_image_download<Fut>(
     &self,
     partition: &ImageCachePartition,
     remote_url: &str,
     fetch: Fut,
-  ) -> Result<String, ImageCacheError>
+  ) -> Result<ImageDownload, ImageCacheError>
   where
     Fut: std::future::Future<Output = Result<ImageDownload, ImageCacheError>>,
   {
     if let Some(path) = self.cached_path(partition, remote_url).await? {
-      return Ok(path_to_string(&path));
+      let bytes = tokio::fs::read(&path).await?;
+      return Ok(ImageDownload {
+        bytes,
+        content_type: content_type_from_path(&path),
+      });
     }
 
     let download = tokio::time::timeout(IMAGE_CACHE_DOWNLOAD_TIMEOUT, fetch)
       .await
       .map_err(|_| ImageCacheError::Download("download timed out".to_string()))??;
-
-    let path = self.write_download(partition, remote_url, download).await?;
-    Ok(path_to_string(&path))
+    self
+      .write_download(partition, remote_url, &download)
+      .await?;
+    Ok(download)
   }
 
   async fn cached_path(
@@ -175,7 +150,7 @@ impl ImageCache {
     &self,
     partition: &ImageCachePartition,
     remote_url: &str,
-    download: ImageDownload,
+    download: &ImageDownload,
   ) -> Result<PathBuf, ImageCacheError> {
     let _guard = self.index_lock.lock().await;
     let mut index = self.load_index(partition).await?;
@@ -187,7 +162,7 @@ impl ImageCache {
     let file_name = format!("{key}.{extension}");
     let path = partition_dir.join(&file_name);
     let size_bytes = download.bytes.len() as u64;
-    tokio::fs::write(&path, download.bytes).await?;
+    tokio::fs::write(&path, &download.bytes).await?;
 
     index.entries.insert(
       key,
@@ -195,6 +170,7 @@ impl ImageCache {
         file_name,
         size_bytes,
         accessed_at_ms: now_ms()?,
+        content_type: download.content_type.clone(),
       },
     );
     self.prune(partition, &mut index).await?;
@@ -295,199 +271,97 @@ impl ImageCache {
   }
 }
 
-pub async fn cache_video_home<F, Fut>(
-  cache: Arc<ImageCache>,
-  partition: &ImageCachePartition,
-  mut home: VideoHome,
-  fetch: F,
-) -> VideoHome
-where
-  F: Fn(String) -> Fut + Clone,
-  Fut: std::future::Future<Output = Result<ImageDownload, ImageCacheError>>,
-{
-  let resolved = cache
-    .resolve_urls(partition, collect_video_home_urls(&home), fetch)
-    .await;
-  rewrite_video_home_urls(&mut home, &resolved);
-  home
-}
-
-pub async fn cache_library_shortcuts<F, Fut>(
-  cache: Arc<ImageCache>,
-  partition: &ImageCachePartition,
-  mut shortcuts: Vec<VideoLibraryShortcut>,
-  fetch: F,
-) -> Vec<VideoLibraryShortcut>
-where
-  F: Fn(String) -> Fut + Clone,
-  Fut: std::future::Future<Output = Result<ImageDownload, ImageCacheError>>,
-{
-  let urls = shortcuts
-    .iter()
-    .filter_map(|item| item.artwork_url.clone())
-    .collect();
-  let resolved = cache.resolve_urls(partition, urls, fetch).await;
-  for item in &mut shortcuts {
-    rewrite_optional_url(&mut item.artwork_url, &resolved);
-  }
-  shortcuts
-}
-
-pub async fn cache_library_page<F, Fut>(
-  cache: Arc<ImageCache>,
-  partition: &ImageCachePartition,
-  mut page: VideoLibraryPage,
-  fetch: F,
-) -> VideoLibraryPage
-where
-  F: Fn(String) -> Fut + Clone,
-  Fut: std::future::Future<Output = Result<ImageDownload, ImageCacheError>>,
-{
-  let urls = page
-    .items
-    .iter()
-    .filter_map(|item| item.artwork_url.clone())
-    .collect();
-  let resolved = cache.resolve_urls(partition, urls, fetch).await;
-  for item in &mut page.items {
-    rewrite_optional_url(&mut item.artwork_url, &resolved);
-  }
-  page
-}
-
-pub async fn cache_search_page<F, Fut>(
-  cache: Arc<ImageCache>,
-  partition: &ImageCachePartition,
-  mut page: VideoSearchPage,
-  fetch: F,
-) -> VideoSearchPage
-where
-  F: Fn(String) -> Fut + Clone,
-  Fut: std::future::Future<Output = Result<ImageDownload, ImageCacheError>>,
-{
-  let urls = page
-    .items
-    .iter()
-    .filter_map(|item| item.artwork_url.clone())
-    .collect();
-  let resolved = cache.resolve_urls(partition, urls, fetch).await;
-  for item in &mut page.items {
-    rewrite_optional_url(&mut item.artwork_url, &resolved);
-  }
-  page
-}
-
-pub async fn cache_item_detail<F, Fut>(
-  cache: Arc<ImageCache>,
-  partition: &ImageCachePartition,
-  mut detail: VideoItemDetail,
-  fetch: F,
-) -> VideoItemDetail
-where
-  F: Fn(String) -> Fut + Clone,
-  Fut: std::future::Future<Output = Result<ImageDownload, ImageCacheError>>,
-{
-  let urls = detail
-    .artwork_url
-    .iter()
-    .chain(detail.backdrop_url.iter())
-    .cloned()
-    .collect();
-  let resolved = cache.resolve_urls(partition, urls, fetch).await;
-  rewrite_optional_url(&mut detail.artwork_url, &resolved);
-  rewrite_optional_url(&mut detail.backdrop_url, &resolved);
-  detail
-}
-
-pub async fn cache_show_detail<F, Fut>(
-  cache: Arc<ImageCache>,
-  partition: &ImageCachePartition,
-  mut detail: VideoShowDetail,
-  fetch: F,
-) -> VideoShowDetail
-where
-  F: Fn(String) -> Fut + Clone,
-  Fut: std::future::Future<Output = Result<ImageDownload, ImageCacheError>>,
-{
-  let mut urls = Vec::new();
-  urls.extend(detail.artwork_url.iter().cloned());
-  urls.extend(detail.backdrop_url.iter().cloned());
-  urls.extend(
-    detail
-      .next_episode
-      .iter()
-      .filter_map(|item| item.artwork_url.clone()),
-  );
-  urls.extend(
-    detail
-      .seasons
-      .iter()
-      .filter_map(|season| season.artwork_url.clone()),
-  );
-  let resolved = cache.resolve_urls(partition, urls, fetch).await;
-  rewrite_optional_url(&mut detail.artwork_url, &resolved);
-  rewrite_optional_url(&mut detail.backdrop_url, &resolved);
-  if let Some(next_episode) = &mut detail.next_episode {
-    rewrite_optional_url(&mut next_episode.artwork_url, &resolved);
-  }
-  for season in &mut detail.seasons {
-    rewrite_optional_url(&mut season.artwork_url, &resolved);
-  }
-  detail
-}
-
-pub async fn cache_season_episodes<F, Fut>(
-  cache: Arc<ImageCache>,
-  partition: &ImageCachePartition,
-  mut page: VideoSeasonEpisodes,
-  fetch: F,
-) -> VideoSeasonEpisodes
-where
-  F: Fn(String) -> Fut + Clone,
-  Fut: std::future::Future<Output = Result<ImageDownload, ImageCacheError>>,
-{
-  let urls = page
-    .episodes
-    .iter()
-    .filter_map(|item| item.artwork_url.clone())
-    .collect();
-  let resolved = cache.resolve_urls(partition, urls, fetch).await;
-  for episode in &mut page.episodes {
-    rewrite_optional_url(&mut episode.artwork_url, &resolved);
-  }
-  page
-}
-
-fn collect_video_home_urls(home: &VideoHome) -> Vec<String> {
-  home
-    .continue_watching
-    .iter()
-    .chain(home.next_up.iter())
-    .chain(home.latest_movies.iter())
-    .chain(home.latest_episodes.iter())
-    .filter_map(|item| item.artwork_url.clone())
-    .collect()
-}
-
-fn rewrite_video_home_urls(home: &mut VideoHome, resolved: &HashMap<String, String>) {
-  for item in home
-    .continue_watching
-    .iter_mut()
-    .chain(home.next_up.iter_mut())
-    .chain(home.latest_movies.iter_mut())
-    .chain(home.latest_episodes.iter_mut())
-  {
-    rewrite_optional_url(&mut item.artwork_url, resolved);
-  }
-}
-
-fn rewrite_optional_url(value: &mut Option<String>, resolved: &HashMap<String, String>) {
-  let Some(current) = value.as_ref() else {
-    return;
+pub async fn image_response_for_token(
+  client: Arc<JellyfinClient>,
+  config: Arc<RwLock<AppConfig>>,
+  image_cache_state: ImageCacheState,
+  token: String,
+) -> Response<Vec<u8>> {
+  let payload = match decode_image_id(&token) {
+    Ok(payload) => payload,
+    Err(err) => return text_response(StatusCode::BAD_REQUEST, err.to_string()),
   };
-  if let Some(next) = resolved.get(current) {
-    *value = Some(next.clone());
+
+  let connection = client.login().connection_state();
+  if !connection.connected {
+    return text_response(StatusCode::UNAUTHORIZED, "media server is not connected");
   }
+  if connection.provider != payload.provider {
+    return text_response(StatusCode::FORBIDDEN, "image reference provider mismatch");
+  }
+  let Some(server_url) = connection.server_url.as_deref() else {
+    return text_response(StatusCode::UNAUTHORIZED, "media server URL is unavailable");
+  };
+  if normalize_server_url(server_url) != normalize_server_url(&payload.server_url) {
+    return text_response(StatusCode::FORBIDDEN, "image reference server mismatch");
+  }
+
+  let partition = ImageCache::partition(payload.provider, &payload.server_url);
+  let disk_cache_enabled = config.read().image_disk_cache_enabled;
+  let cache = image_cache_state.get();
+  let remote_url = payload.remote_url;
+  let fetch_url = remote_url.clone();
+  let fetch_client = client.clone();
+  let fetch = async move {
+    fetch_client
+      .download_image(&fetch_url)
+      .await
+      .map_err(|err| ImageCacheError::Download(err.to_string()))
+  };
+
+  let result = if disk_cache_enabled {
+    match cache {
+      Some(cache) => {
+        cache
+          .resolve_image_download(&partition, &remote_url, fetch)
+          .await
+      }
+      None => fetch_with_timeout(fetch).await,
+    }
+  } else {
+    fetch_with_timeout(fetch).await
+  };
+
+  match result {
+    Ok(download) => image_response(&remote_url, download),
+    Err(err) => {
+      log::warn!("Image protocol request failed for {}: {}", remote_url, err);
+      text_response(StatusCode::BAD_GATEWAY, "image request failed")
+    }
+  }
+}
+
+async fn fetch_with_timeout<Fut>(fetch: Fut) -> Result<ImageDownload, ImageCacheError>
+where
+  Fut: std::future::Future<Output = Result<ImageDownload, ImageCacheError>>,
+{
+  tokio::time::timeout(IMAGE_CACHE_DOWNLOAD_TIMEOUT, fetch)
+    .await
+    .map_err(|_| ImageCacheError::Download("download timed out".to_string()))?
+}
+
+fn image_response(remote_url: &str, download: ImageDownload) -> Response<Vec<u8>> {
+  let content_type = download
+    .content_type
+    .or_else(|| content_type_from_url(remote_url))
+    .unwrap_or_else(|| "application/octet-stream".to_string());
+  response_builder(StatusCode::OK)
+    .header(header::CONTENT_TYPE, content_type)
+    .body(download.bytes)
+    .unwrap_or_else(|_| Response::new(Vec::new()))
+}
+
+fn text_response(status: StatusCode, message: impl Into<String>) -> Response<Vec<u8>> {
+  response_builder(status)
+    .header(header::CONTENT_TYPE, "text/plain; charset=utf-8")
+    .body(message.into().into_bytes())
+    .unwrap_or_else(|_| Response::new(Vec::new()))
+}
+
+fn response_builder(status: StatusCode) -> tauri::http::response::Builder {
+  Response::builder()
+    .status(status)
+    .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
 }
 
 fn provider_slug(provider: MediaServerProvider) -> &'static str {
@@ -495,10 +369,6 @@ fn provider_slug(provider: MediaServerProvider) -> &'static str {
     MediaServerProvider::Jellyfin => "jellyfin",
     MediaServerProvider::Emby => "emby",
   }
-}
-
-fn normalize_server_url(server_url: &str) -> &str {
-  server_url.trim_end_matches('/')
 }
 
 fn cache_key(remote_url: &str) -> String {
@@ -518,6 +388,27 @@ fn cache_extension(remote_url: &str, content_type: Option<&str>) -> &'static str
   match content_type.and_then(extension_from_content_type) {
     Some(extension) => extension,
     None => extension_from_url(remote_url).unwrap_or("img"),
+  }
+}
+
+fn content_type_from_path(path: &Path) -> Option<String> {
+  let extension = path.extension()?.to_str()?.to_ascii_lowercase();
+  content_type_from_extension(&extension).map(str::to_string)
+}
+
+fn content_type_from_url(remote_url: &str) -> Option<String> {
+  let extension = extension_from_url(remote_url)?;
+  content_type_from_extension(extension).map(str::to_string)
+}
+
+fn content_type_from_extension(extension: &str) -> Option<&'static str> {
+  match extension {
+    "jpg" | "jpeg" => Some("image/jpeg"),
+    "png" => Some("image/png"),
+    "webp" => Some("image/webp"),
+    "gif" => Some("image/gif"),
+    "avif" => Some("image/avif"),
+    _ => None,
   }
 }
 
@@ -544,10 +435,6 @@ fn extension_from_url(remote_url: &str) -> Option<&'static str> {
     "avif" => Some("avif"),
     _ => None,
   }
-}
-
-fn path_to_string(path: &Path) -> String {
-  path.to_string_lossy().into_owned()
 }
 
 fn now_ms() -> Result<u128, ImageCacheError> {
@@ -580,14 +467,14 @@ mod tests {
   }
 
   #[tokio::test]
-  async fn resolve_url_reuses_cached_file_after_first_download() {
+  async fn resolve_image_download_reuses_cached_file_after_first_download() {
     let root = temp_cache_dir();
     let cache = ImageCache::with_max_bytes(root.clone(), 1024 * 1024);
     let calls = Arc::new(AtomicUsize::new(0));
     let calls_for_fetch = calls.clone();
 
     let first = cache
-      .resolve_url(
+      .resolve_image_download(
         &partition(),
         "https://media.example.com/Items/1/Images/Primary?tag=a",
         async move {
@@ -601,7 +488,7 @@ mod tests {
       .await
       .expect("first image should cache");
     let second = cache
-      .resolve_url(
+      .resolve_image_download(
         &partition(),
         "https://media.example.com/Items/1/Images/Primary?tag=a",
         async {
@@ -614,19 +501,22 @@ mod tests {
       .await
       .expect("second image should hit cache");
 
-    assert_eq!(first, second);
+    assert_eq!(first.bytes, b"image");
+    assert_eq!(second.bytes, b"image");
     assert_eq!(calls.load(Ordering::SeqCst), 1);
     let _ = std::fs::remove_dir_all(root);
   }
 
   #[tokio::test]
-  async fn resolve_url_evicts_least_recently_used_files_over_limit() {
+  async fn resolve_image_download_evicts_least_recently_used_files_over_limit() {
     let root = temp_cache_dir();
     let cache = ImageCache::with_max_bytes(root.clone(), 7);
     let partition = partition();
+    let first_url = "https://media.example.com/a.png?tag=1";
+    let second_url = "https://media.example.com/b.png?tag=2";
 
-    let first = cache
-      .resolve_url(&partition, "https://media.example.com/a.png?tag=1", async {
+    cache
+      .resolve_image_download(&partition, first_url, async {
         Ok(ImageDownload {
           bytes: b"12345".to_vec(),
           content_type: Some("image/png".to_string()),
@@ -635,8 +525,8 @@ mod tests {
       .await
       .expect("first image should cache");
     tokio::time::sleep(std::time::Duration::from_millis(2)).await;
-    let second = cache
-      .resolve_url(&partition, "https://media.example.com/b.png?tag=2", async {
+    cache
+      .resolve_image_download(&partition, second_url, async {
         Ok(ImageDownload {
           bytes: b"67890".to_vec(),
           content_type: Some("image/png".to_string()),
@@ -644,25 +534,32 @@ mod tests {
       })
       .await
       .expect("second image should cache");
+    let first = cache
+      .partition_dir(&partition)
+      .join(format!("{}.png", cache_key(first_url)));
+    let second = cache
+      .partition_dir(&partition)
+      .join(format!("{}.png", cache_key(second_url)));
 
-    assert!(!Path::new(&first).exists());
-    assert!(Path::new(&second).exists());
+    assert!(!first.exists());
+    assert!(second.exists());
     let _ = std::fs::remove_dir_all(root);
   }
 
   #[tokio::test]
-  async fn resolve_urls_falls_back_to_remote_url_when_download_fails() {
+  async fn resolve_image_download_returns_error_when_download_fails() {
     let root = temp_cache_dir();
-    let cache = Arc::new(ImageCache::with_max_bytes(root.clone(), 1024 * 1024));
+    let cache = ImageCache::with_max_bytes(root.clone(), 1024 * 1024);
     let remote_url = "https://media.example.com/Items/1/Images/Primary?tag=a".to_string();
 
-    let resolved = cache
-      .resolve_urls(&partition(), vec![remote_url.clone()], |_| async {
+    let err = cache
+      .resolve_image_download(&partition(), &remote_url, async {
         Err(ImageCacheError::Download("no route".to_string()))
       })
-      .await;
+      .await
+      .expect_err("failed download should propagate");
 
-    assert_eq!(resolved.get(&remote_url), Some(&remote_url));
+    assert_eq!(err.to_string(), "image download failed: no route");
     let _ = std::fs::remove_dir_all(root);
   }
 }

@@ -1870,6 +1870,7 @@ name = "jellypilot"
 version = "1.4.1"
 dependencies = [
  "async-channel",
+ "base64 0.22.1",
  "dirs",
  "emby_api",
  "futures-util",
@@ -1879,6 +1880,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "sha2",
  "specta",
  "specta-typescript",
  "tauri",

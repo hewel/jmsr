@@ -20,6 +20,7 @@ import { ToastProvider } from '../src/components/ToastProvider';
 import { queryKeys } from '../src/effects/query';
 import { createJellyPilotRouter } from '../src/router';
 import { resetSharedLibraryFilters } from '../src/utils/createSharedLibraryFilters';
+import { imageSource } from '../src/utils/imageSource';
 import { createTestQueryClient, TestQueryProvider } from './query-client';
 
 interface TestIntersectionObserverController {
@@ -165,7 +166,7 @@ const videoHome: VideoHome = {
       playedPercentage: 25,
       played: true,
       favorite: true,
-      artworkUrl: 'https://jellyfin.example.com/Items/movie-1/Images/Primary',
+      artworkImageId: 'https://jellyfin.example.com/Items/movie-1/Images/Primary',
     },
   ],
   latestEpisodes: [
@@ -183,7 +184,7 @@ const videoHome: VideoHome = {
       playedPercentage: null,
       played: false,
       favorite: false,
-      artworkUrl: null,
+      artworkImageId: null,
     },
   ],
   latestMovies: [
@@ -201,7 +202,7 @@ const videoHome: VideoHome = {
       playedPercentage: null,
       played: false,
       favorite: false,
-      artworkUrl: null,
+      artworkImageId: null,
     },
   ],
   nextUp: [
@@ -219,7 +220,7 @@ const videoHome: VideoHome = {
       playedPercentage: null,
       played: false,
       favorite: false,
-      artworkUrl: null,
+      artworkImageId: null,
     },
   ],
 };
@@ -230,20 +231,20 @@ const videoLibraryShortcuts: VideoLibraryShortcut[] = [
     name: 'Movies',
     collectionType: 'movies',
     itemCount: 8,
-    artworkUrl: null,
+    artworkImageId: null,
   },
   {
     id: 'shows',
     name: 'Shows',
     collectionType: 'tvshows',
     itemCount: 5,
-    artworkUrl: null,
+    artworkImageId: null,
   },
 ];
 
 const movieDetail: VideoItemDetail = {
-  artworkUrl: 'https://jellyfin.example.com/Items/detail-movie/Images/Primary',
-  backdropUrl: 'https://jellyfin.example.com/Items/detail-movie/Images/Backdrop/0',
+  artworkImageId: 'https://jellyfin.example.com/Items/detail-movie/Images/Primary',
+  backdropImageId: 'https://jellyfin.example.com/Items/detail-movie/Images/Backdrop/0',
   audioStreams,
   canPlay: true,
   canResume: true,
@@ -266,8 +267,8 @@ const movieDetail: VideoItemDetail = {
 };
 
 const episodeDetail: VideoItemDetail = {
-  artworkUrl: null,
-  backdropUrl: null,
+  artworkImageId: null,
+  backdropImageId: null,
   audioStreams,
   canPlay: true,
   canResume: false,
@@ -302,15 +303,15 @@ const nextEpisodeDetail: VideoItemDetail = {
 };
 
 const showDetail: VideoShowDetail = {
-  artworkUrl: null,
-  backdropUrl: null,
+  artworkImageId: null,
+  backdropImageId: null,
   canPlay: true,
   favorite: false,
   genres: ['Drama'],
   id: 'series-1',
   name: 'Example Show',
   nextEpisode: {
-    artworkUrl: null,
+    artworkImageId: null,
     episodeNumber: 2,
     favorite: false,
     id: 'episode-2',
@@ -335,7 +336,7 @@ const showDetail: VideoShowDetail = {
       seasonNumber: 1,
       played: false,
       favorite: false,
-      artworkUrl: null,
+      artworkImageId: null,
     },
     {
       id: 'season-2',
@@ -343,7 +344,7 @@ const showDetail: VideoShowDetail = {
       seasonNumber: 2,
       played: false,
       favorite: true,
-      artworkUrl: null,
+      artworkImageId: null,
     },
   ],
 };
@@ -358,7 +359,7 @@ const seasonEpisodes: VideoSeasonEpisodes = {
       runtimeSeconds: 1800,
       played: false,
       favorite: false,
-      artworkUrl: null,
+      artworkImageId: null,
       seasonNumber: 1,
       episodeNumber: 2,
       seriesId: 'series-1',
@@ -386,7 +387,7 @@ function videoLibraryPage(startIndex: number): VideoLibraryPage {
           runtimeSeconds: 5400,
           played: false,
           favorite: true,
-          artworkUrl: 'https://jellyfin.example.com/Items/movie-1/Images/Primary',
+          artworkImageId: 'https://jellyfin.example.com/Items/movie-1/Images/Primary',
           seasonNumber: null,
           episodeNumber: null,
           seriesId: null,
@@ -414,7 +415,7 @@ function videoLibraryPage(startIndex: number): VideoLibraryPage {
         runtimeSeconds: null,
         played: true,
         favorite: false,
-        artworkUrl: null,
+        artworkImageId: null,
         seasonNumber: null,
         episodeNumber: null,
         seriesId: null,
@@ -447,7 +448,7 @@ function largeVideoLibraryPage(startIndex: number): VideoLibraryPage {
         runtimeSeconds: null,
         played: false,
         favorite: false,
-        artworkUrl: null,
+        artworkImageId: null,
         seasonNumber: null,
         episodeNumber: null,
         seriesId: null,
@@ -678,7 +679,10 @@ test('library landing renders command-backed rows and drawer trigger', async () 
   expect(resumeMovieLink.querySelector('svg')).not.toBeNull();
   expect(within(resumeMovieLink).getByRole('img', { name: 'Played' })).toBeVisible();
   const resumeArtwork = screen.getByAltText('Resume Movie artwork');
-  expect(resumeArtwork).toHaveAttribute('src', videoHome.continueWatching[0]?.artworkUrl ?? '');
+  expect(resumeArtwork).toHaveAttribute(
+    'src',
+    imageSource(videoHome.continueWatching[0]?.artworkImageId ?? ''),
+  );
   expect(resumeArtwork.parentElement).toHaveClass('aspect-video');
   fireEvent.load(resumeArtwork);
   expect(resumeArtwork.parentElement).toHaveClass('aspect-video');
@@ -1208,7 +1212,7 @@ test('library item detail renders resume-primary movie metadata', async () => {
   expect(screen.getByText('2h 0m')).toBeVisible();
   expect(screen.getByAltText('Detail Movie artwork')).toHaveAttribute(
     'src',
-    movieDetail.artworkUrl ?? '',
+    imageSource(movieDetail.artworkImageId ?? ''),
   );
   expect(screen.getByRole('button', { name: 'Resume' })).toBeVisible();
   expect(screen.getByRole('button', { name: 'Play from beginning' })).toBeVisible();

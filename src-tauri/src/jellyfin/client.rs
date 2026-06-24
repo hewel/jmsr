@@ -6,6 +6,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::image_cache::ImageDownload;
+use crate::image_ref::{image_id_for_url, ImageRefKind};
 
 use super::error::JellyfinError;
 use super::intro_skipper::{
@@ -2787,7 +2788,12 @@ fn map_video_home_item(
   let id = item.id?.to_string();
   let item_type = item.r#type?.to_string();
   let user_data = item.user_data.flatten();
-  let artwork_url = artwork_url(server_url, &id, item.image_tags.flatten(), image_type);
+  let artwork_image_id = image_id_for_remote_url(
+    MediaServerProvider::Jellyfin,
+    server_url,
+    artwork_url(server_url, &id, item.image_tags.flatten(), image_type),
+    ImageRefKind::Artwork,
+  );
 
   Some(VideoHomeItem {
     id,
@@ -2817,7 +2823,7 @@ fn map_video_home_item(
       .as_ref()
       .and_then(|data| data.is_favorite)
       .unwrap_or(false),
-    artwork_url,
+    artwork_image_id,
   })
 }
 
@@ -2828,11 +2834,16 @@ fn map_video_library_item(
   let id = item.id?.to_string();
   let item_type = item.r#type?.to_string();
   let user_data = item.user_data.flatten();
-  let artwork_url = artwork_url(
+  let artwork_image_id = image_id_for_remote_url(
+    MediaServerProvider::Jellyfin,
     server_url,
-    &id,
-    item.image_tags.flatten(),
-    jellyfin_api::models::ImageType::Primary,
+    artwork_url(
+      server_url,
+      &id,
+      item.image_tags.flatten(),
+      jellyfin_api::models::ImageType::Primary,
+    ),
+    ImageRefKind::Artwork,
   );
 
   let user_data_ref = user_data.as_ref();
@@ -2859,7 +2870,7 @@ fn map_video_library_item(
     favorite: user_data_ref
       .and_then(|data| data.is_favorite)
       .unwrap_or(false),
-    artwork_url,
+    artwork_image_id,
     season_number: item.parent_index_number.flatten(),
     episode_number: item.index_number.flatten(),
     series_id: item.series_id.flatten().map(|id| id.to_string()),
@@ -2879,21 +2890,31 @@ fn map_video_show_detail(
 
   let id = item.id?.to_string();
   let user_data = item.user_data.flatten();
-  let artwork_url = artwork_url(
+  let artwork_image_id = image_id_for_remote_url(
+    MediaServerProvider::Jellyfin,
     server_url,
-    &id,
-    item.image_tags.flatten(),
-    jellyfin_api::models::ImageType::Primary,
+    artwork_url(
+      server_url,
+      &id,
+      item.image_tags.flatten(),
+      jellyfin_api::models::ImageType::Primary,
+    ),
+    ImageRefKind::Artwork,
   );
-  let backdrop_url = backdrop_url(
+  let backdrop_image_id = image_id_for_remote_url(
+    MediaServerProvider::Jellyfin,
     server_url,
-    &id,
-    item.backdrop_image_tags.flatten(),
-    item
-      .parent_backdrop_item_id
-      .flatten()
-      .map(|id| id.to_string()),
-    item.parent_backdrop_image_tags.flatten(),
+    backdrop_url(
+      server_url,
+      &id,
+      item.backdrop_image_tags.flatten(),
+      item
+        .parent_backdrop_item_id
+        .flatten()
+        .map(|id| id.to_string()),
+      item.parent_backdrop_image_tags.flatten(),
+    ),
+    ImageRefKind::Backdrop,
   );
 
   Some(VideoShowDetail {
@@ -2914,8 +2935,8 @@ fn map_video_show_detail(
       .and_then(|data| data.is_favorite)
       .unwrap_or(false),
     can_play: false,
-    artwork_url,
-    backdrop_url,
+    artwork_image_id,
+    backdrop_image_id,
     next_episode: None,
     seasons: Vec::new(),
   })
@@ -2943,11 +2964,16 @@ fn map_video_season(
       .as_ref()
       .and_then(|data| data.is_favorite)
       .unwrap_or(false),
-    artwork_url: artwork_url(
+    artwork_image_id: image_id_for_remote_url(
+      MediaServerProvider::Jellyfin,
       server_url,
-      &id,
-      item.image_tags.flatten(),
-      jellyfin_api::models::ImageType::Primary,
+      artwork_url(
+        server_url,
+        &id,
+        item.image_tags.flatten(),
+        jellyfin_api::models::ImageType::Primary,
+      ),
+      ImageRefKind::Artwork,
     ),
   })
 }
@@ -3008,21 +3034,31 @@ fn map_video_item_detail(
     .as_ref()
     .and_then(|data| data.played)
     .unwrap_or(false);
-  let artwork_url = artwork_url(
+  let artwork_image_id = image_id_for_remote_url(
+    MediaServerProvider::Jellyfin,
     server_url,
-    &id,
-    item.image_tags.flatten(),
-    jellyfin_api::models::ImageType::Primary,
+    artwork_url(
+      server_url,
+      &id,
+      item.image_tags.flatten(),
+      jellyfin_api::models::ImageType::Primary,
+    ),
+    ImageRefKind::Artwork,
   );
-  let backdrop_url = backdrop_url(
+  let backdrop_image_id = image_id_for_remote_url(
+    MediaServerProvider::Jellyfin,
     server_url,
-    &id,
-    item.backdrop_image_tags.flatten(),
-    item
-      .parent_backdrop_item_id
-      .flatten()
-      .map(|id| id.to_string()),
-    item.parent_backdrop_image_tags.flatten(),
+    backdrop_url(
+      server_url,
+      &id,
+      item.backdrop_image_tags.flatten(),
+      item
+        .parent_backdrop_item_id
+        .flatten()
+        .map(|id| id.to_string()),
+      item.parent_backdrop_image_tags.flatten(),
+    ),
+    ImageRefKind::Backdrop,
   );
 
   Some(VideoItemDetail {
@@ -3051,8 +3087,8 @@ fn map_video_item_detail(
     resume_position_seconds,
     can_resume: resume_position_seconds.unwrap_or(0.0) > 0.0 && !played,
     can_play: true,
-    artwork_url,
-    backdrop_url,
+    artwork_image_id,
+    backdrop_image_id,
     audio_streams,
     subtitle_streams,
   })
@@ -3123,11 +3159,16 @@ fn map_video_library_shortcut(
   }
 
   let id = item.id?.to_string();
-  let artwork_url = artwork_url(
+  let artwork_image_id = image_id_for_remote_url(
+    MediaServerProvider::Jellyfin,
     server_url,
-    &id,
-    item.image_tags.flatten(),
-    jellyfin_api::models::ImageType::Primary,
+    artwork_url(
+      server_url,
+      &id,
+      item.image_tags.flatten(),
+      jellyfin_api::models::ImageType::Primary,
+    ),
+    ImageRefKind::Artwork,
   );
 
   Some(VideoLibraryShortcut {
@@ -3138,7 +3179,7 @@ fn map_video_library_shortcut(
       .unwrap_or_else(|| "Untitled".to_string()),
     collection_type: collection_type.to_string(),
     item_count: item.recursive_item_count.flatten(),
-    artwork_url,
+    artwork_image_id,
   })
 }
 
@@ -3177,6 +3218,23 @@ fn backdrop_url(
     "{}/Items/{}/Images/Backdrop/0?tag={}",
     server_url, image_item_id, tag
   ))
+}
+
+fn image_id_for_remote_url(
+  provider: MediaServerProvider,
+  server_url: &str,
+  remote_url: Option<String>,
+  kind: ImageRefKind,
+) -> Option<String> {
+  remote_url.and_then(
+    |url| match image_id_for_url(provider, server_url, url, kind) {
+      Ok(image_id) => Some(image_id),
+      Err(err) => {
+        log::warn!("Failed to create image reference: {}", err);
+        None
+      }
+    },
+  )
 }
 
 fn ticks_to_seconds(ticks: i64) -> f64 {
@@ -3463,13 +3521,18 @@ fn map_emby_video_home_item(
   let id = item.id?;
   let item_type = item.r#type?;
   let user_data = item.user_data.as_deref();
-  let artwork_url = emby_artwork_url(
+  let artwork_image_id = image_id_for_remote_url(
+    MediaServerProvider::Emby,
     server_url,
-    &id,
-    item.image_tags,
-    item.primary_image_item_id,
-    item.primary_image_tag,
-    image_type,
+    emby_artwork_url(
+      server_url,
+      &id,
+      item.image_tags,
+      item.primary_image_item_id,
+      item.primary_image_tag,
+      image_type,
+    ),
+    ImageRefKind::Artwork,
   );
 
   Some(VideoHomeItem {
@@ -3488,7 +3551,7 @@ fn map_emby_video_home_item(
     played_percentage: user_data.and_then(|data| data.played_percentage.flatten()),
     played: user_data.and_then(|data| data.played).unwrap_or(false),
     favorite: user_data.and_then(|data| data.is_favorite).unwrap_or(false),
-    artwork_url,
+    artwork_image_id,
   })
 }
 
@@ -3499,13 +3562,18 @@ fn map_emby_video_library_item(
   let id = item.id?;
   let item_type = item.r#type?;
   let user_data = item.user_data.as_deref();
-  let artwork_url = emby_artwork_url(
+  let artwork_image_id = image_id_for_remote_url(
+    MediaServerProvider::Emby,
     server_url,
-    &id,
-    item.image_tags,
-    item.primary_image_item_id,
-    item.primary_image_tag,
-    "Primary",
+    emby_artwork_url(
+      server_url,
+      &id,
+      item.image_tags,
+      item.primary_image_item_id,
+      item.primary_image_tag,
+      "Primary",
+    ),
+    ImageRefKind::Artwork,
   );
 
   let played = user_data.and_then(|data| data.played).unwrap_or(false);
@@ -3526,7 +3594,7 @@ fn map_emby_video_library_item(
     runtime_seconds: item.run_time_ticks.flatten().map(ticks_to_seconds),
     played,
     favorite: user_data.and_then(|data| data.is_favorite).unwrap_or(false),
-    artwork_url,
+    artwork_image_id,
     season_number: item.parent_index_number.flatten(),
     episode_number: item.index_number.flatten(),
     series_id: item.series_id,
@@ -3546,20 +3614,30 @@ fn map_emby_video_show_detail(
 
   let id = item.id?;
   let user_data = item.user_data.as_deref();
-  let artwork_url = emby_artwork_url(
+  let artwork_image_id = image_id_for_remote_url(
+    MediaServerProvider::Emby,
     server_url,
-    &id,
-    item.image_tags,
-    item.primary_image_item_id,
-    item.primary_image_tag,
-    "Primary",
+    emby_artwork_url(
+      server_url,
+      &id,
+      item.image_tags,
+      item.primary_image_item_id,
+      item.primary_image_tag,
+      "Primary",
+    ),
+    ImageRefKind::Artwork,
   );
-  let backdrop_url = backdrop_url(
+  let backdrop_image_id = image_id_for_remote_url(
+    MediaServerProvider::Emby,
     server_url,
-    &id,
-    item.backdrop_image_tags,
-    item.parent_backdrop_item_id,
-    item.parent_backdrop_image_tags,
+    backdrop_url(
+      server_url,
+      &id,
+      item.backdrop_image_tags,
+      item.parent_backdrop_item_id,
+      item.parent_backdrop_image_tags,
+    ),
+    ImageRefKind::Backdrop,
   );
 
   Some(VideoShowDetail {
@@ -3571,8 +3649,8 @@ fn map_emby_video_show_detail(
     played: user_data.and_then(|data| data.played).unwrap_or(false),
     favorite: user_data.and_then(|data| data.is_favorite).unwrap_or(false),
     can_play: false,
-    artwork_url,
-    backdrop_url,
+    artwork_image_id,
+    backdrop_image_id,
     next_episode: None,
     seasons: Vec::new(),
   })
@@ -3584,13 +3662,18 @@ fn map_emby_video_season(
 ) -> Option<VideoSeason> {
   let id = item.id?;
   let user_data = item.user_data.as_deref();
-  let artwork_url = emby_artwork_url(
+  let artwork_image_id = image_id_for_remote_url(
+    MediaServerProvider::Emby,
     server_url,
-    &id,
-    item.image_tags,
-    item.primary_image_item_id,
-    item.primary_image_tag,
-    "Primary",
+    emby_artwork_url(
+      server_url,
+      &id,
+      item.image_tags,
+      item.primary_image_item_id,
+      item.primary_image_tag,
+      "Primary",
+    ),
+    ImageRefKind::Artwork,
   );
 
   Some(VideoSeason {
@@ -3599,7 +3682,7 @@ fn map_emby_video_season(
     season_number: item.index_number.flatten(),
     played: user_data.and_then(|data| data.played).unwrap_or(false),
     favorite: user_data.and_then(|data| data.is_favorite).unwrap_or(false),
-    artwork_url,
+    artwork_image_id,
   })
 }
 
@@ -3620,20 +3703,30 @@ fn map_emby_video_item_detail(
     .and_then(|data| data.playback_position_ticks)
     .map(ticks_to_seconds);
   let played = user_data.and_then(|data| data.played).unwrap_or(false);
-  let artwork_url = emby_artwork_url(
+  let artwork_image_id = image_id_for_remote_url(
+    MediaServerProvider::Emby,
     server_url,
-    &id,
-    item.image_tags,
-    item.primary_image_item_id,
-    item.primary_image_tag,
-    "Primary",
+    emby_artwork_url(
+      server_url,
+      &id,
+      item.image_tags,
+      item.primary_image_item_id,
+      item.primary_image_tag,
+      "Primary",
+    ),
+    ImageRefKind::Artwork,
   );
-  let backdrop_url = backdrop_url(
+  let backdrop_image_id = image_id_for_remote_url(
+    MediaServerProvider::Emby,
     server_url,
-    &id,
-    item.backdrop_image_tags,
-    item.parent_backdrop_item_id,
-    item.parent_backdrop_image_tags,
+    backdrop_url(
+      server_url,
+      &id,
+      item.backdrop_image_tags,
+      item.parent_backdrop_item_id,
+      item.parent_backdrop_image_tags,
+    ),
+    ImageRefKind::Backdrop,
   );
 
   Some(VideoItemDetail {
@@ -3654,8 +3747,8 @@ fn map_emby_video_item_detail(
     resume_position_seconds,
     can_resume: resume_position_seconds.unwrap_or(0.0) > 0.0 && !played,
     can_play: true,
-    artwork_url,
-    backdrop_url,
+    artwork_image_id,
+    backdrop_image_id,
     audio_streams,
     subtitle_streams,
   })
@@ -3723,13 +3816,18 @@ fn map_emby_video_library_shortcut(
   }
 
   let id = item.id?;
-  let artwork_url = emby_artwork_url(
+  let artwork_image_id = image_id_for_remote_url(
+    MediaServerProvider::Emby,
     server_url,
-    &id,
-    item.image_tags,
-    item.primary_image_item_id,
-    item.primary_image_tag,
-    "Primary",
+    emby_artwork_url(
+      server_url,
+      &id,
+      item.image_tags,
+      item.primary_image_item_id,
+      item.primary_image_tag,
+      "Primary",
+    ),
+    ImageRefKind::Artwork,
   );
 
   Some(VideoLibraryShortcut {
@@ -3737,7 +3835,7 @@ fn map_emby_video_library_shortcut(
     name: item.name.unwrap_or_else(|| "Untitled".to_string()),
     collection_type,
     item_count: item.recursive_item_count.flatten(),
-    artwork_url,
+    artwork_image_id,
   })
 }
 
@@ -3789,7 +3887,7 @@ fn video_home_item_to_library_item(item: VideoHomeItem) -> VideoLibraryItem {
     runtime_seconds: item.runtime_seconds,
     played: item.played,
     favorite: item.favorite,
-    artwork_url: item.artwork_url,
+    artwork_image_id: item.artwork_image_id,
     season_number: item.season_number,
     episode_number: item.episode_number,
     series_id: item.series_id,
@@ -3807,6 +3905,7 @@ impl Default for JellyfinClient {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::image_ref::decode_image_id;
   use std::sync::Arc;
   use tokio::io::{AsyncReadExt, AsyncWriteExt};
   use tokio::net::TcpListener;
@@ -3820,6 +3919,12 @@ mod tests {
     assert!(request.contains("chrome/"));
     assert!(request.contains("safari/537.36"));
     assert!(request.contains("jellypilot/"));
+  }
+
+  fn assert_image_ref_url(image_id: Option<&String>, expected_url: &str) {
+    let image_id = image_id.expect("image id should be present");
+    let payload = decode_image_id(image_id).expect("image id should decode");
+    assert_eq!(payload.remote_url, expected_url);
   }
 
   async fn serve_once(status: &'static str, response_body: &'static str) -> String {
@@ -4690,15 +4795,15 @@ mod tests {
     assert_eq!(home.continue_watching[0].id, movie_id);
     assert_eq!(home.continue_watching[0].name, "Resume Movie");
     let expected_artwork = format!("{server_url}/Items/{movie_id}/Images/Thumb?tag=thumb-1");
-    assert_eq!(
-      home.continue_watching[0].artwork_url.as_deref(),
-      Some(expected_artwork.as_str())
+    assert_image_ref_url(
+      home.continue_watching[0].artwork_image_id.as_ref(),
+      &expected_artwork,
     );
     let expected_episode_artwork =
       format!("{server_url}/Items/{resume_episode_id}/Images/Primary?tag=episode-primary");
-    assert_eq!(
-      home.continue_watching[1].artwork_url.as_deref(),
-      Some(expected_episode_artwork.as_str())
+    assert_image_ref_url(
+      home.continue_watching[1].artwork_image_id.as_ref(),
+      &expected_episode_artwork,
     );
     assert_eq!(home.next_up[0].id, episode_id);
     assert_eq!(home.next_up[0].series_id.as_deref(), Some(series_id));
@@ -4838,9 +4943,9 @@ mod tests {
     assert_eq!(movies.items[0].runtime_seconds, Some(5400.0));
     let expected_movie_artwork =
       format!("{server_url}/Items/{movie_id}/Images/Primary?tag=poster-movie");
-    assert_eq!(
-      movies.items[0].artwork_url.as_deref(),
-      Some(expected_movie_artwork.as_str())
+    assert_image_ref_url(
+      movies.items[0].artwork_image_id.as_ref(),
+      &expected_movie_artwork,
     );
 
     assert_eq!(shows.start_index, 0);
@@ -5017,10 +5122,7 @@ mod tests {
     assert!(movie.favorite);
     let expected_artwork =
       format!("{server_url}/Items/{movie_id}/Images/Primary?tag=poster-detail");
-    assert_eq!(
-      movie.artwork_url.as_deref(),
-      Some(expected_artwork.as_str())
-    );
+    assert_image_ref_url(movie.artwork_image_id.as_ref(), &expected_artwork);
     assert_eq!(movie.audio_streams.len(), 2);
     assert_eq!(movie.audio_streams[0].index, 1);
     assert_eq!(movie.audio_streams[0].label, "English - AAC 2.0");
@@ -5039,7 +5141,7 @@ mod tests {
     assert_eq!(episode.episode_number, Some(3));
     assert!(episode.played);
     assert!(!episode.can_resume);
-    assert_eq!(episode.artwork_url, None);
+    assert_eq!(episode.artwork_image_id, None);
 
     let captured = requests.lock();
     assert!(captured[0].starts_with("GET /Items/00000000-0000-0000-0000-000000000050?"));
@@ -5118,10 +5220,7 @@ mod tests {
       Some(next_episode_id)
     );
     let expected_artwork = format!("{server_url}/Items/{series_id}/Images/Primary?tag=poster-show");
-    assert_eq!(
-      detail.artwork_url.as_deref(),
-      Some(expected_artwork.as_str())
-    );
+    assert_image_ref_url(detail.artwork_image_id.as_ref(), &expected_artwork);
 
     let captured = requests.lock();
     assert!(captured[0].starts_with("GET /Items/00000000-0000-0000-0000-000000000060?"));
@@ -5168,9 +5267,9 @@ mod tests {
     assert_eq!(page.episodes[0].runtime_seconds, Some(1800.0));
     let expected_artwork =
       format!("{server_url}/Items/{episode_id}/Images/Primary?tag=poster-episode");
-    assert_eq!(
-      page.episodes[0].artwork_url.as_deref(),
-      Some(expected_artwork.as_str())
+    assert_image_ref_url(
+      page.episodes[0].artwork_image_id.as_ref(),
+      &expected_artwork,
     );
 
     let captured = requests.lock();
@@ -5300,9 +5399,9 @@ mod tests {
       home.continue_watching[0].resume_position_seconds,
       Some(150.0)
     );
-    assert_eq!(
-      home.continue_watching[0].artwork_url.as_deref(),
-      Some(format!("{emby_base}/Items/{movie_id}/Images/Thumb?tag=thumb-emby").as_str())
+    assert_image_ref_url(
+      home.continue_watching[0].artwork_image_id.as_ref(),
+      &format!("{emby_base}/Items/{movie_id}/Images/Thumb?tag=thumb-emby"),
     );
     assert_eq!(home.next_up[0].id, episode_id);
     assert_eq!(home.latest_movies[0].name, "Latest Emby Movie");
