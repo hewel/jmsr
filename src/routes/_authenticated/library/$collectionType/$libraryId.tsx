@@ -5,7 +5,6 @@ import { useAppScrollArea } from '@components/AppScrollAreaContext';
 import { useLibraryNavbarControls } from '@components/library/LibraryNavbarContext';
 import {
   LibraryStatusPanel,
-  MediaInfoHoverCard,
   VideoCard,
   libraryTitle,
   playedFilterLabel,
@@ -209,6 +208,18 @@ function LibraryBrowseRoute() {
       }),
   }));
 
+  const browsePageQueryKey = (startIndex: number) =>
+    queryKeys.libraryBrowsePage(
+      sessionKey(),
+      collectionType(),
+      params().libraryId,
+      filterSort(),
+      libraryFilters.playedFilter(),
+      libraryFilters.favoritesOnly(),
+      libraryFilters.sortDirection(),
+      startIndex,
+    );
+
   let activeBrowseQueryKey = '';
   createEffect(() => {
     const nextBrowseQueryKey = browseQueryKey().join('\u0000');
@@ -223,6 +234,13 @@ function LibraryBrowseRoute() {
     browseQuery.data?.pages.filter(
       (page): page is LibraryExit<LibraryBrowseState> & { _tag: 'Success' } => Exit.isSuccess(page),
     ) ?? [];
+
+  createEffect(() => {
+    for (const page of successfulPages()) {
+      queryClient.setQueryData(browsePageQueryKey(page.value.page.startIndex), page);
+    }
+  });
+
   const successfulPageMap = createMemo(() => {
     const pages = new Map<number, LibraryBrowseState>();
     for (const page of successfulPages()) {
@@ -348,7 +366,7 @@ function LibraryBrowseRoute() {
 
     return starts;
   };
-  const fetchVirtualPage = (startIndex: number) => {
+  const fetchVirtualPage = (startIndex: number, allowNetworkFetch: boolean) => {
     const total = totalRecordCount();
     if (
       startIndex < 0 ||
@@ -365,23 +383,24 @@ function LibraryBrowseRoute() {
     const sort = filterSort();
     const playedFilter = libraryFilters.playedFilter();
     const favoritesOnly = libraryFilters.favoritesOnly();
-    const sortDirection = libraryFilters.sortDirection();
     const expectedBrowseQueryKey = browseQueryKey();
+    const virtualPageQueryKey = browsePageQueryKey(startIndex);
+    const cachedPage =
+      queryClient.getQueryData<LibraryExit<LibraryBrowseState>>(virtualPageQueryKey);
+    if (cachedPage && Exit.isSuccess(cachedPage)) {
+      setVirtualPagesByStartIndex((current) => new Map([...current, [startIndex, cachedPage]]));
+      return;
+    }
+
+    if (!allowNetworkFetch) {
+      return;
+    }
 
     setVirtualPageStartsFetching((current) => new Set([...current, startIndex]));
 
     void queryClient
       .fetchQuery({
-        queryKey: queryKeys.libraryBrowsePage(
-          sessionKey(),
-          collectionTypeValue,
-          libraryId,
-          sort,
-          playedFilter,
-          favoritesOnly,
-          sortDirection,
-          startIndex,
-        ),
+        queryKey: virtualPageQueryKey,
         queryFn: () =>
           runExit(
             fetchVideoLibraryPage(
@@ -413,18 +432,29 @@ function LibraryBrowseRoute() {
         });
       });
   };
-  const fetchVisibleVirtualPages = () => {
+  const fetchVisibleVirtualPages = (allowNetworkFetch: boolean) => {
     for (const startIndex of virtualPageStartsForCurrentWindow()) {
-      fetchVirtualPage(startIndex);
+      fetchVirtualPage(startIndex, allowNetworkFetch);
     }
+  };
+  const canUseVirtualPages = () => {
+    const currentFirstPage = firstPage();
+
+    return (
+      libraryFilters.ready() &&
+      isLibrarySessionKeyConnected(sessionKey()) &&
+      currentFirstPage !== null &&
+      Exit.isSuccess(currentFirstPage) &&
+      currentFirstPage.value.page.startIndex === 0
+    );
   };
 
   createEffect(() => {
-    if (!usesVirtualGrid()) {
+    if (!usesVirtualGrid() || !canUseVirtualPages()) {
       return;
     }
 
-    fetchVisibleVirtualPages();
+    fetchVisibleVirtualPages(!browseQuery.isFetching);
   });
   const statusTitle = () => {
     const current = firstPage();
@@ -478,7 +508,7 @@ function LibraryBrowseRoute() {
         }
         return next;
       });
-      fetchVisibleVirtualPages();
+      fetchVisibleVirtualPages(true);
       return;
     }
 
@@ -532,11 +562,13 @@ function LibraryBrowseRoute() {
     }
     void browseQuery.fetchNextPage({ cancelRefetch: false });
   });
+  const controlsLoading = () =>
+    !readyState() && (!libraryFilters.ready() || browseQuery.isFetching);
 
   return (
     <div class="min-w-0">
       <LibraryBrowseNavbarControls
-        loading={() => browseQuery.isFetching}
+        loading={controlsLoading}
         sortedValue={libraryFilters.sort}
         sortDirection={libraryFilters.sortDirection}
         playedFilter={libraryFilters.playedFilter}
@@ -584,9 +616,7 @@ function LibraryBrowseRoute() {
                 >
                   <For each={readyState()?.items ?? []}>
                     {(item) => (
-                      <MediaInfoHoverCard id={item.id} itemType={item.itemType}>
-                        <VideoCard kind="library" item={item} collectionType={collectionType()} />
-                      </MediaInfoHoverCard>
+                      <VideoCard kind="library" item={item} collectionType={collectionType()} />
                     )}
                   </For>
                   <Show when={browseQuery.isFetchingNextPage}>
@@ -624,16 +654,11 @@ function LibraryBrowseRoute() {
                                 <Show when={displayIndex() < totalRecordCount()}>
                                   <Show when={item()} fallback={<LibraryBrowseSkeletonCard />}>
                                     {(loadedItem) => (
-                                      <MediaInfoHoverCard
-                                        id={loadedItem().id}
-                                        itemType={loadedItem().itemType}
-                                      >
-                                        <VideoCard
-                                          kind="library"
-                                          item={loadedItem()}
-                                          collectionType={collectionType()}
-                                        />
-                                      </MediaInfoHoverCard>
+                                      <VideoCard
+                                        kind="library"
+                                        item={loadedItem()}
+                                        collectionType={collectionType()}
+                                      />
                                     )}
                                   </Show>
                                 </Show>

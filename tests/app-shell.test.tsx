@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, rstest, test } from '@rstest/core';
+import type { QueryClient } from '@tanstack/solid-query';
 import { RouterProvider, createMemoryHistory } from '@tanstack/solid-router';
 import { fireEvent, screen, waitFor, within } from '@testing-library/dom';
 import { render } from 'solid-js/web';
@@ -17,7 +18,26 @@ import type {
 import { ToastProvider } from '../src/components/ToastProvider';
 import { createJellyPilotRouter } from '../src/router';
 import { resetSharedLibraryFilters } from '../src/utils/createSharedLibraryFilters';
-import { TestQueryProvider } from './query-client';
+import { createTestQueryClient, TestQueryProvider } from './query-client';
+
+interface TestIntersectionObserverController {
+  trigger(isIntersecting?: boolean): void;
+}
+
+interface TestTauriStoreController {
+  reset(): void;
+  get(path: string, key: string): unknown;
+  getCount(path: string, key: string): number;
+  loadCount(path: string): number;
+  set(path: string, key: string, value: unknown): void;
+}
+
+declare global {
+  interface Window {
+    __TEST_INTERSECTION_OBSERVER__: TestIntersectionObserverController;
+    __TEST_TAURI_STORE__: TestTauriStoreController;
+  }
+}
 
 // Mock scrollTo since JSDOM doesn't implement layout/scrolling APIs
 Element.prototype.scrollTo = () => {};
@@ -514,13 +534,13 @@ function appScrollViewport(): HTMLElement {
   throw new Error('App scroll viewport was not rendered');
 }
 
-function renderShell(path = '/library') {
+function renderShell(path = '/library', client?: QueryClient) {
   const root = document.createElement('div');
   document.body.append(root);
   const router = createJellyPilotRouter(createMemoryHistory({ initialEntries: [path] }));
   const dispose = render(
     () => (
-      <TestQueryProvider>
+      <TestQueryProvider client={client}>
         <ToastProvider>
           <RouterProvider router={router} />
         </ToastProvider>
@@ -791,6 +811,93 @@ test('library browse virtualizes large libraries and fetches visible placeholder
   cleanup();
 });
 
+test('library browse reuses cached virtual pages on route re-entry', async () => {
+  mockShellCommands();
+  const queryClient = createTestQueryClient();
+  const browseCommand = rstest.spyOn(commands, 'libraryBrowseVideo').mockImplementation((request) =>
+    Promise.resolve({
+      data: largeVideoLibraryPage(request.startIndex),
+      status: 'ok',
+    }),
+  );
+  const firstCleanup = renderShell('/library/movies/movies', queryClient);
+
+  expect(await screen.findByRole('link', { name: 'Open Virtual Movie 1' })).toBeVisible();
+  const firstViewport = appScrollViewport();
+  firstViewport.scrollTop = 99_999;
+  fireEvent.scroll(firstViewport);
+  expect(await screen.findByRole('link', { name: 'Open Virtual Movie 125' })).toBeVisible();
+
+  firstCleanup();
+  browseCommand.mockClear();
+  const secondCleanup = renderShell('/library/movies/movies', queryClient);
+
+  expect(await screen.findByRole('link', { name: 'Open Virtual Movie 1' })).toBeVisible();
+  const secondViewport = appScrollViewport();
+  secondViewport.scrollTop = 99_999;
+  fireEvent.scroll(secondViewport);
+  expect(screen.getByRole('link', { name: 'Open Virtual Movie 125' })).toBeVisible();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(browseCommand).toHaveBeenCalledTimes(1);
+  expect(browseCommand).toHaveBeenCalledWith({
+    collectionType: 'movies',
+    favoritesOnly: false,
+    libraryId: 'movies',
+    limit: 24,
+    playedFilter: 'all',
+    sort: 'title',
+    startIndex: 0,
+  });
+
+  secondCleanup();
+});
+
+test('library browse reuses cached switched library pages before virtual pages', async () => {
+  mockShellCommands();
+  const browseCommand = rstest.spyOn(commands, 'libraryBrowseVideo').mockImplementation((request) =>
+    Promise.resolve({
+      data: {
+        ...largeVideoLibraryPage(request.startIndex),
+        collectionType: request.collectionType,
+        libraryId: request.libraryId,
+      },
+      status: 'ok',
+    }),
+  );
+  const cleanup = renderShell('/library/movies/movies');
+
+  expect(await screen.findByRole('link', { name: 'Open Virtual Movie 1' })).toBeVisible();
+  fireEvent.click(screen.getByRole('radio', { name: 'Shows' }));
+  await waitFor(() =>
+    expect(browseCommand).toHaveBeenCalledWith({
+      collectionType: 'tvshows',
+      favoritesOnly: false,
+      libraryId: 'shows',
+      limit: 24,
+      playedFilter: 'all',
+      sort: 'title',
+      startIndex: 0,
+    }),
+  );
+
+  const viewport = appScrollViewport();
+  viewport.scrollTop = 99_999;
+  fireEvent.scroll(viewport);
+  browseCommand.mockClear();
+
+  fireEvent.click(screen.getByRole('radio', { name: 'Movies' }));
+  expect(await screen.findByRole('link', { name: 'Open Virtual Movie 1' })).toBeVisible();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  const movieRequests = browseCommand.mock.calls
+    .map(([request]) => request)
+    .filter((request) => request.collectionType === 'movies' && request.libraryId === 'movies');
+  expect(movieRequests).toHaveLength(1);
+  expect(movieRequests[0]?.startIndex).toBe(0);
+
+  cleanup();
+});
+
 test('library browse retries failed virtual placeholder page', async () => {
   mockShellCommands();
   let bottomPageShouldFail = true;
@@ -837,7 +944,7 @@ test('library browse controls reload paged results from the first page', async (
   fireEvent.click(screen.getByText('Recently added', { selector: 'span' }));
 
   await waitFor(() =>
-    expect(browseCommand).toHaveBeenLastCalledWith({
+    expect(browseCommand).toHaveBeenCalledWith({
       collectionType: 'movies',
       favoritesOnly: false,
       libraryId: 'movies',
@@ -848,10 +955,11 @@ test('library browse controls reload paged results from the first page', async (
     }),
   );
 
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Status' })).not.toBeDisabled());
   fireEvent.click(screen.getByRole('button', { name: 'Status' }));
   fireEvent.click(screen.getByText('Unplayed', { selector: 'span' }));
   await waitFor(() =>
-    expect(browseCommand).toHaveBeenLastCalledWith({
+    expect(browseCommand).toHaveBeenCalledWith({
       collectionType: 'movies',
       favoritesOnly: false,
       libraryId: 'movies',
@@ -862,10 +970,11 @@ test('library browse controls reload paged results from the first page', async (
     }),
   );
 
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Status' })).not.toBeDisabled());
   fireEvent.click(screen.getByRole('button', { name: 'Status' }));
   fireEvent.click(screen.getByText('Favorites Only', { selector: 'span' }));
   await waitFor(() =>
-    expect(browseCommand).toHaveBeenLastCalledWith({
+    expect(browseCommand).toHaveBeenCalledWith({
       collectionType: 'movies',
       favoritesOnly: true,
       libraryId: 'movies',
@@ -875,9 +984,12 @@ test('library browse controls reload paged results from the first page', async (
       startIndex: 0,
     }),
   );
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: 'Sort ascending' })).not.toBeDisabled(),
+  );
   fireEvent.click(screen.getByRole('button', { name: 'Sort ascending' }));
   await waitFor(() =>
-    expect(browseCommand).toHaveBeenLastCalledWith({
+    expect(browseCommand).toHaveBeenCalledWith({
       collectionType: 'movies',
       favoritesOnly: true,
       libraryId: 'movies',
@@ -930,6 +1042,50 @@ test('library browse controls are shared across libraries', async () => {
     }),
   );
   expect(screen.getByRole('button', { name: 'Sort descending' })).toBeVisible();
+
+  cleanup();
+});
+
+test('library browse hydrates shared filters once across route remounts', async () => {
+  mockShellCommands();
+  window.__TEST_TAURI_STORE__.set('preferences.json', 'library_filters', {
+    sort: 'recentlyAdded',
+    playedFilter: 'all',
+    favoritesOnly: false,
+    sortDirection: 'asc',
+  });
+  const browseCommand = rstest.spyOn(commands, 'libraryBrowseVideo');
+  const cleanup = renderShell('/library/tvshows/shows');
+
+  await waitFor(() =>
+    expect(browseCommand).toHaveBeenCalledWith({
+      collectionType: 'tvshows',
+      favoritesOnly: false,
+      libraryId: 'shows',
+      limit: 24,
+      playedFilter: 'all',
+      sort: 'recentlyAdded',
+      startIndex: 0,
+    }),
+  );
+  expect(window.__TEST_TAURI_STORE__.loadCount('preferences.json')).toBe(1);
+  expect(window.__TEST_TAURI_STORE__.getCount('preferences.json', 'library_filters')).toBe(1);
+
+  fireEvent.click(screen.getByRole('radio', { name: 'Movies' }));
+
+  await waitFor(() =>
+    expect(browseCommand).toHaveBeenCalledWith({
+      collectionType: 'movies',
+      favoritesOnly: false,
+      libraryId: 'movies',
+      limit: 24,
+      playedFilter: 'all',
+      sort: 'recentlyAdded',
+      startIndex: 0,
+    }),
+  );
+  expect(window.__TEST_TAURI_STORE__.loadCount('preferences.json')).toBe(1);
+  expect(window.__TEST_TAURI_STORE__.getCount('preferences.json', 'library_filters')).toBe(1);
 
   cleanup();
 });

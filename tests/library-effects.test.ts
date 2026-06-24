@@ -1,8 +1,39 @@
-import { expect, test } from '@rstest/core';
-import { Option } from 'effect';
+import { afterEach, expect, rstest, test } from '@rstest/core';
+import { Effect, Exit, Option } from 'effect';
 
-import type { VideoShowDetail } from '../src/bindings';
-import { initialSeasonForShow } from '../src/effects/library';
+import { commands } from '../src/bindings';
+import type { ConnectionState, VideoLibraryPage, VideoShowDetail } from '../src/bindings';
+import { fetchVideoLibraryPage, initialSeasonForShow } from '../src/effects/library';
+
+const connectedState: ConnectionState = {
+  capabilities: {
+    introSkipper: true,
+    quickConnect: true,
+    remoteControl: true,
+    remoteControlAvailable: true,
+    remoteControlWarning: null,
+  },
+  connected: true,
+  provider: 'jellyfin',
+  serverName: 'Jellyfin Home',
+  serverUrl: 'https://jellyfin.example.com',
+  userId: 'user-1',
+  userName: 'Ada',
+};
+
+const page: VideoLibraryPage = {
+  collectionType: 'movies',
+  hasMore: false,
+  items: [],
+  libraryId: 'movies',
+  limit: 24,
+  startIndex: 0,
+  totalRecordCount: 0,
+};
+
+afterEach(() => {
+  rstest.restoreAllMocks();
+});
 
 test('initialSeasonForShow returns season matching nextEpisode.seasonNumber', () => {
   const show: VideoShowDetail = {
@@ -128,4 +159,28 @@ test('initialSeasonForShow returns null if show has no seasons', () => {
 
   const result = initialSeasonForShow(show);
   expect(Option.isNone(result)).toBe(true);
+});
+
+test('fetchVideoLibraryPage does not preflight connection state per page', async () => {
+  const serverGetState = rstest.spyOn(commands, 'serverGetState').mockResolvedValue(connectedState);
+  const browse = rstest.spyOn(commands, 'libraryBrowseVideo').mockResolvedValue({
+    data: page,
+    status: 'ok',
+  });
+
+  const exit = await Effect.runPromiseExit(
+    fetchVideoLibraryPage('movies', 'movies', 0, 'title', 'all', false),
+  );
+
+  expect(Exit.isSuccess(exit)).toBe(true);
+  expect(serverGetState).not.toHaveBeenCalled();
+  expect(browse).toHaveBeenCalledWith({
+    collectionType: 'movies',
+    favoritesOnly: false,
+    libraryId: 'movies',
+    limit: 24,
+    playedFilter: 'all',
+    sort: 'title',
+    startIndex: 0,
+  });
 });

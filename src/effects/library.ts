@@ -72,19 +72,17 @@ export function fetchVideoLibraryPage(
   playedFilter: VideoLibraryPlayedFilter,
   favoritesOnly: boolean,
 ): LibraryEffect<LibraryBrowseState> {
-  return withConnection(
-    runTauriCommand(() =>
-      commands.libraryBrowseVideo({
-        collectionType,
-        favoritesOnly,
-        libraryId,
-        limit: LIBRARY_BROWSE_PAGE_SIZE,
-        playedFilter,
-        sort,
-        startIndex,
-      }),
-    ).pipe(Effect.map((page) => ({ items: page.items, page }))),
-  );
+  return runTauriCommand(() =>
+    commands.libraryBrowseVideo({
+      collectionType,
+      favoritesOnly,
+      libraryId,
+      limit: LIBRARY_BROWSE_PAGE_SIZE,
+      playedFilter,
+      sort,
+      startIndex,
+    }),
+  ).pipe(Effect.map((page) => ({ items: page.items, page })));
 }
 
 export function fetchVideoItemDetail(itemId: string): LibraryEffect<LibraryDetailState> {

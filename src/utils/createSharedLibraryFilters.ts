@@ -1,7 +1,7 @@
 import { load } from '@tauri-apps/plugin-store';
 import { Effect, Exit, Match, Option } from 'effect';
 import type { Accessor, Setter } from 'solid-js';
-import { createEffect, createSignal, onCleanup } from 'solid-js';
+import { createEffect, createSignal } from 'solid-js';
 
 import type { VideoLibraryPlayedFilter, VideoLibrarySort } from '../bindings';
 
@@ -32,6 +32,7 @@ const [sortDirection, setSortDirection] =
 let writeQueue: Promise<void> | null = null;
 let hydratedSnapshot: LibraryFilterSnapshot | null = null;
 let hydrateGeneration = 0;
+let hydratePromise: Promise<void> | null = null;
 
 export interface SharedLibraryFilters {
   ready: Accessor<boolean>;
@@ -219,6 +220,7 @@ function persistFilters(filters: LibraryFilterSnapshot, generation: number) {
 
 export function resetSharedLibraryFilters() {
   hydrateGeneration += 1;
+  hydratePromise = null;
   writeQueue = null;
   hydratedSnapshot = null;
   setReady(false);
@@ -226,25 +228,29 @@ export function resetSharedLibraryFilters() {
 }
 
 export function createSharedLibraryFilters(): SharedLibraryFilters {
-  const generation = hydrateGeneration + 1;
-  hydrateGeneration = generation;
-  setReady(false);
-  onCleanup(() => {
-    if (generation === hydrateGeneration) {
-      hydrateGeneration += 1;
-    }
-  });
-  void hydrateFilters(generation).finally(() => {
-    if (generation === hydrateGeneration) {
-      setReady(true);
-    }
-  });
+  const generation = hydrateGeneration;
+  let observedInitialReadySnapshot = false;
+  if (!ready() && !hydratePromise) {
+    hydratePromise = hydrateFilters(generation).finally(() => {
+      if (generation === hydrateGeneration) {
+        setReady(true);
+        hydratePromise = null;
+      }
+    });
+  }
 
   createEffect(() => {
     if (!ready()) {
       return;
     }
     const filters = snapshot();
+    if (!observedInitialReadySnapshot) {
+      observedInitialReadySnapshot = true;
+      if (hydratedSnapshot && snapshotsEqual(filters, hydratedSnapshot)) {
+        hydratedSnapshot = null;
+      }
+      return;
+    }
     if (hydratedSnapshot && snapshotsEqual(filters, hydratedSnapshot)) {
       hydratedSnapshot = null;
       return;

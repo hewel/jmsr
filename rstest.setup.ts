@@ -60,6 +60,8 @@ class TestIntersectionObserver implements IntersectionObserver {
 const storePathsByRid = new Map<number, string>();
 const storeRidsByPath = new Map<string, number>();
 const storeValuesByPath = new Map<string, Map<string, unknown>>();
+const storeLoadCountsByPath = new Map<string, number>();
+const storeGetCountsByPathKey = new Map<string, number>();
 let nextStoreRid = 1;
 
 function record(value: unknown): Record<string, unknown> {
@@ -76,6 +78,7 @@ function storeForPath(path: string) {
 }
 
 function loadTestStore(path: string) {
+  storeLoadCountsByPath.set(path, (storeLoadCountsByPath.get(path) ?? 0) + 1);
   const existingRid = storeRidsByPath.get(path);
   if (existingRid) {
     return existingRid;
@@ -93,10 +96,18 @@ const testTauriStore = {
     storePathsByRid.clear();
     storeRidsByPath.clear();
     storeValuesByPath.clear();
+    storeLoadCountsByPath.clear();
+    storeGetCountsByPathKey.clear();
     nextStoreRid = 1;
   },
   get(path: string, key: string) {
     return storeValuesByPath.get(path)?.get(key);
+  },
+  getCount(path: string, key: string) {
+    return storeGetCountsByPathKey.get(`${path}\u0000${key}`) ?? 0;
+  },
+  loadCount(path: string) {
+    return storeLoadCountsByPath.get(path) ?? 0;
   },
   set(path: string, key: string, value: unknown) {
     storeForPath(path).set(key, value);
@@ -145,6 +156,10 @@ Object.assign(window, {
         if (!path || typeof key !== 'string') {
           return [null, false];
         }
+        storeGetCountsByPathKey.set(
+          `${path}\u0000${key}`,
+          (storeGetCountsByPathKey.get(`${path}\u0000${key}`) ?? 0) + 1,
+        );
         const store = storeForPath(path);
         return store.has(key) ? [store.get(key), true] : [null, false];
       }
