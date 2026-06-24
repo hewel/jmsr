@@ -1,6 +1,7 @@
 import { Exit, Match } from 'effect';
 import { Check, Clapperboard, Heart, RefreshCw } from 'lucide-solid';
 import { For, Show, createSignal } from 'solid-js';
+import type { JSX } from 'solid-js';
 
 import type {
   VideoHomeItem,
@@ -120,6 +121,34 @@ export function detailSubtitle(detail: VideoItemDetail) {
         : 'Episode';
     return `${detail.seriesName} · ${episode}`;
   }
+  return detail.productionYear?.toString() ?? detail.itemType;
+}
+
+export function detailSubtitleElement(detail: VideoItemDetail): JSX.Element {
+  if (detail.itemType === 'Episode' && detail.seriesName) {
+    const episode =
+      detail.seasonNumber !== null && detail.episodeNumber !== null
+        ? `S${detail.seasonNumber.toString().padStart(2, '0')}E${detail.episodeNumber.toString().padStart(2, '0')}`
+        : 'Episode';
+
+    return (
+      <>
+        <Show when={detail.seriesId} fallback={<span>{detail.seriesName}</span>}>
+          {(seriesId) => (
+            <a
+              href={`/library/shows/${seriesId()}`}
+              class="text-secondary underline-offset-4 hover:underline"
+            >
+              {detail.seriesName}
+            </a>
+          )}
+        </Show>
+        {' · '}
+        {episode}
+      </>
+    );
+  }
+
   return detail.productionYear?.toString() ?? detail.itemType;
 }
 

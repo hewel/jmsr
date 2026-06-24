@@ -1,5 +1,7 @@
+import { Dialog } from '@ark-ui/solid/dialog';
 import { Play, X } from 'lucide-solid';
 import { createEffect, createMemo, createSignal } from 'solid-js';
+import { Portal } from 'solid-js/web';
 
 import type {
   VideoItemDetail,
@@ -78,73 +80,84 @@ export function LibraryPlaybackChooser(props: {
     props.pending.mode === 'resume' ? 'Resume playback' : 'Start playback';
 
   return (
-    <Card
-      as="section"
-      variant="filled"
-      class="border-secondary/40 bg-secondary-container/10 space-y-4"
-      aria-labelledby="library-playback-chooser-title"
+    <Dialog.Root
+      open={true}
+      onOpenChange={(event) => {
+        if (!event.open) {
+          props.onCancel();
+        }
+      }}
+      lazyMount
+      unmountOnExit
     >
-      <div>
-        <p class="text-secondary text-[11px] leading-[16px] font-bold tracking-[0.08em] uppercase">
-          {props.pending.detail.itemType}
-        </p>
-        <h2
-          id="library-playback-chooser-title"
-          class="text-on-surface text-[22px] leading-[28px] font-bold"
-        >
-          {props.pending.detail.name}
-        </h2>
-      </div>
+      <Portal>
+        <Dialog.Backdrop class="fixed inset-0 z-60 bg-black/70 backdrop-blur-sm transition-[backdrop-filter,background-color,opacity] duration-300 data-[state=closed]:opacity-0 data-[state=open]:opacity-100" />
+        <Dialog.Positioner class="fixed inset-0 z-60 flex items-center justify-center overflow-y-auto p-4">
+          <Dialog.Content class="relative w-full max-w-2xl outline-none">
+            <Card
+              as="section"
+              variant="filled"
+              class="border-secondary/40 bg-secondary-container/10 space-y-4"
+            >
+              <div>
+                <p class="text-secondary text-[11px] leading-[16px] font-bold tracking-[0.08em] uppercase">
+                  {props.pending.detail.itemType}
+                </p>
+                <Dialog.Title class="text-on-surface text-[22px] leading-[28px] font-bold">
+                  {props.pending.detail.name}
+                </Dialog.Title>
+              </div>
 
-      <div class="grid gap-4 sm:grid-cols-2">
-        <JellyPilotSelect
-          label="Audio track"
-          items={audioItems()}
-          disabled={props.busy || props.pending.detail.audioStreams.length === 0}
-          value={audioValue()}
-          placeholder="No audio tracks"
-          size="compact"
-          onValueChange={setAudioValue}
-        />
+              <div class="grid gap-4 sm:grid-cols-2">
+                <JellyPilotSelect
+                  label="Audio track"
+                  items={audioItems()}
+                  disabled={props.busy || props.pending.detail.audioStreams.length === 0}
+                  value={audioValue()}
+                  placeholder="No audio tracks"
+                  size="compact"
+                  onValueChange={setAudioValue}
+                />
 
-        <JellyPilotSelect
-          label="Subtitle track"
-          items={subtitleItems()}
-          disabled={props.busy}
-          value={subtitleValue()}
-          size="compact"
-          onValueChange={setSubtitleValue}
-        />
-      </div>
+                <JellyPilotSelect
+                  label="Subtitle track"
+                  items={subtitleItems()}
+                  disabled={props.busy}
+                  value={subtitleValue()}
+                  size="compact"
+                  onValueChange={setSubtitleValue}
+                />
+              </div>
 
-      <div class="flex flex-wrap justify-end gap-3">
-        <Button
-          type="button"
-          variant="outlined"
-          class="rounded-full"
-          disabled={props.busy}
-          onClick={props.onCancel}
-          leadingIcon={<X class="h-4 w-4" />}
-        >
-          Cancel
-        </Button>
-        <Button
-          type="button"
-          variant="primary"
-          class="rounded-full"
-          disabled={props.busy}
-          onClick={() =>
-            props.onConfirm({
-              audioStreamIndex: audioStreamIndex(),
-              subtitleStreamIndex: subtitleStreamIndex(),
-            })
-          }
-          leadingIcon={<Play class="h-4 w-4 fill-current" />}
-        >
-          {props.busy ? 'Starting...' : confirmLabel()}
-        </Button>
-      </div>
-    </Card>
+              <div class="flex flex-wrap justify-end gap-3">
+                <Dialog.CloseTrigger
+                  class="border-outline text-on-surface hover:border-primary hover:bg-primary/5 inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-full border bg-transparent px-5 py-3 text-[14px] leading-[20px] font-bold transition-[background-color,border-color,color,transform] duration-200 select-none active:scale-[0.96] disabled:pointer-events-none disabled:opacity-50"
+                  disabled={props.busy}
+                >
+                  <X class="h-4 w-4" />
+                  Cancel
+                </Dialog.CloseTrigger>
+                <Button
+                  type="button"
+                  variant="primary"
+                  class="rounded-full"
+                  disabled={props.busy}
+                  onClick={() =>
+                    props.onConfirm({
+                      audioStreamIndex: audioStreamIndex(),
+                      subtitleStreamIndex: subtitleStreamIndex(),
+                    })
+                  }
+                  leadingIcon={<Play class="h-4 w-4 fill-current" />}
+                >
+                  {props.busy ? 'Starting...' : confirmLabel()}
+                </Button>
+              </div>
+            </Card>
+          </Dialog.Content>
+        </Dialog.Positioner>
+      </Portal>
+    </Dialog.Root>
   );
 }
 

@@ -29,6 +29,7 @@ const connectedState = {
 
 const movieDetail: VideoItemDetail = {
   artworkUrl: 'https://example.com/movie.png',
+  backdropUrl: null,
   audioStreams: [],
   canPlay: true,
   canResume: true,
@@ -52,6 +53,7 @@ const movieDetail: VideoItemDetail = {
 
 const showDetail: VideoShowDetail = {
   artworkUrl: null,
+  backdropUrl: null,
   canPlay: true,
   favorite: false,
   genres: ['Crime', 'Thriller'],

@@ -387,9 +387,15 @@ where
   F: Fn(String) -> Fut + Clone,
   Fut: std::future::Future<Output = Result<ImageDownload, ImageCacheError>>,
 {
-  let urls = detail.artwork_url.iter().cloned().collect();
+  let urls = detail
+    .artwork_url
+    .iter()
+    .chain(detail.backdrop_url.iter())
+    .cloned()
+    .collect();
   let resolved = cache.resolve_urls(partition, urls, fetch).await;
   rewrite_optional_url(&mut detail.artwork_url, &resolved);
+  rewrite_optional_url(&mut detail.backdrop_url, &resolved);
   detail
 }
 
@@ -405,6 +411,7 @@ where
 {
   let mut urls = Vec::new();
   urls.extend(detail.artwork_url.iter().cloned());
+  urls.extend(detail.backdrop_url.iter().cloned());
   urls.extend(
     detail
       .next_episode
@@ -419,6 +426,7 @@ where
   );
   let resolved = cache.resolve_urls(partition, urls, fetch).await;
   rewrite_optional_url(&mut detail.artwork_url, &resolved);
+  rewrite_optional_url(&mut detail.backdrop_url, &resolved);
   if let Some(next_episode) = &mut detail.next_episode {
     rewrite_optional_url(&mut next_episode.artwork_url, &resolved);
   }

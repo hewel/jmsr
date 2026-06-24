@@ -2879,6 +2879,22 @@ fn map_video_show_detail(
 
   let id = item.id?.to_string();
   let user_data = item.user_data.flatten();
+  let artwork_url = artwork_url(
+    server_url,
+    &id,
+    item.image_tags.flatten(),
+    jellyfin_api::models::ImageType::Primary,
+  );
+  let backdrop_url = backdrop_url(
+    server_url,
+    &id,
+    item.backdrop_image_tags.flatten(),
+    item
+      .parent_backdrop_item_id
+      .flatten()
+      .map(|id| id.to_string()),
+    item.parent_backdrop_image_tags.flatten(),
+  );
 
   Some(VideoShowDetail {
     id: id.clone(),
@@ -2898,12 +2914,8 @@ fn map_video_show_detail(
       .and_then(|data| data.is_favorite)
       .unwrap_or(false),
     can_play: false,
-    artwork_url: artwork_url(
-      server_url,
-      &id,
-      item.image_tags.flatten(),
-      jellyfin_api::models::ImageType::Primary,
-    ),
+    artwork_url,
+    backdrop_url,
     next_episode: None,
     seasons: Vec::new(),
   })
@@ -2996,6 +3008,22 @@ fn map_video_item_detail(
     .as_ref()
     .and_then(|data| data.played)
     .unwrap_or(false);
+  let artwork_url = artwork_url(
+    server_url,
+    &id,
+    item.image_tags.flatten(),
+    jellyfin_api::models::ImageType::Primary,
+  );
+  let backdrop_url = backdrop_url(
+    server_url,
+    &id,
+    item.backdrop_image_tags.flatten(),
+    item
+      .parent_backdrop_item_id
+      .flatten()
+      .map(|id| id.to_string()),
+    item.parent_backdrop_image_tags.flatten(),
+  );
 
   Some(VideoItemDetail {
     id: id.clone(),
@@ -3023,12 +3051,8 @@ fn map_video_item_detail(
     resume_position_seconds,
     can_resume: resume_position_seconds.unwrap_or(0.0) > 0.0 && !played,
     can_play: true,
-    artwork_url: artwork_url(
-      server_url,
-      &id,
-      item.image_tags.flatten(),
-      jellyfin_api::models::ImageType::Primary,
-    ),
+    artwork_url,
+    backdrop_url,
     audio_streams,
     subtitle_streams,
   })
@@ -3129,6 +3153,29 @@ fn artwork_url(
   Some(format!(
     "{}/Items/{}/Images/{}?tag={}",
     server_url, item_id, image_type, tag
+  ))
+}
+
+fn backdrop_url(
+  server_url: &str,
+  item_id: &str,
+  backdrop_tags: Option<Vec<String>>,
+  parent_backdrop_item_id: Option<String>,
+  parent_backdrop_tags: Option<Vec<String>>,
+) -> Option<String> {
+  let (image_item_id, tag) = backdrop_tags
+    .and_then(|tags| tags.into_iter().next())
+    .map(|tag| (item_id.to_string(), tag))
+    .or_else(|| {
+      Some((
+        parent_backdrop_item_id?,
+        parent_backdrop_tags?.into_iter().next()?,
+      ))
+    })?;
+
+  Some(format!(
+    "{}/Items/{}/Images/Backdrop/0?tag={}",
+    server_url, image_item_id, tag
   ))
 }
 
@@ -3507,6 +3554,13 @@ fn map_emby_video_show_detail(
     item.primary_image_tag,
     "Primary",
   );
+  let backdrop_url = backdrop_url(
+    server_url,
+    &id,
+    item.backdrop_image_tags,
+    item.parent_backdrop_item_id,
+    item.parent_backdrop_image_tags,
+  );
 
   Some(VideoShowDetail {
     id,
@@ -3518,6 +3572,7 @@ fn map_emby_video_show_detail(
     favorite: user_data.and_then(|data| data.is_favorite).unwrap_or(false),
     can_play: false,
     artwork_url,
+    backdrop_url,
     next_episode: None,
     seasons: Vec::new(),
   })
@@ -3573,6 +3628,13 @@ fn map_emby_video_item_detail(
     item.primary_image_tag,
     "Primary",
   );
+  let backdrop_url = backdrop_url(
+    server_url,
+    &id,
+    item.backdrop_image_tags,
+    item.parent_backdrop_item_id,
+    item.parent_backdrop_image_tags,
+  );
 
   Some(VideoItemDetail {
     id,
@@ -3593,6 +3655,7 @@ fn map_emby_video_item_detail(
     can_resume: resume_position_seconds.unwrap_or(0.0) > 0.0 && !played,
     can_play: true,
     artwork_url,
+    backdrop_url,
     audio_streams,
     subtitle_streams,
   })

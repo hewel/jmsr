@@ -46,6 +46,7 @@ test('initialSeasonForShow returns season matching nextEpisode.seasonNumber', ()
     productionYear: null,
     canPlay: true,
     artworkUrl: null,
+    backdropUrl: null,
     nextEpisode: {
       id: 'ep-2',
       name: 'Episode 2',
@@ -107,6 +108,7 @@ test('initialSeasonForShow returns first season if no matching nextEpisode.seaso
     productionYear: null,
     canPlay: true,
     artworkUrl: null,
+    backdropUrl: null,
     nextEpisode: null,
     seasons: [
       {
@@ -153,6 +155,7 @@ test('initialSeasonForShow returns null if show has no seasons', () => {
     productionYear: null,
     canPlay: true,
     artworkUrl: null,
+    backdropUrl: null,
     nextEpisode: null,
     seasons: [],
   };

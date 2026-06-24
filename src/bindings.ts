@@ -353,6 +353,7 @@ export type VideoItemDetail = {
 	canResume: boolean,
 	canPlay: boolean,
 	artworkUrl: string | null,
+	backdropUrl: string | null,
 	audioStreams: VideoPlaybackStreamOption[],
 	subtitleStreams: VideoPlaybackStreamOption[],
 };
@@ -496,6 +497,7 @@ export type VideoShowDetail = {
 	favorite: boolean,
 	canPlay: boolean,
 	artworkUrl: string | null,
+	backdropUrl: string | null,
 	nextEpisode: VideoLibraryItem | null,
 	seasons: VideoSeason[],
 };

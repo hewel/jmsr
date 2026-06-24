@@ -4,6 +4,7 @@ import type {
   VideoSeason,
   VideoUserDataUpdateRequest,
 } from '@bindings';
+import { DetailHero } from '@components/library/DetailHero';
 import { LibraryPlaybackChooser } from '@components/library/LibraryPlaybackChooser';
 import type {
   LibraryPlaybackSelection,
@@ -16,11 +17,12 @@ import {
   seasonLabel,
   showSubtitle,
 } from '@components/library/shared';
-import { Button, Card, ConsoleGrid, StatusBadge } from '@components/ui';
+import { Button, Card, JellyPilotSelect, StatusBadge } from '@components/ui';
+import type { JellyPilotSelectItem } from '@components/ui';
 import { createMutation, createQuery, useQueryClient } from '@tanstack/solid-query';
 import { createFileRoute } from '@tanstack/solid-router';
 import { Exit, Option } from 'effect';
-import { Film, Library, RefreshCw, Tv } from 'lucide-solid';
+import { Film, Play, RefreshCw, Tv } from 'lucide-solid';
 import { For, Show, Suspense, createMemo, createSignal } from 'solid-js';
 import { commandFailureMessage } from '~effects/commands';
 import { fetchConnectionState } from '~effects/connection';
@@ -71,16 +73,6 @@ function LibraryShowDetailRoute() {
   const [confirmBusy, setConfirmBusy] = createSignal(false);
   const [pendingPlayback, setPendingPlayback] = createSignal<PendingLibraryPlayback | null>(null);
   const [playError, setPlayError] = createSignal<string | null>(null);
-
-  const reloadShow = () => {
-    setSelectedSeason(null);
-    void queryClient.invalidateQueries({
-      queryKey: queryKeys.libraryShowDetail(sessionKey(), params().seriesId),
-    });
-    void queryClient.invalidateQueries({
-      queryKey: queryKeys.librarySeasonEpisodesRoot(sessionKey(), params().seriesId),
-    });
-  };
 
   const detail = () =>
     showQuery.data && Exit.isSuccess(showQuery.data) ? showQuery.data.value : null;
@@ -237,353 +229,192 @@ function LibraryShowDetailRoute() {
     }
     return 'Episode';
   };
+  const playShowLabel = () => {
+    const show = detail();
+    const nextEpisode = show?.nextEpisode;
+    if (!nextEpisode) {
+      return 'Play';
+    }
+    const prefix =
+      nextEpisode.resumePositionSeconds != null &&
+      nextEpisode.resumePositionSeconds > 0 &&
+      !nextEpisode.played
+        ? 'Continue'
+        : 'Play';
+    return `${prefix} ${episodeLabel(nextEpisode)}`;
+  };
 
   return (
     <div class="space-y-6">
-      <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <Button
-          href="/library"
-          variant="outlined"
-          class="rounded-full"
-          leadingIcon={<Library class="h-4 w-4" />}
-        >
-          Video Home
-        </Button>
-        <Button
-          type="button"
-          variant="outlined"
-          class="rounded-full"
-          disabled={showQuery.isFetching}
-          onClick={reloadShow}
-          leadingIcon={
-            <RefreshCw class="h-4 w-4" classList={{ 'animate-spin': showQuery.isFetching }} />
-          }
-        >
-          Retry Show
-        </Button>
-      </div>
-
       <Suspense fallback={<ShowDetailSkeleton />}>
         <Show
           when={detail()}
           fallback={<LibraryStatusPanel title={statusTitle()} description={statusDescription()} />}
         >
           {(show) => (
-            <ConsoleGrid>
-              {/* Left Column (Interactive): Seasons & Episode List */}
-              <section
-                class="order-2 min-w-0 space-y-4 lg:order-1"
-                aria-labelledby="show-seasons-title"
-              >
-                <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                  <div>
-                    <h2
-                      id="show-seasons-title"
-                      class="text-on-surface text-[22px] leading-[28px] font-bold"
-                    >
-                      Episodes
-                    </h2>
-                  </div>
-                  <p class="text-on-surface-variant/80 text-[12px] leading-[16px] tabular-nums">
-                    {show().seasons.length} seasons available
-                  </p>
-                </div>
-
-                <Show
-                  when={show().seasons.length > 0}
-                  fallback={
-                    <LibraryStatusPanel
-                      title="No seasons available"
-                      description="Jellyfin returned no seasons for this show."
-                    />
-                  }
-                >
-                  <ul
-                    class="border-outline-variant bg-surface-container-low/70 flex gap-2 overflow-x-auto rounded-2xl border p-2"
-                    aria-label="Show seasons"
-                  >
-                    <For each={show().seasons}>
-                      {(season) => (
-                        <li class="shrink-0">
-                          <Button
-                            type="button"
-                            variant="outlined"
-                            class={`rounded-full ${
-                              activeSeason()?.id === season.id
-                                ? 'border-secondary bg-secondary-container/45 text-on-secondary-container'
-                                : ''
-                            }`}
-                            aria-pressed={activeSeason()?.id === season.id}
-                            disabled={episodesLoading()}
-                            onClick={() => loadEpisodes(season)}
-                          >
-                            {seasonLabel(season)}
-                          </Button>
-                        </li>
-                      )}
-                    </For>
-                  </ul>
-
-                  <Suspense fallback={<SeasonEpisodesSkeleton />}>
-                    <Show
-                      when={hasSeasonEpisodes()}
-                      fallback={
-                        episodesLoading() ? (
-                          <SeasonEpisodesSkeleton />
-                        ) : (
-                          <LibraryStatusPanel
-                            title={episodesStatusTitle()}
-                            description={episodesStatusDescription()}
-                          />
-                        )
-                      }
-                    >
-                      <section class="space-y-3" aria-labelledby="season-episodes-title">
-                        <h3
-                          id="season-episodes-title"
-                          class="text-on-surface text-[16px] leading-[24px] font-semibold"
-                        >
-                          {activeSeason() ? `${activeSeason()?.name} Episodes` : 'Episodes'}
-                        </h3>
-                        <div class="flex animate-[fadeIn_0.3s_cubic-bezier(0.16,1,0.3,1)_forwards] flex-col gap-3">
-                          <For each={seasonEpisodes()}>
-                            {(episode) => (
-                              <Card
-                                variant="filled"
-                                surfaceTint={false}
-                                class="grid grid-cols-1 items-center gap-4 !p-3 sm:grid-cols-[160px_1fr_auto]"
-                              >
-                                {/* Episode thumbnail - landscape, episode-specific */}
-                                <div class="bg-surface-container-lowest/60 aspect-video w-full overflow-hidden rounded-lg">
-                                  <Show
-                                    when={episode.artworkUrl}
-                                    fallback={
-                                      <div class="text-on-surface-variant flex h-full items-center justify-center text-[11px] leading-[16px] font-bold tracking-[0.08em] uppercase">
-                                        <Film class="h-5 w-5" />
-                                      </div>
-                                    }
-                                  >
-                                    {(artworkUrl) => (
-                                      <img
-                                        src={imageSource(artworkUrl())}
-                                        alt={`${episode.name} artwork`}
-                                        class="h-full w-full object-cover outline outline-1 -outline-offset-1 outline-white/10"
-                                        loading="lazy"
-                                      />
-                                    )}
-                                  </Show>
-                                </div>
-
-                                {/* Episode metadata column */}
-                                <div class="min-w-0 space-y-1.5">
-                                  <div class="flex flex-wrap items-center gap-2">
-                                    <span class="text-secondary text-[11px] leading-[16px] font-bold tracking-[0.08em] uppercase">
-                                      {episodeLabel(episode)}
-                                    </span>
-                                    <Show when={episode.played}>
-                                      <StatusBadge variant="success">Played</StatusBadge>
-                                    </Show>
-                                    <Show when={episode.favorite}>
-                                      <StatusBadge variant="success">Favorite</StatusBadge>
-                                    </Show>
-                                    <Show when={formatRuntime(episode.runtimeSeconds)}>
-                                      {(runtime) => (
-                                        <>
-                                          <span class="text-on-surface-variant/70 text-[12px] leading-[16px]">
-                                            {runtime()}
-                                          </span>
-                                        </>
-                                      )}
-                                    </Show>
-                                    <Show
-                                      when={
-                                        episode.resumePositionSeconds != null &&
-                                        episode.resumePositionSeconds > 0 &&
-                                        !episode.played
-                                      }
-                                    >
-                                      <span class="text-on-surface-variant/70">·</span>{' '}
-                                      <span class="text-secondary text-[12px] leading-[16px] font-semibold tabular-nums">
-                                        {Math.round(episode.playedPercentage ?? 0)}% watched
-                                      </span>
-                                    </Show>
-                                  </div>
-                                  <a
-                                    href={`/library/items/${episode.id}`}
-                                    class="text-on-surface block truncate text-[16px] leading-[24px] font-semibold hover:underline"
-                                  >
-                                    {episode.name}
-                                  </a>
-                                </div>
-
-                                {/* Episode Action Column on the far right */}
-                                <div class="flex shrink-0">
-                                  <Show
-                                    when={
-                                      episode.resumePositionSeconds != null &&
-                                      episode.resumePositionSeconds > 0 &&
-                                      !episode.played
-                                    }
-                                    fallback={
-                                      <Button
-                                        type="button"
-                                        variant="primary"
-                                        class="rounded-full px-5 py-2 text-[14px] leading-[20px] font-semibold tracking-wide uppercase"
-                                        disabled={episodePlayBusy() !== null || confirmBusy()}
-                                        onClick={() => void playEpisode(episode)}
-                                      >
-                                        {episodePlayBusy() === episode.id ? 'Loading...' : 'Play'}
-                                      </Button>
-                                    }
-                                  >
-                                    <Button
-                                      type="button"
-                                      variant="primary"
-                                      class="rounded-full px-5 py-2 text-[14px] leading-[20px] font-semibold tracking-wide uppercase"
-                                      disabled={episodePlayBusy() !== null || confirmBusy()}
-                                      onClick={() => void playEpisode(episode)}
-                                    >
-                                      {episodePlayBusy() === episode.id ? 'Loading...' : 'Resume'}
-                                    </Button>
-                                  </Show>
-                                </div>
-                              </Card>
-                            )}
-                          </For>
-                        </div>
-                      </section>
-                    </Show>
-                  </Suspense>
-                </Show>
-              </section>
-
-              {/* Right Column (Sidebar): Series Info */}
-              <aside class="order-1 space-y-6 lg:order-2">
-                <Card as="article" variant="filled" class="space-y-4">
-                  <div class="bg-surface-container-lowest/60 border-outline-variant aspect-[2/3] overflow-hidden rounded-2xl border">
-                    <Show
-                      when={show().artworkUrl}
-                      fallback={
-                        <div class="text-on-surface-variant flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
-                          <Tv class="h-8 w-8" />
-                          <p class="text-on-surface text-[16px] leading-[24px] font-semibold">
-                            {show().name}
-                          </p>
-                          <p class="text-on-surface-variant/90 text-[11px] leading-[16px] font-bold tracking-[0.08em] uppercase">
-                            No artwork
-                          </p>
-                        </div>
-                      }
-                    >
-                      {(artworkUrl) => (
-                        <img
-                          src={imageSource(artworkUrl())}
-                          alt={`${show().name} artwork`}
-                          class="h-full w-full animate-[fadeIn_0.3s_cubic-bezier(0.16,1,0.3,1)_forwards] object-cover outline outline-1 -outline-offset-1 outline-white/10"
-                        />
-                      )}
-                    </Show>
-                  </div>
-                  <div>
-                    <p class="text-secondary text-[11px] leading-[16px] font-bold tracking-[0.08em] uppercase">
-                      Series
-                    </p>
-                    <h1 class="font-display text-[28px] leading-[36px] font-bold tracking-tight">
-                      {show().name}
-                    </h1>
-                    <p class="text-on-surface-variant mt-1 text-[14px] leading-[20px]">
-                      {showSubtitle(show())}
-                    </p>
-                  </div>
-                  <div class="flex flex-wrap gap-2">
+            <>
+              <DetailHero
+                title={show().name}
+                subtitle={showSubtitle(show())}
+                backdropUrl={show().backdropUrl ?? null}
+                artworkUrl={show().artworkUrl ?? null}
+                artworkAspect="poster"
+                typeLabel="Series"
+                typeIcon={<Tv class="h-6 w-6" />}
+                badges={
+                  <>
                     <StatusBadge variant={show().played ? 'success' : 'neutral'}>
                       {show().played ? 'Played' : 'Unplayed'}
                     </StatusBadge>
                     <StatusBadge variant={show().favorite ? 'success' : 'neutral'}>
                       {show().favorite ? 'Favorite' : 'Not favorite'}
                     </StatusBadge>
+                  </>
+                }
+                actions={
+                  <>
+                    <Button
+                      type="button"
+                      variant="primary"
+                      class="rounded-full"
+                      disabled={!show().nextEpisode || playBusy() || confirmBusy()}
+                      onClick={() => void playShow()}
+                      leadingIcon={
+                        <Show when={playBusy()} fallback={<Play class="h-4 w-4 fill-current" />}>
+                          <RefreshCw class="h-4 w-4 animate-spin" />
+                        </Show>
+                      }
+                    >
+                      {playBusy() ? 'Loading...' : playShowLabel()}
+                    </Button>
+                    <UserDataControls
+                      itemId={show().id}
+                      played={show().played}
+                      favorite={show().favorite}
+                      subject="show"
+                      onUpdate={(request) => userDataMutation.mutateAsync(request)}
+                      onSuccess={() => {
+                        queryClient.invalidateQueries({
+                          queryKey: queryKeys.libraryShowDetail(sessionKey(), params().seriesId),
+                        });
+                        queryClient.invalidateQueries({
+                          queryKey: queryKeys.libraryMediaDetail(
+                            sessionKey(),
+                            'Series',
+                            params().seriesId,
+                          ),
+                        });
+                        queryClient.invalidateQueries({
+                          queryKey: queryKeys.librarySeasonEpisodesRoot(
+                            sessionKey(),
+                            params().seriesId,
+                          ),
+                        });
+                        queryClient.invalidateQueries({
+                          queryKey: queryKeys.libraryHome(sessionKey()),
+                        });
+                        queryClient.invalidateQueries({
+                          queryKey: queryKeys.libraryBrowseRoot(sessionKey()),
+                        });
+                      }}
+                    />
+                  </>
+                }
+              />
+
+              <div class="mx-auto w-full max-w-[1400px] space-y-6 px-6 py-6 lg:px-10 xl:px-12">
+                <Show when={show().overview}>
+                  {(overview) => (
+                    <p class="text-on-surface-variant max-w-[1100px] text-[14px] leading-[22px] text-pretty lg:text-[15px] lg:leading-[24px]">
+                      {overview()}
+                    </p>
+                  )}
+                </Show>
+
+                <Show when={show().genres.length > 0}>
+                  <div class="flex flex-wrap gap-2">
+                    <For each={show().genres}>
+                      {(genre) => (
+                        <span class="border-outline-variant text-on-surface-variant/90 rounded-full border px-3 py-1 text-[11px] leading-[16px] font-bold tracking-[0.08em] uppercase">
+                          {genre}
+                        </span>
+                      )}
+                    </For>
+                  </div>
+                </Show>
+
+                <section class="space-y-4" aria-labelledby="show-seasons-title">
+                  <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                      <h2
+                        id="show-seasons-title"
+                        class="text-on-surface text-[22px] leading-[28px] font-bold"
+                      >
+                        Episodes
+                      </h2>
+                    </div>
+                    <p class="text-on-surface-variant/80 text-[12px] leading-[16px] tabular-nums">
+                      {show().seasons.length} seasons available
+                    </p>
                   </div>
 
-                  <UserDataControls
-                    itemId={show().id}
-                    played={show().played}
-                    favorite={show().favorite}
-                    subject="show"
-                    onUpdate={(request) => userDataMutation.mutateAsync(request)}
-                    onSuccess={() => {
-                      queryClient.invalidateQueries({
-                        queryKey: queryKeys.libraryShowDetail(sessionKey(), params().seriesId),
-                      });
-                      queryClient.invalidateQueries({
-                        queryKey: queryKeys.libraryMediaDetail(
-                          sessionKey(),
-                          'Series',
-                          params().seriesId,
-                        ),
-                      });
-                      queryClient.invalidateQueries({
-                        queryKey: queryKeys.librarySeasonEpisodesRoot(
-                          sessionKey(),
-                          params().seriesId,
-                        ),
-                      });
-                      queryClient.invalidateQueries({
-                        queryKey: queryKeys.libraryHome(sessionKey()),
-                      });
-                      queryClient.invalidateQueries({
-                        queryKey: queryKeys.libraryBrowseRoot(sessionKey()),
-                      });
-                    }}
-                  />
+                  <Show
+                    when={show().seasons.length > 0}
+                    fallback={
+                      <LibraryStatusPanel
+                        title="No seasons available"
+                        description="Jellyfin returned no seasons for this show."
+                      />
+                    }
+                  >
+                    <SeasonSelector
+                      seasons={show().seasons}
+                      activeSeason={activeSeason()}
+                      disabled={episodesLoading()}
+                      onSelect={loadEpisodes}
+                    />
 
-                  <Show when={show().overview}>
-                    {(overview) => (
-                      <p class="text-on-surface-variant border-outline-variant/30 border-t pt-3 text-[14px] leading-[20px] leading-relaxed">
-                        {overview()}
-                      </p>
-                    )}
+                    <Suspense fallback={<SeasonEpisodesSkeleton />}>
+                      <Show
+                        when={hasSeasonEpisodes()}
+                        fallback={
+                          episodesLoading() ? (
+                            <SeasonEpisodesSkeleton />
+                          ) : (
+                            <LibraryStatusPanel
+                              title={episodesStatusTitle()}
+                              description={episodesStatusDescription()}
+                            />
+                          )
+                        }
+                      >
+                        <section class="space-y-3" aria-labelledby="season-episodes-title">
+                          <h3
+                            id="season-episodes-title"
+                            class="text-on-surface text-[16px] leading-[24px] font-semibold"
+                          >
+                            {activeSeason() ? `${activeSeason()?.name} Episodes` : 'Episodes'}
+                          </h3>
+                          <div class="flex animate-[fadeIn_0.3s_cubic-bezier(0.16,1,0.3,1)_forwards] flex-col gap-3">
+                            <For each={seasonEpisodes()}>
+                              {(episode) => (
+                                <EpisodeRow
+                                  episode={episode}
+                                  label={episodeLabel(episode)}
+                                  busy={episodePlayBusy() === episode.id}
+                                  disabled={episodePlayBusy() !== null || confirmBusy()}
+                                  onPlay={() => void playEpisode(episode)}
+                                />
+                              )}
+                            </For>
+                          </div>
+                        </section>
+                      </Show>
+                    </Suspense>
                   </Show>
-
-                  <Show when={show().genres.length > 0}>
-                    <div class="border-outline-variant/30 flex flex-wrap gap-1.5 border-t pt-3">
-                      <For each={show().genres}>
-                        {(genre) => (
-                          <span class="border-outline-variant text-on-surface-variant/90 rounded-full border px-2.5 py-0.5 text-[11px] font-bold">
-                            {genre}
-                          </span>
-                        )}
-                      </For>
-                    </div>
-                  </Show>
-
-                  {/* Secondary Play next episode shortcut */}
-                  <Show when={show().nextEpisode}>
-                    {(nextEpisode) => (
-                      <div class="border-outline-variant/30 flex flex-col gap-3 border-t pt-3">
-                        <p class="text-secondary text-[11px] leading-[16px] font-bold tracking-[0.08em] uppercase">
-                          Up Next
-                        </p>
-                        <Button
-                          type="button"
-                          variant="primary"
-                          class="w-full rounded-full"
-                          disabled={playBusy() || confirmBusy()}
-                          onClick={() => void playShow()}
-                        >
-                          {playBusy() ? 'Loading...' : 'Play Next Episode'}
-                        </Button>
-                        <a
-                          href={`/library/items/${nextEpisode().id}`}
-                          class="text-on-surface-variant hover:text-secondary block truncate text-center text-[12px] leading-[16px] underline-offset-4 hover:underline"
-                        >
-                          Next: {nextEpisode().name}
-                        </a>
-                      </div>
-                    )}
-                  </Show>
-                </Card>
-              </aside>
-            </ConsoleGrid>
+                </section>
+              </div>
+            </>
           )}
         </Show>
       </Suspense>
@@ -598,20 +429,180 @@ function LibraryShowDetailRoute() {
         )}
       </Show>
       <Show when={playError()}>
-        {(message) => <p class="text-error text-[12px] leading-[16px]">{message()}</p>}
+        {(message) => <p class="text-error px-6 text-[12px] leading-[16px]">{message()}</p>}
       </Show>
     </div>
   );
 }
 
+function SeasonSelector(props: {
+  seasons: VideoSeason[];
+  activeSeason: VideoSeason | null;
+  disabled: boolean;
+  onSelect: (season: VideoSeason) => void;
+}) {
+  const seasonItems = createMemo<JellyPilotSelectItem[]>(() =>
+    props.seasons.map((season) => ({
+      label: seasonLabel(season),
+      value: season.id,
+    })),
+  );
+  const selectSeason = (seasonId: string) => {
+    const season = props.seasons.find((item) => item.id === seasonId);
+    if (season) {
+      props.onSelect(season);
+    }
+  };
+
+  return (
+    <Show
+      when={props.seasons.length > 6}
+      fallback={
+        <ul
+          class="border-outline-variant bg-surface-container-low/70 flex gap-2 overflow-x-auto rounded-2xl border p-2"
+          aria-label="Show seasons"
+        >
+          <For each={props.seasons}>
+            {(season) => (
+              <li class="shrink-0">
+                <Button
+                  type="button"
+                  variant="outlined"
+                  class={`rounded-full ${
+                    props.activeSeason?.id === season.id
+                      ? 'border-secondary bg-secondary-container/45 text-on-secondary-container'
+                      : ''
+                  }`}
+                  aria-pressed={props.activeSeason?.id === season.id}
+                  disabled={props.disabled}
+                  onClick={() => props.onSelect(season)}
+                >
+                  {seasonLabel(season)}
+                </Button>
+              </li>
+            )}
+          </For>
+        </ul>
+      }
+    >
+      <div class="max-w-xs">
+        <JellyPilotSelect
+          label="Season"
+          items={seasonItems()}
+          disabled={props.disabled}
+          value={props.activeSeason?.id ?? ''}
+          size="compact"
+          onValueChange={selectSeason}
+        />
+      </div>
+    </Show>
+  );
+}
+
+function EpisodeRow(props: {
+  episode: VideoLibraryItem;
+  label: string;
+  busy: boolean;
+  disabled: boolean;
+  onPlay: () => void;
+}) {
+  const hasResume = () =>
+    props.episode.resumePositionSeconds != null &&
+    props.episode.resumePositionSeconds > 0 &&
+    !props.episode.played;
+
+  return (
+    <Card
+      variant="filled"
+      surfaceTint={false}
+      class="grid grid-cols-1 items-center gap-4 !p-3 sm:grid-cols-[160px_1fr_auto] lg:grid-cols-[220px_1fr_auto]"
+    >
+      <div class="bg-surface-container-lowest/60 hidden aspect-video w-[160px] overflow-hidden rounded-lg sm:block lg:w-[220px]">
+        <Show
+          when={props.episode.artworkUrl}
+          fallback={
+            <div class="text-on-surface-variant flex h-full items-center justify-center text-[11px] leading-[16px] font-bold tracking-[0.08em] uppercase">
+              <Film class="h-5 w-5" />
+            </div>
+          }
+        >
+          {(artworkUrl) => (
+            <img
+              src={imageSource(artworkUrl())}
+              alt={`${props.episode.name} artwork`}
+              class="h-full w-full object-cover outline outline-1 -outline-offset-1 outline-white/10"
+              loading="lazy"
+            />
+          )}
+        </Show>
+      </div>
+
+      <div class="min-w-0 space-y-1.5">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-secondary text-[11px] leading-[16px] font-bold tracking-[0.08em] uppercase">
+            {props.label}
+          </span>
+          <Show when={props.episode.played}>
+            <StatusBadge variant="success">Played</StatusBadge>
+          </Show>
+          <Show when={props.episode.favorite}>
+            <StatusBadge variant="success">Favorite</StatusBadge>
+          </Show>
+          <Show when={formatRuntime(props.episode.runtimeSeconds)}>
+            {(runtime) => (
+              <span class="text-on-surface-variant/70 text-[12px] leading-[16px]">{runtime()}</span>
+            )}
+          </Show>
+          <Show when={hasResume()}>
+            <span class="text-on-surface-variant/70">·</span>
+            <span class="text-secondary text-[12px] leading-[16px] font-semibold tabular-nums">
+              {Math.round(props.episode.playedPercentage ?? 0)}% watched
+            </span>
+          </Show>
+        </div>
+        <a
+          href={`/library/items/${props.episode.id}`}
+          class="text-on-surface block truncate text-[16px] leading-[24px] font-semibold hover:underline"
+        >
+          {props.episode.name}
+        </a>
+      </div>
+
+      <div class="flex shrink-0">
+        <Button
+          type="button"
+          variant="primary"
+          class="rounded-full px-5 py-2 text-[14px] leading-[20px] font-semibold tracking-wide uppercase"
+          disabled={props.disabled}
+          onClick={props.onPlay}
+          leadingIcon={
+            <Show when={props.busy} fallback={<Play class="h-4 w-4 fill-current" />}>
+              <RefreshCw class="h-4 w-4 animate-spin" />
+            </Show>
+          }
+        >
+          {props.busy ? 'Loading...' : hasResume() ? 'Resume' : 'Play'}
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
 function ShowDetailSkeleton() {
   return (
-    <ConsoleGrid aria-hidden={true}>
-      <section class="order-2 min-w-0 space-y-4 lg:order-1">
-        <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div class="bg-surface-container-high/80 h-7 w-32 animate-pulse rounded-md" />
-          <div class="bg-surface-container-high/60 h-4 w-28 animate-pulse rounded" />
+    <article class="space-y-6" aria-hidden="true">
+      <div class="bg-surface-container-lowest/60 h-[clamp(280px,44vh,560px)] animate-pulse" />
+      <div class="mx-auto w-full max-w-[1400px] space-y-5 px-6 py-2 lg:px-10 xl:px-12">
+        <div class="space-y-2">
+          <div class="bg-surface-container-high/60 h-4 w-full max-w-[1100px] animate-pulse rounded" />
+          <div class="bg-surface-container-high/60 h-4 w-10/12 max-w-[900px] animate-pulse rounded" />
         </div>
+        <div class="flex flex-wrap gap-2">
+          <For each={[0, 1, 2]}>
+            {() => <div class="bg-surface-container-high/70 h-7 w-24 animate-pulse rounded-full" />}
+          </For>
+        </div>
+        <div class="bg-surface-container-high/80 h-7 w-32 animate-pulse rounded-md" />
         <div class="border-outline-variant bg-surface-container-low/70 flex gap-2 overflow-x-auto rounded-2xl border p-2">
           <For each={[0, 1, 2]}>
             {() => (
@@ -620,35 +611,8 @@ function ShowDetailSkeleton() {
           </For>
         </div>
         <SeasonEpisodesSkeleton />
-      </section>
-
-      <aside class="order-1 space-y-6 lg:order-2">
-        <Card as="article" variant="filled" surfaceTint={false} class="space-y-4">
-          <div class="bg-surface-container-lowest/60 border-outline-variant aspect-[2/3] animate-pulse rounded-2xl border" />
-          <div class="space-y-3">
-            <div class="bg-surface-container-high/60 h-3 w-16 animate-pulse rounded" />
-            <div class="bg-surface-container-high/80 h-8 w-4/5 animate-pulse rounded-md" />
-            <div class="bg-surface-container-high/60 h-4 w-2/3 animate-pulse rounded" />
-          </div>
-          <div class="flex flex-wrap gap-2">
-            <div class="bg-surface-container-high/70 h-7 w-24 animate-pulse rounded-full" />
-            <div class="bg-surface-container-high/60 h-7 w-28 animate-pulse rounded-full" />
-          </div>
-          <div class="flex flex-wrap gap-3">
-            <div class="bg-surface-container-high/70 h-10 w-28 animate-pulse rounded-full" />
-            <div class="bg-surface-container-high/60 h-10 w-32 animate-pulse rounded-full" />
-          </div>
-          <div class="border-outline-variant/30 space-y-2 border-t pt-3">
-            <div class="bg-surface-container-high/60 h-4 w-full animate-pulse rounded" />
-            <div class="bg-surface-container-high/60 h-4 w-10/12 animate-pulse rounded" />
-            <div class="bg-surface-container-high/50 h-4 w-7/12 animate-pulse rounded" />
-          </div>
-          <div class="border-outline-variant/30 border-t pt-3">
-            <div class="bg-primary-container/40 h-11 w-full animate-pulse rounded-full" />
-          </div>
-        </Card>
-      </aside>
-    </ConsoleGrid>
+      </div>
+    </article>
   );
 }
 
@@ -662,9 +626,9 @@ function SeasonEpisodesSkeleton() {
             <Card
               variant="filled"
               surfaceTint={false}
-              class="grid grid-cols-1 items-center gap-4 !p-3 sm:grid-cols-[160px_1fr_auto]"
+              class="grid grid-cols-1 items-center gap-4 !p-3 sm:grid-cols-[160px_1fr_auto] lg:grid-cols-[220px_1fr_auto]"
             >
-              <div class="bg-surface-container-lowest/60 aspect-video w-full animate-pulse rounded-lg" />
+              <div class="bg-surface-container-lowest/60 hidden aspect-video w-[160px] animate-pulse rounded-lg sm:block lg:w-[220px]" />
               <div class="min-w-0 space-y-2">
                 <div class="flex flex-wrap items-center gap-2">
                   <div class="bg-surface-container-high/70 h-3 w-14 animate-pulse rounded" />

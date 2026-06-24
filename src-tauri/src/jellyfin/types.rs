@@ -239,6 +239,7 @@ pub struct VideoItemDetail {
   pub can_resume: bool,
   pub can_play: bool,
   pub artwork_url: Option<String>,
+  pub backdrop_url: Option<String>,
   pub audio_streams: Vec<VideoPlaybackStreamOption>,
   pub subtitle_streams: Vec<VideoPlaybackStreamOption>,
 }
@@ -268,6 +269,7 @@ pub struct VideoShowDetail {
   pub favorite: bool,
   pub can_play: bool,
   pub artwork_url: Option<String>,
+  pub backdrop_url: Option<String>,
   pub next_episode: Option<VideoLibraryItem>,
   pub seasons: Vec<VideoSeason>,
 }

@@ -243,6 +243,7 @@ const videoLibraryShortcuts: VideoLibraryShortcut[] = [
 
 const movieDetail: VideoItemDetail = {
   artworkUrl: 'https://jellyfin.example.com/Items/detail-movie/Images/Primary',
+  backdropUrl: 'https://jellyfin.example.com/Items/detail-movie/Images/Backdrop/0',
   audioStreams,
   canPlay: true,
   canResume: true,
@@ -266,6 +267,7 @@ const movieDetail: VideoItemDetail = {
 
 const episodeDetail: VideoItemDetail = {
   artworkUrl: null,
+  backdropUrl: null,
   audioStreams,
   canPlay: true,
   canResume: false,
@@ -301,6 +303,7 @@ const nextEpisodeDetail: VideoItemDetail = {
 
 const showDetail: VideoShowDetail = {
   artworkUrl: null,
+  backdropUrl: null,
   canPlay: true,
   favorite: false,
   genres: ['Drama'],
@@ -1196,19 +1199,21 @@ test('library item detail renders resume-primary movie metadata', async () => {
   expect(screen.getByText('Mystery')).toBeVisible();
   expect(screen.getByText('Favorite')).toBeVisible();
   expect(screen.getByText('2h 0m')).toBeVisible();
-  expect(screen.getByText('Resume at 120s · 25% watched')).toBeVisible();
   expect(screen.getByAltText('Detail Movie artwork')).toHaveAttribute(
     'src',
     movieDetail.artworkUrl ?? '',
   );
   expect(screen.getByRole('button', { name: 'Resume' })).toBeVisible();
   expect(screen.getByRole('button', { name: 'Play from beginning' })).toBeVisible();
-  expect(getArkHiddenSelect('Audio track')).toHaveValue('auto');
-  expect(getArkHiddenSelect('Subtitle track')).toHaveValue('auto');
   fireEvent.click(screen.getByRole('button', { name: 'Resume' }));
+  expect(await screen.findByRole('dialog', { name: 'Detail Movie' })).toBeVisible();
+  expect(getArkHiddenSelect('Audio track')).toHaveValue('1');
+  expect(getArkHiddenSelect('Subtitle track')).toHaveValue('auto');
+  await selectArkOption('Audio track', /Japanese - FLAC/);
+  fireEvent.click(screen.getByRole('button', { name: 'Resume playback' }));
   await waitFor(() =>
     expect(playCommand).toHaveBeenCalledWith({
-      audioStreamIndex: null,
+      audioStreamIndex: 2,
       itemId: 'detail-movie',
       mode: 'resume',
       startPositionSeconds: 120,
@@ -1216,12 +1221,12 @@ test('library item detail renders resume-primary movie metadata', async () => {
     }),
   );
   expect(screen.queryByRole('button', { name: 'Resume playback' })).toBeNull();
-  await waitFor(() =>
-    expect(screen.getByRole('button', { name: 'Play from beginning' })).not.toBeDisabled(),
-  );
+  expect(screen.getByRole('button', { name: 'Play from beginning' })).not.toBeDisabled();
+  fireEvent.click(screen.getByRole('button', { name: 'Play from beginning' }));
+  expect(await screen.findByRole('dialog', { name: 'Detail Movie' })).toBeVisible();
   await selectArkOption('Audio track', /Japanese - FLAC/);
   await selectArkOption('Subtitle track', /English - SRT/);
-  fireEvent.click(screen.getByRole('button', { name: 'Play from beginning' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Start playback' }));
   await waitFor(() =>
     expect(playCommand).toHaveBeenLastCalledWith({
       audioStreamIndex: 2,
@@ -1234,11 +1239,13 @@ test('library item detail renders resume-primary movie metadata', async () => {
   await waitFor(() =>
     expect(screen.getByRole('button', { name: 'Play from beginning' })).not.toBeDisabled(),
   );
-  await selectArkOption('Subtitle track', 'Off');
   fireEvent.click(screen.getByRole('button', { name: 'Resume' }));
+  expect(await screen.findByRole('dialog', { name: 'Detail Movie' })).toBeVisible();
+  await selectArkOption('Subtitle track', 'Off');
+  fireEvent.click(screen.getByRole('button', { name: 'Resume playback' }));
   await waitFor(() =>
     expect(playCommand).toHaveBeenLastCalledWith({
-      audioStreamIndex: 2,
+      audioStreamIndex: 1,
       itemId: 'detail-movie',
       mode: 'resume',
       startPositionSeconds: 120,
@@ -1300,20 +1307,23 @@ test('library item detail renders episode metadata and semantic artwork placehol
   const cleanup = renderShell('/library/items/detail-episode');
 
   await screen.findByRole('heading', { name: 'Detail Episode' });
-  expect(screen.getByText('Example Show · S02E03')).toBeVisible();
+  expect(screen.getByRole('link', { name: 'Example Show' })).toHaveAttribute(
+    'href',
+    '/library/shows/series-1',
+  );
+  expect(screen.getByText(/S02E03/)).toBeVisible();
   expect(screen.getByText('Played')).toBeVisible();
   expect(screen.getByText('Not favorite')).toBeVisible();
-  expect(screen.getByText('No episode artwork')).toBeVisible();
-  expect(screen.getByText('View series')).toBeVisible();
   expect(screen.getByText('Sci-Fi')).toBeVisible();
   expect(screen.queryByRole('button', { name: 'Resume' })).toBeNull();
-  expect(getArkHiddenSelect('Audio track')).toHaveValue('auto');
-  expect(getArkHiddenSelect('Subtitle track')).toHaveValue('auto');
-  await selectArkOption('Subtitle track', 'Off');
   fireEvent.click(screen.getByRole('button', { name: 'Play' }));
+  expect(await screen.findByRole('dialog', { name: 'Detail Episode' })).toBeVisible();
+  expect(getArkHiddenSelect('Audio track')).toHaveValue('1');
+  await selectArkOption('Subtitle track', 'Off');
+  fireEvent.click(screen.getByRole('button', { name: 'Start playback' }));
   await waitFor(() =>
     expect(playCommand).toHaveBeenCalledWith({
-      audioStreamIndex: null,
+      audioStreamIndex: 1,
       itemId: 'detail-episode',
       mode: 'start',
       startPositionSeconds: 0,
@@ -1350,8 +1360,7 @@ test('library show detail auto-loads next-up season and renders episode rows', a
     }),
   );
 
-  // Secondary "Play next episode" shortcut
-  fireEvent.click(screen.getByRole('button', { name: 'Play Next Episode' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Play S01E02' }));
   await waitFor(() => expect(itemCommand).toHaveBeenCalledWith('episode-2'));
   expect(playCommand).not.toHaveBeenCalled();
   await waitFor(() => expect(getArkCombobox('Audio track')).toBeVisible());
@@ -1367,12 +1376,6 @@ test('library show detail auto-loads next-up season and renders episode rows', a
     }),
   );
   await waitFor(() => expect(screen.queryAllByLabelText('Audio track')).toHaveLength(0));
-
-  // Next episode link
-  expect(screen.getByRole('link', { name: 'Next: Next Episode' })).toHaveAttribute(
-    'href',
-    '/library/items/episode-2',
-  );
 
   // Season selector buttons
   expect(screen.getByRole('button', { name: 'Season 1' })).toBeVisible();
